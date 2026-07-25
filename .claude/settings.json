@@ -1,0 +1,29 @@
+{
+  "$schema_comment": "Hooks que automatizan la verificación. El harness los ejecuta, no el agente, así que no se pueden saltar. Los permisos con comodín fueron aprobados explícitamente por el humano el 2026-07-25 — ver README y AGENTS.md.",
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "./init.sh > /tmp/ims_init.log 2>&1 && echo '[arnés] init.sh OK' || (echo '[arnés] init.sh FALLÓ — revisa /tmp/ims_init.log antes de cerrar' && tail -25 /tmp/ims_init.log)",
+            "description": "Antes de cerrar la sesión, fuerza una verificación completa."
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "allow": [
+      "Bash(./init.sh)",
+      "Bash(pnpm test*)",
+      "Bash(pnpm lint*)",
+      "Bash(pnpm typecheck*)",
+      "Bash(pnpm run*)",
+      "Bash(npm test*)",
+      "Bash(npm run*)",
+      "Bash(docker compose ps*)",
+      "Bash(docker compose logs*)"
+    ]
+  }
+}

@@ -1,0 +1,346 @@
+{
+  "project": "Sistema de Gestión Inmobiliaria",
+  "prd": "docs/PRD.md",
+  "notes": "Alcance del MVP (Fase 1 del PRD §9), secuenciado internamente: 1a fundaciones + hoja de vida, 1b inventarios, 1c contratos. Una feature in_progress a la vez.",
+  "features": [
+    {
+      "id": 1,
+      "name": "project_scaffold",
+      "phase": "1a",
+      "sdd": true,
+      "status": "pending",
+      "title": "Andamiaje del monorepo y stack base",
+      "prd_refs": ["D1", "D2", "11.2"],
+      "acceptance": [
+        "Existe un monorepo con apps/api (NestJS + TypeScript) y apps/web (React + TypeScript).",
+        "Existe docker-compose con PostgreSQL, Redis y MinIO para desarrollo local.",
+        "Los scripts lint, typecheck y test están definidos y pasan en un proyecto vacío.",
+        "Existe una migración inicial versionada y un comando para aplicarla.",
+        "Existe al menos un test de humo que arranca la API y responde a un healthcheck."
+      ]
+    },
+    {
+      "id": 2,
+      "name": "multitenancy_rls",
+      "phase": "1a",
+      "sdd": true,
+      "status": "pending",
+      "title": "Multi-tenancy con Row-Level Security",
+      "prd_refs": ["RF-A1", "D2", "11.3"],
+      "acceptance": [
+        "Existe la entidad Tenant y toda tabla de negocio lleva tenant_id.",
+        "Row-Level Security de PostgreSQL está activo y forzado a nivel de motor.",
+        "El contexto de tenant se propaga desde la petición hasta la consulta.",
+        "Existe un test contra PostgreSQL real (Testcontainers) que demuestra que un tenant NO puede leer datos de otro, incluso si el código de aplicación lo intenta.",
+        "Un intento de consulta sin contexto de tenant falla de forma explícita, no devuelve todo."
+      ]
+    },
+    {
+      "id": 3,
+      "name": "auth_rbac",
+      "phase": "1a",
+      "sdd": true,
+      "status": "pending",
+      "title": "Autenticación, identidad multi-rol y RBAC",
+      "prd_refs": ["RF-AU1", "RF-C2", "RF-C3", "RF-AU6"],
+      "acceptance": [
+        "Login de usuarios internos con JWT.",
+        "Una misma identidad puede tener varios roles en varios tenants (UserRole).",
+        "Todo endpoint protegido valida el rol en el backend.",
+        "Existen tests que verifican que cada rol solo accede a lo que le corresponde.",
+        "Un token de un tenant no da acceso a recursos de otro tenant."
+      ]
+    },
+    {
+      "id": 4,
+      "name": "audit_log",
+      "phase": "1a",
+      "sdd": true,
+      "status": "pending",
+      "title": "Auditoría inmutable de acciones críticas",
+      "prd_refs": ["RF-W4", "11.3", "7"],
+      "acceptance": [
+        "Existe un registro de auditoría append-only para acciones críticas.",
+        "Cada entrada guarda actor, acción, recurso, timestamp e IP.",
+        "El registro no puede modificarse ni borrarse desde la aplicación.",
+        "Existe un test que verifica que una acción crítica genera su entrada de auditoría."
+      ]
+    },
+    {
+      "id": 5,
+      "name": "owner_tenant_profiles",
+      "phase": "1a",
+      "sdd": true,
+      "status": "pending",
+      "title": "Hoja de vida de propietario e inquilino",
+      "prd_refs": ["RF-C1", "RF-C4", "RF-C5", "RF-C6"],
+      "acceptance": [
+        "CRUD de propietario con datos personales, fiscales y cuenta bancaria por defecto.",
+        "CRUD de inquilino con nombre, documento, correo, celular y medio preferido de contacto.",
+        "Se puede crear propietario o inquilino en línea desde otro flujo sin abandonarlo.",
+        "La cuenta bancaria del propietario puede sobrescribirse a nivel de propiedad."
+      ]
+    },
+    {
+      "id": 6,
+      "name": "property_profile",
+      "phase": "1a",
+      "sdd": true,
+      "status": "pending",
+      "title": "Hoja de vida del inmueble",
+      "prd_refs": ["RF-P1", "RF-P2", "RF-P3"],
+      "acceptance": [
+        "CRUD de propiedad con los grupos de datos del PRD: identificación, comercial, administración PH y contable.",
+        "Asociación propiedad ↔ propietario(s) ↔ inquilino actual.",
+        "Historial de ocupación consultable.",
+        "Repositorio documental por propiedad."
+      ]
+    },
+    {
+      "id": 7,
+      "name": "workflow_engine",
+      "phase": "1a",
+      "sdd": true,
+      "status": "pending",
+      "title": "Motor de workflows dirigido por datos",
+      "prd_refs": ["RF-W1", "RF-W4", "RF-W5", "D3"],
+      "acceptance": [
+        "Estados, transiciones, condiciones y responsables se definen como datos, no como código.",
+        "Existen entidades de definición e instancia de workflow.",
+        "Cada transición queda auditada con actor y timestamp.",
+        "Soporta pasos con intervención humana y pasos automáticos.",
+        "Existe un test que ejercita una máquina de estados completa definida solo con datos."
+      ]
+    },
+    {
+      "id": 8,
+      "name": "property_lifecycle",
+      "phase": "1a",
+      "sdd": true,
+      "status": "pending",
+      "title": "Ciclo de vida de la propiedad y dashboard",
+      "prd_refs": ["RF-P4", "RF-P5", "RF-PI4", "RF-PI5", "RF-PI6"],
+      "acceptance": [
+        "La propiedad transiciona entre Disponible, En checkeo, Con aseguradora, Arrendada, En desocupación e Inactiva sobre el motor de workflows.",
+        "Dashboard con conteo por estado, filtros y tiempo transcurrido en el estado actual.",
+        "Desde el dashboard se ejecuta la acción que corresponde a cada estado.",
+        "Transiciones inválidas se rechazan."
+      ]
+    },
+    {
+      "id": 9,
+      "name": "property_intake",
+      "phase": "1a",
+      "sdd": true,
+      "status": "pending",
+      "title": "Ingreso de propiedad (vacante y migración)",
+      "prd_refs": ["RF-PI1", "RF-PI2", "RF-PI3"],
+      "acceptance": [
+        "Soporta el escenario A (propiedad vacante) y el escenario B (propiedad ya arrendada en migración).",
+        "Permite crear propietario o inquilino en línea si no existen.",
+        "Al terminar el ingreso, la propiedad queda en el estado correcto del ciclo de vida."
+      ]
+    },
+    {
+      "id": 10,
+      "name": "notifications",
+      "phase": "1a",
+      "sdd": true,
+      "status": "pending",
+      "title": "Motor de notificaciones asíncronas",
+      "prd_refs": ["RF-N1", "RF-N2", "RF-W3", "RF-C4"],
+      "acceptance": [
+        "Las notificaciones se procesan en cola, fuera del ciclo de la petición.",
+        "Respetan el medio preferido de contacto del destinatario.",
+        "Una transición de workflow puede disparar una notificación de forma declarativa.",
+        "Existen recordatorios programados.",
+        "Los proveedores externos son intercambiables tras una interfaz."
+      ]
+    },
+    {
+      "id": 11,
+      "name": "inventory_templates",
+      "phase": "1b",
+      "sdd": true,
+      "status": "pending",
+      "title": "Plantillas de inmuebles (zonas e ítems)",
+      "prd_refs": ["RF-I2", "RF-I22", "RF-I23", "8.8"],
+      "acceptance": [
+        "Jerarquía PropertyTypeTemplate → TemplateZone → TemplateItem.",
+        "Ítems con field_type configurable: estado, si_no, si_no_estado, conteo, seleccion, texto.",
+        "Zonas repetibles e instanciables N veces, y zonas obligatorias.",
+        "Plantillas base del sistema para apartamento, casa, local, oficina, bodega y parqueadero.",
+        "El tenant puede clonar y personalizar una plantilla base sin afectar la del sistema."
+      ]
+    },
+    {
+      "id": 12,
+      "name": "inventory_creation",
+      "phase": "1b",
+      "sdd": true,
+      "status": "pending",
+      "title": "Creación del inventario con fotos",
+      "prd_refs": ["RF-I1", "RF-I3", "RF-I7", "RF-I13", "RF-I24"],
+      "acceptance": [
+        "Se crea un inventario asociado a propiedad y tipo de evento (entrega/devolución).",
+        "La plantilla se materializa como snapshot: editarla después no altera inventarios existentes.",
+        "El empleado tiene libertad total para agregar, eliminar y reordenar zonas e ítems en campo.",
+        "Fotos múltiples por ítem almacenadas en object storage, nunca en la base de datos.",
+        "El inventario tiene estado visible y un panel de administración lo lista."
+      ]
+    },
+    {
+      "id": 13,
+      "name": "inventory_tenant_review",
+      "phase": "1b",
+      "sdd": true,
+      "status": "pending",
+      "title": "Revisión del inventario por el inquilino",
+      "prd_refs": ["RF-I4", "RF-I5", "RF-AU2", "RF-AU5", "RF-AU3"],
+      "acceptance": [
+        "Se genera un link de invitación seguro con expiración que lleva a crear cuenta persistente, no a acceso anónimo.",
+        "El inquilino acepta u objeta cada ítem individualmente; al objetar el comentario es obligatorio.",
+        "El inquilino puede adjuntar su propia foto al objetar.",
+        "Verificación de identidad mínima (OTP) antes de firmar.",
+        "Un inquilino no puede acceder al inventario de otro."
+      ]
+    },
+    {
+      "id": 14,
+      "name": "inventory_signature_pdf",
+      "phase": "1b",
+      "sdd": true,
+      "status": "pending",
+      "title": "Firma electrónica y PDF del inventario",
+      "prd_refs": ["RF-I8", "RF-I9", "RF-I12", "D4", "10.1"],
+      "acceptance": [
+        "Al alcanzar el acuerdo el contenido queda bloqueado e inmutable.",
+        "Se genera un PDF consolidado con zonas, ítems, fotos y comentarios finales.",
+        "Firma de ambas partes con evidencia: timestamp, IP, método de verificación y hash SHA-256 del documento.",
+        "Queda constancia del consentimiento expreso para usar medios electrónicos.",
+        "El documento final se vincula como anexo del contrato.",
+        "La firma se implementa tras una interfaz abstracta que permita enchufar un proveedor certificado después."
+      ]
+    },
+    {
+      "id": 15,
+      "name": "pwa_offline",
+      "phase": "1b",
+      "sdd": true,
+      "status": "pending",
+      "title": "PWA de campo con soporte offline",
+      "prd_refs": ["RF-I14", "RF-I15", "RF-I16", "RF-I17", "RF-I18", "D5"],
+      "acceptance": [
+        "El empleado crea un inventario completo sin conexión; los datos y fotos persisten en IndexedDB.",
+        "Las fotos se comprimen en el dispositivo antes de subir.",
+        "Indicador permanente de pendientes de sincronizar hasta que el backend confirme.",
+        "Botón de sincronización manual siempre disponible, además del sync automático al reconectar.",
+        "Manejo de conflictos si el mismo inventario se editó desde otro dispositivo.",
+        "Existe un test E2E que simula pérdida de conexión, trabajo offline y sincronización posterior."
+      ]
+    },
+    {
+      "id": 16,
+      "name": "contract_templates",
+      "phase": "1c",
+      "sdd": true,
+      "status": "pending",
+      "title": "Templates de contrato en tres ámbitos",
+      "prd_refs": ["RF-CT1", "RF-CT2", "RF-PI3"],
+      "acceptance": [
+        "La inmobiliaria define un clausulado común con campos variables.",
+        "Al ingresar una propiedad el sistema propone un borrador con los campos de propiedad ya resueltos.",
+        "El admin valida, ajusta y guarda el template de esa propiedad.",
+        "Un template no validado no puede usarse para generar un contrato."
+      ]
+    },
+    {
+      "id": 17,
+      "name": "contract_generation_signature",
+      "phase": "1c",
+      "sdd": true,
+      "status": "pending",
+      "title": "Generación del contrato y firma electrónica",
+      "prd_refs": ["RF-CT3", "RF-CT4", "RF-CT5"],
+      "acceptance": [
+        "Al asociar un inquilino, el sistema hace el merge del template con sus datos y genera el PDF.",
+        "El contrato se envía a firma electrónica de las partes con la misma evidencia de trazabilidad que los inventarios.",
+        "El contrato firmado queda vinculado a propiedad, propietario e inquilino, y disponible en sus portales."
+      ]
+    },
+    {
+      "id": 18,
+      "name": "contract_digitization",
+      "phase": "1c",
+      "sdd": true,
+      "status": "pending",
+      "title": "Digitalización de contratos físicos",
+      "prd_refs": ["RF-CT6", "RF-CT7"],
+      "acceptance": [
+        "Se puede subir y archivar un contrato físico escaneado con sus metadatos.",
+        "Un contrato digitalizado se vincula igual que uno generado por el sistema.",
+        "El origen del documento (generado / digitalizado) queda registrado."
+      ]
+    },
+    {
+      "id": 19,
+      "name": "contract_renewals_alerts",
+      "phase": "1c",
+      "sdd": true,
+      "status": "pending",
+      "title": "Renovaciones y alertas de vencimiento",
+      "prd_refs": ["RF-CT8", "RF-CT9", "RF-CT10", "RF-CT11", "RF-CT12", "RF-CT13"],
+      "acceptance": [
+        "El admin del tenant configura múltiples umbrales de alerta en días.",
+        "Las alertas se dirigen a los destinatarios configurados por su medio preferido.",
+        "Existe un panel de contratos próximos a vencer con estado de gestión.",
+        "La renovación propone el nuevo canon aplicando el incremento configurado y genera la prórroga a firma.",
+        "Toda alerta emitida y toda decisión de renovación queda auditada.",
+        "El preaviso de terminación transiciona la propiedad a En desocupación."
+      ]
+    },
+    {
+      "id": 20,
+      "name": "insurance_policy",
+      "phase": "1c",
+      "sdd": true,
+      "status": "pending",
+      "title": "Afianzamiento y captura de póliza",
+      "prd_refs": ["RF-PI7", "RF-PI8"],
+      "acceptance": [
+        "Se registra el envío del candidato a la aseguradora y su resultado con fechas.",
+        "Al aprobar se sube la póliza con aseguradora, número, vigencia, cobertura y documento PDF.",
+        "La póliza queda vinculada a la propiedad y al contrato."
+      ]
+    },
+    {
+      "id": 21,
+      "name": "inventory_comparison",
+      "phase": "2",
+      "sdd": true,
+      "status": "pending",
+      "title": "Comparación de inventario entrada vs salida",
+      "prd_refs": ["RF-I10", "US-16"],
+      "acceptance": [
+        "Se comparan dos inventarios de la misma propiedad ítem por ítem.",
+        "Se resaltan las diferencias de estado entre entrada y salida.",
+        "Se muestran las fotos de ambos momentos lado a lado."
+      ]
+    },
+    {
+      "id": 22,
+      "name": "inventory_versioning",
+      "phase": "2",
+      "sdd": true,
+      "status": "pending",
+      "title": "Versionado y negociación del inventario",
+      "prd_refs": ["RF-I6", "US-09", "US-10", "US-11"],
+      "acceptance": [
+        "Cada ronda de negociación crea una versión inmutable; nada se sobrescribe.",
+        "El historial de versiones es consultable y muestra qué cambió.",
+        "El empleado ve todas las objeciones en un solo panel.",
+        "El admin ve inventarios estancados en negociación."
+      ]
+    }
+  ]
+}
