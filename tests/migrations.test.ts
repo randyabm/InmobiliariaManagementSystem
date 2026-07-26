@@ -32,8 +32,20 @@ const archivosSql = readdirSync(rutaRepo(CARPETA))
  * Las tablas `user` y `user_role` se crearon en la feature #3
  * `auth_rbac` (specs/auth_rbac/).
  * La tabla `audit_log` se creó en la feature #4 `auditoria`.
+ * Las tablas `perfil_propietario`, `perfil_inquilino` y `cuenta_bancaria` se
+ * crearon en la feature #5 `owner_tenant_profiles`
+ * (specs/owner_tenant_profiles/, R37), todas con RLS habilitado y forzado en
+ * la misma migración que las crea.
  */
-const TABLAS_PERMITIDAS: readonly string[] = ['tenant', 'user', 'user_role', 'audit_log'];
+const TABLAS_PERMITIDAS: readonly string[] = [
+  'tenant',
+  'user',
+  'user_role',
+  'audit_log',
+  'perfil_propietario',
+  'perfil_inquilino',
+  'cuenta_bancaria',
+];
 
 describe('Migración inicial (R10)', () => {
   it('existe el archivo de migración inicial', () => {

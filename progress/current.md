@@ -4,13 +4,44 @@
 > `history.md`. Mientras trabajas, **mantenlo actualizado en tiempo real**,
 > no al final.
 
-- **Feature en curso:** #5 `owner_tenant_profiles` — status **`spec_ready`**
-- **Inicio:** 2026-07-26
-- **Agente:** leader → spec_author (spec v3, partido)
-- **Estado:** ⏸ **esperando aprobación humana del spec**. No se ha lanzado
-  al `implementer`.
+- **Feature en curso:** #5 `owner_tenant_profiles` — status **`in_progress`**
+- **Inicio:** 2026-07-26 (spec) / 2026-07-27 (implementación)
+- **Agente:** leader → spec_author (spec v3, partido) → **implementer**
+- **Estado:** spec aprobado por el humano. Implementación en curso.
+- **Línea base antes de tocar código:** `./init.sh` verde, **142 tests**.
 
-## Hecho en esta sesión
+## Plan de implementación (T1–T47, en orden)
+
+| Bloque | Tasks | Contenido | Estado |
+|---|---|---|---|
+| 1 | T1–T10 | Esquema Drizzle, migración `0005`, RLS, índices, tests | ✅ |
+| 2 | T11–T14 | Contexto de tenant: helper, interceptor registrado, `RolesGuard` | ✅ |
+| 3 | T15–T21 | `identidad.service`, login tras D-5, enmienda a `auth_rbac` | ✅ |
+| 4 | T22–T27 | CRUD de propietario + hoja de vida | ✅ |
+| 5 | T28–T32 | Cuentas bancarias y `resolverCuentaDeGiro` | ✅ |
+| 6 | T33–T36 | CRUD de inquilino | ✅ |
+| 7 | T37–T42 | Invariantes de seguridad (deterministas, Postgres real) | ✅ |
+| 8 | T43–T47 | Integración, trazabilidad, verificación | ✅ |
+
+**47/47 tasks completadas.** `./init.sh` verde (exit 0). Tests **142 → 257**;
+`npm run test:db` 20 (con 4 rojos preexistentes) → **24 verdes**.
+
+**Informe completo: `progress/impl_owner_tenant_profiles.md`** — incluye el
+mapa de trazabilidad R1–R37 → test y las contradicciones detectadas.
+
+### Pendiente de decisión del humano (detectado al implementar)
+
+1. La aplicación se conecta a PostgreSQL como **superusuario**, que se salta el
+   RLS por completo. Hace falta un rol de aplicación sin `BYPASSRLS`. (§5.2)
+2. La política RLS de `user` de la feature #3 impide crear identidades y
+   vincular por email entre tenants en cuanto el rol deje de ser superusuario.
+   Choca con R22/R25 de #5. (§5.3)
+3. `init.sh` no ejecuta `npm run test:db`: 4 tests de políticas RLS llevaban
+   rotos desde #2/#3 sin que nadie lo viera. Corregidos. (§5.1)
+
+**La feature NO se ha marcado `done`**: espera al reviewer.
+
+## Hecho en la sesión de spec (2026-07-26)
 
 1. **Higiene de git.** El trabajo de las features #24, #2, #3 y #4 estaba
    implementado y verificado pero **sin commitear**; vivía solo en el working

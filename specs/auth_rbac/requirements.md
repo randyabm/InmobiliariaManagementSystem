@@ -5,14 +5,62 @@
 
 ---
 
+## ENMIENDA (2026-07-27) — R1 superado por R7 de la feature #5
+
+> Esta feature está `done`. Su **R1 queda parcialmente superado** por la
+> feature #5 `owner_tenant_profiles` (R6 y R7), implementada el 2026-07-27.
+> Se registra aquí —igual que `docs/conventions.md` se enmendó tras la
+> feature #1— para que el estado del repositorio no quede contradictorio: el
+> esquema real ya no cumple el R1 tal como está escrito más abajo.
+
+**Qué cambia.** En la tabla `user`:
+
+| Columna | R1 de #3 (original) | Estado real desde #5 |
+|---|---|---|
+| `email` | `text NOT NULL UNIQUE` | `text UNIQUE` — **NULL-able** |
+| `password_hash` | `text NOT NULL` | `text` — **NULL-able** |
+
+**Motivo (decisión del humano D-5, `specs/owner_tenant_profiles/requirements.md`).**
+Hay propietarios reales sin correo electrónico; exigirlo produce datos falsos
+inventados por el operador. Y un cliente registrado por la inmobiliaria
+(RF-C1) todavía no tiene credenciales de portal, así que `password_hash` no
+puede ser obligatorio en el momento del alta.
+
+**Qué NO cambia.** La restricción `UNIQUE` sobre `email` se conserva intacta:
+PostgreSQL trata cada NULL como distinto, así que varias identidades sin
+correo conviven y **dos emails iguales no nulos siguen colisionando**
+(#5 R7). No se añadió índice parcial.
+
+**Contrapartidas obligatorias, implementadas y probadas en #5.** Relajar el
+esquema sin ellas habría abierto un agujero de autenticación:
+
+- **#5 R6** — `POST /auth/login` responde 401 si `password_hash IS NULL`, sin
+  llegar a evaluar ninguna contraseña.
+- **#5 R8** — `POST /auth/login` responde 401 si el `email` recibido es nulo,
+  ausente o vacío, y la consulta nunca puede casar un `user` con
+  `email IS NULL`.
+
+**Consecuencia abierta para la feature del portal del cliente (RF-AU2/AU4).**
+El R4 de esta feature incluye `email` en el payload del JWT. Hoy no rompe nada
+—#5 no emite tokens para clientes—, pero cuando exista el portal habrá que
+decidir qué identificador lleva el token de un usuario sin correo.
+
+Migración que aplica el cambio:
+`apps/api/drizzle/0005_owner_tenant_profiles.sql`.
+
+---
+
 ## Requisitos
 
 ### R1 — Tabla `user` (RF-AU1)
 
+> ⚠️ **Enmendado por la feature #5 (D-5).** Ver la sección ENMIENDA al inicio
+> de este archivo: `email` y `password_hash` son NULL-able.
+
 El sistema debe almacenar usuarios con:
 - `id` uuid PK (gen_random_uuid)
-- `email` text NOT NULL UNIQUE
-- `password_hash` text NOT NULL
+- `email` text NOT NULL UNIQUE — *enmendado por #5 R7: **NULL-able**, la UNIQUE se conserva*
+- `password_hash` text NOT NULL — *enmendado por #5 R6: **NULL-able***
 - `nombre` text NOT NULL
 - `telefono` text
 - `created_at` timestamp NOT NULL DEFAULT now()

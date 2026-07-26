@@ -4,18 +4,20 @@ import { HealthController } from './health/health.controller';
 import { HealthService } from './health/health.service';
 import { AuthModule } from './auth/auth.module';
 import { AuditModule } from './audit/audit.module';
+import { ClientesModule } from './clientes/clientes.module';
 
 /**
- * Módulo transversal: tenant, auth, usuarios, roles y auditoría vivirán aquí
+ * Módulo transversal: tenant, auth, usuarios, roles y auditoría viven aquí
  * (docs/architecture.md). `core/` NO depende de ningún otro módulo; todos los
  * demás dependen de él.
  *
- * Hoy contiene healthcheck, auth y auditoría; las features #2 lo pueblan.
+ * Contiene healthcheck (#1), auth (#3), auditoría (#4) y la hoja de vida de
+ * propietario e inquilino (#5, `ClientesModule`).
  */
 @Module({
-  imports: [AuthModule, AuditModule],
+  imports: [AuthModule, AuditModule, ClientesModule],
   controllers: [HealthController],
   providers: [HealthService],
-  exports: [HealthService, AuthModule, AuditModule],
+  exports: [HealthService, AuthModule, AuditModule, ClientesModule],
 })
 export class CoreModule {}

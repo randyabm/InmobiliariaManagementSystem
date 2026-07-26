@@ -1,0 +1,132 @@
+import { Injectable } from '@nestjs/common';
+import type { PerfilInquilino, TipoDocumento } from '@inmobiliaria/types';
+
+import type { ContextoPeticion } from '../../../common/database/cliente-tenant';
+import { ResourceNotFoundError } from '../../../common/errors';
+import type {
+  ActualizarInquilinoDto,
+  CrearInquilinoDto,
+} from './dto/inquilino.dto';
+import { PerfilYaExisteError } from './errors';
+import { IdentidadService, normalizarEmail } from './identidad.service';
+import { InquilinosRepository } from './inquilinos.repository';
+import { esViolacionDeUnicidad } from './propietarios.service';
+
+/**
+ * Hoja de vida del inquilino (RF-C4, RF-C1, RF-C6).
+ *
+ * Mismo patrón que `PropietariosService`: creación atómica de identidad, rol y
+ * perfil (**R22**), 409 `PERFIL_YA_EXISTE` por documento repetido en el tenant
+ * (**R24**, D-4) y baja lógica (**R21**).
+ *
+ * **Frontera con la feature #25 (D-6):** los codeudores, coarrendatarios y
+ * referencias del inquilino NO se implementan aquí. Esta feature no crea sus
+ * tablas ni sus rutas.
+ */
+@Injectable()
+export class InquilinosService {
+  constructor(
+    private readonly repositorio: InquilinosRepository,
+    private readonly identidad: IdentidadService,
+  ) {}
+
+  /** **R18**, R22, R24, R25. */
+  async crear(
+    dto: CrearInquilinoDto,
+    ctx: ContextoPeticion,
+  ): Promise<PerfilInquilino> {
+    await this.rechazarSiDocumentoRepetido(ctx, dto.tipo_documento, dto.documento);
+
+    const { userId } = await this.identidad.crearOVincularIdentidad(
+      ctx.cliente,
+      {
+        nombre: dto.nombre,
+        email: normalizarEmail(dto.email),
+        telefono: dto.telefono ?? null,
+      },
+      ctx.tenantId,
+      'inquilino',
+    );
+
+    try {
+      return await this.repositorio.insertar(ctx, {
+        userId,
+        tipoDocumento: dto.tipo_documento,
+        documento: dto.documento,
+        celular: dto.celular,
+        medioPreferidoContacto: dto.medio_preferido_contacto,
+      });
+    } catch (error) {
+      if (esViolacionDeUnicidad(error)) {
+        throw new PerfilYaExisteError();
+      }
+      throw error;
+    }
+  }
+
+  async obtener(id: string, ctx: ContextoPeticion): Promise<PerfilInquilino> {
+    return this.exigirPerfil(id, ctx);
+  }
+
+  /** **R23**, D-4. */
+  async buscarPorDocumento(
+    tipo: TipoDocumento,
+    documento: string,
+    ctx: ContextoPeticion,
+  ): Promise<PerfilInquilino[]> {
+    return this.repositorio.buscarPorDocumento(ctx, tipo, documento);
+  }
+
+  /** **R20** — PATCH parcial, incluido `medio_preferido_contacto`. */
+  async actualizar(
+    id: string,
+    dto: ActualizarInquilinoDto,
+    ctx: ContextoPeticion,
+  ): Promise<PerfilInquilino> {
+    const perfil = await this.exigirPerfil(id, ctx);
+
+    await this.repositorio.actualizar(ctx, id, {
+      ...(dto.celular !== undefined ? { celular: dto.celular } : {}),
+      ...(dto.medio_preferido_contacto !== undefined
+        ? { medioPreferidoContacto: dto.medio_preferido_contacto }
+        : {}),
+    });
+
+    await this.repositorio.actualizarContacto(ctx, perfil.user_id, {
+      ...(dto.nombre !== undefined ? { nombre: dto.nombre } : {}),
+      ...(dto.email !== undefined ? { email: dto.email } : {}),
+      ...('telefono' in dto ? { telefono: dto.telefono ?? null } : {}),
+    });
+
+    return this.exigirPerfil(id, ctx);
+  }
+
+  /** **R21** — baja lógica. */
+  async darDeBaja(id: string, ctx: ContextoPeticion): Promise<void> {
+    await this.exigirPerfil(id, ctx);
+    await this.repositorio.marcarInactivo(ctx, id);
+  }
+
+  /** 404 —no 403— también para el recurso de otro tenant (**R31**). */
+  private async exigirPerfil(
+    id: string,
+    ctx: ContextoPeticion,
+  ): Promise<PerfilInquilino> {
+    const perfil = await this.repositorio.buscarPorId(ctx, id);
+    if (!perfil) {
+      throw new ResourceNotFoundError();
+    }
+    return perfil;
+  }
+
+  private async rechazarSiDocumentoRepetido(
+    ctx: ContextoPeticion,
+    tipo: TipoDocumento,
+    documento: string,
+  ): Promise<void> {
+    const existentes = await this.repositorio.buscarPorDocumento(ctx, tipo, documento);
+    if (existentes.length > 0) {
+      throw new PerfilYaExisteError();
+    }
+  }
+}

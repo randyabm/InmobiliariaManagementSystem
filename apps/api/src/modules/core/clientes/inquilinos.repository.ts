@@ -1,0 +1,193 @@
+import { Injectable } from '@nestjs/common';
+import type {
+  MedioPreferidoContacto,
+  PerfilInquilino,
+  TipoDocumento,
+} from '@inmobiliaria/types';
+
+import type { ContextoPeticion } from '../../../common/database/cliente-tenant';
+
+/**
+ * Único punto de acceso a datos de `perfil_inquilino`.
+ *
+ * Mismas reglas que `PropietariosRepository`: solo el `PoolClient` de la
+ * transacción con `SET LOCAL app.current_tenant` (**R34**), y `tenant_id`
+ * explícito en cada consulta como defensa en profundidad sobre el RLS.
+ */
+@Injectable()
+export class InquilinosRepository {
+  private static readonly SELECT = `
+    SELECT p.id, p.tenant_id, p.user_id,
+           u.nombre, u.email, u.telefono,
+           p.tipo_documento, p.documento, p.celular,
+           p.medio_preferido_contacto, p.activo,
+           p.created_at, p.updated_at
+      FROM perfil_inquilino p
+      JOIN "user" u ON u.id = p.user_id`;
+
+  async insertar(
+    ctx: ContextoPeticion,
+    datos: {
+      userId: string;
+      tipoDocumento: TipoDocumento;
+      documento: string;
+      celular: string;
+      medioPreferidoContacto: MedioPreferidoContacto;
+    },
+  ): Promise<PerfilInquilino> {
+    const { rows } = await ctx.cliente.query<{ id: string }>(
+      `INSERT INTO perfil_inquilino
+         (tenant_id, user_id, tipo_documento, documento, celular, medio_preferido_contacto)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING id`,
+      [
+        ctx.tenantId,
+        datos.userId,
+        datos.tipoDocumento,
+        datos.documento,
+        datos.celular,
+        datos.medioPreferidoContacto,
+      ],
+    );
+
+    const creado = await this.buscarPorId(ctx, rows[0]!.id);
+    if (!creado) {
+      throw new Error('El perfil de inquilino recién creado no es legible.');
+    }
+    return creado;
+  }
+
+  async buscarPorId(
+    ctx: ContextoPeticion,
+    id: string,
+  ): Promise<PerfilInquilino | null> {
+    const { rows } = await ctx.cliente.query(
+      `${InquilinosRepository.SELECT} WHERE p.id = $1 AND p.tenant_id = $2`,
+      [id, ctx.tenantId],
+    );
+    return rows[0] ? aPerfil(rows[0]) : null;
+  }
+
+  /** **R23**, D-4 — solo perfiles del tenant de la petición. */
+  async buscarPorDocumento(
+    ctx: ContextoPeticion,
+    tipoDocumento: TipoDocumento,
+    documento: string,
+  ): Promise<PerfilInquilino[]> {
+    const { rows } = await ctx.cliente.query(
+      `${InquilinosRepository.SELECT}
+        WHERE p.tenant_id = $1 AND p.tipo_documento = $2 AND p.documento = $3
+        ORDER BY p.created_at`,
+      [ctx.tenantId, tipoDocumento, documento],
+    );
+    return rows.map(aPerfil);
+  }
+
+  /** **R20**. */
+  async actualizar(
+    ctx: ContextoPeticion,
+    id: string,
+    cambios: {
+      celular?: string;
+      medioPreferidoContacto?: MedioPreferidoContacto;
+    },
+  ): Promise<void> {
+    const asignaciones: string[] = [];
+    const valores: unknown[] = [];
+
+    if (cambios.celular !== undefined) {
+      valores.push(cambios.celular);
+      asignaciones.push(`celular = $${valores.length}`);
+    }
+    if (cambios.medioPreferidoContacto !== undefined) {
+      valores.push(cambios.medioPreferidoContacto);
+      asignaciones.push(`medio_preferido_contacto = $${valores.length}`);
+    }
+
+    asignaciones.push('updated_at = now()');
+    valores.push(id, ctx.tenantId);
+
+    await ctx.cliente.query(
+      `UPDATE perfil_inquilino SET ${asignaciones.join(', ')}
+        WHERE id = $${valores.length - 1} AND tenant_id = $${valores.length}`,
+      valores,
+    );
+  }
+
+  /** Contacto en `user` (**R20**). */
+  async actualizarContacto(
+    ctx: ContextoPeticion,
+    userId: string,
+    cambios: { nombre?: string; email?: string; telefono?: string | null },
+  ): Promise<void> {
+    const asignaciones: string[] = [];
+    const valores: unknown[] = [];
+
+    if (cambios.nombre !== undefined) {
+      valores.push(cambios.nombre);
+      asignaciones.push(`nombre = $${valores.length}`);
+    }
+    if (cambios.email !== undefined) {
+      valores.push(cambios.email);
+      asignaciones.push(`email = $${valores.length}`);
+    }
+    if ('telefono' in cambios) {
+      valores.push(cambios.telefono ?? null);
+      asignaciones.push(`telefono = $${valores.length}`);
+    }
+    if (asignaciones.length === 0) return;
+
+    asignaciones.push('updated_at = now()');
+    valores.push(userId);
+
+    await ctx.cliente.query(
+      `UPDATE "user" SET ${asignaciones.join(', ')} WHERE id = $${valores.length}`,
+      valores,
+    );
+  }
+
+  /** Baja lógica (**R21**): nada de borrado físico. */
+  async marcarInactivo(ctx: ContextoPeticion, id: string): Promise<number> {
+    const { rowCount } = await ctx.cliente.query(
+      `UPDATE perfil_inquilino SET activo = false, updated_at = now()
+        WHERE id = $1 AND tenant_id = $2`,
+      [id, ctx.tenantId],
+    );
+    return rowCount ?? 0;
+  }
+}
+
+interface FilaPerfilInquilino {
+  id: string;
+  tenant_id: string;
+  user_id: string;
+  nombre: string;
+  email: string | null;
+  telefono: string | null;
+  tipo_documento: TipoDocumento;
+  documento: string;
+  celular: string;
+  medio_preferido_contacto: MedioPreferidoContacto;
+  activo: boolean;
+  created_at: Date;
+  updated_at: Date;
+}
+
+function aPerfil(fila: unknown): PerfilInquilino {
+  const f = fila as FilaPerfilInquilino;
+  return {
+    id: f.id,
+    tenant_id: f.tenant_id,
+    user_id: f.user_id,
+    nombre: f.nombre,
+    email: f.email,
+    telefono: f.telefono,
+    tipo_documento: f.tipo_documento,
+    documento: f.documento,
+    celular: f.celular,
+    medio_preferido_contacto: f.medio_preferido_contacto,
+    activo: f.activo,
+    created_at: f.created_at.toISOString(),
+    updated_at: f.updated_at.toISOString(),
+  };
+}

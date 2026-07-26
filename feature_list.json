@@ -104,7 +104,7 @@
       "name": "owner_tenant_profiles",
       "phase": "1a",
       "sdd": true,
-      "status": "spec_ready",
+      "status": "in_progress",
       "title": "Hoja de vida de propietario e inquilino (núcleo)",
       "prd_refs": ["RF-C1", "RF-C4", "RF-C5", "RF-C6"],
       "note": "Partida en dos el 2026-07-26 por decisión del humano: 55 tasks en una corrida daban un diff inrevisable. La tarifa de retención, los codeudores/coarrendatarios y las referencias del inquilino se movieron a la feature #25 retencion_codeudor_referencias. La columna sujeto_retencion del perfil se queda aquí; solo la tarifa se fue.",

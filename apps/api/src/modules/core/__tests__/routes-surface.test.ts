@@ -15,7 +15,29 @@ import { usarEntornoDePrueba } from '../../../../test/support/test-env';
  * tres tests (camino feliz autorizado, rechazo por rol, rechazo por tenant
  * ajeno) en cuanto existan roles y tenants (features #2 y #3).
  */
-const RUTAS_PERMITIDAS = ['GET /auth/me', 'GET /health', 'POST /auth/login'] as const;
+const RUTAS_PERMITIDAS = [
+  'GET /auth/me',
+  'GET /health',
+  'POST /auth/login',
+  // ─── Feature #5 owner_tenant_profiles: 13 rutas (R37, design.md §5) ─────
+  // Todas con @UseGuards(JwtAuthGuard, RolesGuard) y @Roles('admin','empleado').
+  // Sus tres tests obligatorios (camino feliz autorizado, rechazo por rol y
+  // rechazo por tenant ajeno) están en `modules/core/clientes/__tests__/`.
+  'POST /propietarios',
+  'GET /propietarios',
+  'GET /propietarios/:id',
+  'PATCH /propietarios/:id',
+  'DELETE /propietarios/:id',
+  'POST /propietarios/:id/cuentas-bancarias',
+  'GET /propietarios/:id/cuentas-bancarias',
+  'PATCH /propietarios/:idPropietario/cuentas-bancarias/:idCuenta',
+  'POST /inquilinos',
+  'GET /inquilinos',
+  'GET /inquilinos/:id',
+  'PATCH /inquilinos/:id',
+  'DELETE /inquilinos/:id',
+  // Las 10 rutas de la feature #25 se añadirán en su propia corrida.
+] as const;
 
 function normalizar(segmento: unknown): string {
   const valor = typeof segmento === 'string' ? segmento : '';

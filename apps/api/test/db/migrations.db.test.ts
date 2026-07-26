@@ -40,7 +40,7 @@ describe('Aplicación real de las migraciones (R10)', () => {
       'SELECT count(*)::text AS total FROM drizzle.__drizzle_migrations',
     );
 
-    expect(Number(rows[0]?.total)).toBe(5);
+    expect(Number(rows[0]?.total)).toBe(6);
   });
 
   it('deja disponibles las extensiones que declara', async () => {
@@ -71,7 +71,7 @@ describe('Aplicación real de las migraciones (R10)', () => {
       'SELECT count(*)::text AS total FROM drizzle.__drizzle_migrations',
     );
 
-    expect(Number(rows[0]?.total)).toBe(5);
+    expect(Number(rows[0]?.total)).toBe(6);
   });
 
   it('la tabla tenant existe con RLS habilitado (R3)', async () => {
@@ -90,7 +90,7 @@ describe('Aplicación real de las migraciones (R10)', () => {
 
   it('la política tenant_isolation existe (R4)', async () => {
     const { rows } = await pool.query<{ polname: string }>(
-      "SELECT polname FROM pg_policies WHERE tablename = 'tenant' AND schemaname = 'public'",
+      "SELECT policyname AS polname FROM pg_policies WHERE tablename = 'tenant' AND schemaname = 'public'",
     );
 
     expect(rows.map((r) => r.polname)).toContain('tenant_isolation');
@@ -126,7 +126,7 @@ describe('Aplicación real de las migraciones (R10)', () => {
 
   it('la política user_role_tenant_isolation existe (R2)', async () => {
     const { rows } = await pool.query<{ polname: string }>(
-      "SELECT polname FROM pg_policies WHERE tablename = 'user_role' AND schemaname = 'public'",
+      "SELECT policyname AS polname FROM pg_policies WHERE tablename = 'user_role' AND schemaname = 'public'",
     );
 
     expect(rows.map((r) => r.polname)).toContain('user_role_tenant_isolation');
@@ -134,7 +134,7 @@ describe('Aplicación real de las migraciones (R10)', () => {
 
   it('la política user_tenant_isolation existe (R1)', async () => {
     const { rows } = await pool.query<{ polname: string }>(
-      "SELECT polname FROM pg_policies WHERE tablename = 'user' AND schemaname = 'public'",
+      "SELECT policyname AS polname FROM pg_policies WHERE tablename = 'user' AND schemaname = 'public'",
     );
 
     expect(rows.map((r) => r.polname)).toContain('user_tenant_isolation');
@@ -156,7 +156,7 @@ describe('Aplicación real de las migraciones (R10)', () => {
 
   it('las políticas de audit_log existen (R8)', async () => {
     const { rows } = await pool.query<{ polname: string }>(
-      "SELECT polname FROM pg_policies WHERE tablename = 'audit_log' AND schemaname = 'public'",
+      "SELECT policyname AS polname FROM pg_policies WHERE tablename = 'audit_log' AND schemaname = 'public'",
     );
 
     const nombres = rows.map((r) => r.polname);
@@ -170,5 +170,131 @@ describe('Aplicación real de las migraciones (R10)', () => {
     );
 
     expect(rows.map((r) => r.indexname)).toContain('audit_log_tenant_created_idx');
+  });
+
+  // ─── Feature #5 owner_tenant_profiles (T8: R1, R5, R6, R7, R37) ───────────
+
+  const TABLAS_CLIENTES = [
+    'perfil_propietario',
+    'perfil_inquilino',
+    'cuenta_bancaria',
+  ] as const;
+
+  it.each(TABLAS_CLIENTES)(
+    'la tabla %s existe con RLS habilitado Y FORZADO (#5 R5)',
+    async (tabla) => {
+      const { rows } = await pool.query<{
+        relrowsecurity: boolean;
+        relforcerowsecurity: boolean;
+      }>(
+        `SELECT c.relrowsecurity, c.relforcerowsecurity
+           FROM pg_class c
+           JOIN pg_namespace n ON n.oid = c.relnamespace
+          WHERE n.nspname = 'public' AND c.relname = $1`,
+        [tabla],
+      );
+
+      expect(rows, `la tabla ${tabla} no existe`).toHaveLength(1);
+      // ENABLE sin FORCE dejaría al dueño de la tabla fuera del aislamiento
+      // (docs/architecture.md: el aislamiento lo fuerza PostgreSQL).
+      expect(rows[0]?.relrowsecurity).toBe(true);
+      expect(rows[0]?.relforcerowsecurity).toBe(true);
+    },
+  );
+
+  it.each(TABLAS_CLIENTES)(
+    'la política de aislamiento de %s filtra por app.current_tenant (#5 R5)',
+    async (tabla) => {
+      const { rows } = await pool.query<{ polname: string; qual: string | null }>(
+        `SELECT policyname AS polname, qual
+           FROM pg_policies WHERE schemaname = 'public' AND tablename = $1`,
+        [tabla],
+      );
+
+      expect(rows.map((r) => r.polname)).toContain(`${tabla}_tenant_isolation`);
+      const politica = rows.find((r) => r.polname === `${tabla}_tenant_isolation`);
+      expect(politica?.qual).toContain('app.current_tenant');
+    },
+  );
+
+  it('user.email y user.password_hash son NULL-able tras D-5 (#5 R6, R7)', async () => {
+    const { rows } = await pool.query<{ column_name: string; is_nullable: string }>(
+      `SELECT column_name, is_nullable
+         FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'user'
+          AND column_name IN ('email', 'password_hash')
+        ORDER BY column_name`,
+    );
+
+    expect(rows).toEqual([
+      { column_name: 'email', is_nullable: 'YES' },
+      { column_name: 'password_hash', is_nullable: 'YES' },
+    ]);
+  });
+
+  it('la UNIQUE de user.email se conserva intacta tras D-5 (#5 R7)', async () => {
+    // D-5 relaja el NOT NULL pero NO la unicidad: en PostgreSQL cada NULL es
+    // distinto, así que no hace falta índice parcial.
+    const { rows } = await pool.query<{ indexdef: string }>(
+      `SELECT indexdef FROM pg_indexes
+        WHERE schemaname = 'public' AND tablename = 'user'`,
+    );
+
+    const unicos = rows
+      .map((r) => r.indexdef)
+      .filter((d) => /CREATE UNIQUE INDEX/i.test(d) && /\(email\)/i.test(d));
+
+    expect(unicos).toHaveLength(1);
+    expect(unicos[0]).not.toMatch(/WHERE/i);
+  });
+
+  it('perfil_propietario tiene sujeto_retencion y NINGUNA columna de tarifa (#5 R1, D-2)', async () => {
+    const { rows } = await pool.query<{ column_name: string }>(
+      `SELECT column_name FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'perfil_propietario'`,
+    );
+    const columnas = rows.map((r) => r.column_name);
+
+    expect(columnas).toContain('sujeto_retencion');
+
+    // D-2: la tarifa la fija la ley y cambia por año; una copia por
+    // propietario se desincroniza. Vive en la feature #25, no aquí.
+    const tarifas = columnas.filter((c) =>
+      /porcentaje|tarifa|retencion_pct|pct_retencion/.test(c),
+    );
+    expect(
+      tarifas,
+      `perfil_propietario no puede llevar columna de tarifa (D-2): ${tarifas.join(', ')}`,
+    ).toEqual([]);
+  });
+
+  it('perfil_propietario y perfil_inquilino tienen las dos UNIQUE de R1/R2 (#5 R1, R2, R9)', async () => {
+    const { rows } = await pool.query<{ table_name: string; constraint_name: string }>(
+      `SELECT tc.table_name, tc.constraint_name
+         FROM information_schema.table_constraints tc
+        WHERE tc.table_schema = 'public'
+          AND tc.constraint_type = 'UNIQUE'
+          AND tc.table_name IN ('perfil_propietario', 'perfil_inquilino')`,
+    );
+    const nombres = rows.map((r) => r.constraint_name);
+
+    expect(nombres).toContain('perfil_propietario_tenant_user_key');
+    expect(nombres).toContain('perfil_propietario_tenant_documento_key');
+    expect(nombres).toContain('perfil_inquilino_tenant_user_key');
+    expect(nombres).toContain('perfil_inquilino_tenant_documento_key');
+  });
+
+  it('el índice único parcial de cuenta predeterminada existe (#5 R4)', async () => {
+    const { rows } = await pool.query<{ indexname: string; indexdef: string }>(
+      `SELECT indexname, indexdef FROM pg_indexes
+        WHERE schemaname = 'public' AND tablename = 'cuenta_bancaria'`,
+    );
+
+    const parcial = rows.find(
+      (r) => r.indexname === 'cuenta_bancaria_predeterminada_key',
+    );
+    expect(parcial).toBeDefined();
+    expect(parcial?.indexdef).toMatch(/CREATE UNIQUE INDEX/i);
+    expect(parcial?.indexdef).toMatch(/WHERE .*es_predeterminada.*activa/is);
   });
 });
