@@ -105,13 +105,35 @@
       "phase": "1a",
       "sdd": true,
       "status": "spec_ready",
-      "title": "Hoja de vida de propietario e inquilino",
+      "title": "Hoja de vida de propietario e inquilino (núcleo)",
       "prd_refs": ["RF-C1", "RF-C4", "RF-C5", "RF-C6"],
+      "note": "Partida en dos el 2026-07-26 por decisión del humano: 55 tasks en una corrida daban un diff inrevisable. La tarifa de retención, los codeudores/coarrendatarios y las referencias del inquilino se movieron a la feature #25 retencion_codeudor_referencias. La columna sujeto_retencion del perfil se queda aquí; solo la tarifa se fue.",
       "acceptance": [
-        "CRUD de propietario con datos personales, fiscales y cuenta bancaria por defecto.",
-        "CRUD de inquilino con nombre, documento, correo, celular y medio preferido de contacto.",
-        "Se puede crear propietario o inquilino en línea desde otro flujo sin abandonarlo.",
-        "La cuenta bancaria del propietario puede sobrescribirse a nivel de propiedad."
+        "CRUD de propietario con datos personales, marca de sujeto de retención y cuenta bancaria por defecto (la tarifa de retención se configura en la feature #25).",
+        "CRUD de inquilino con nombre, documento, correo, celular y medio preferido de contacto (codeudores y referencias en la feature #25).",
+        "Se puede crear propietario o inquilino en línea desde otro flujo sin abandonarlo: búsqueda por documento más creación atómica en una sola llamada.",
+        "La cuenta bancaria del propietario tiene regla de precedencia override sobre predeterminada, con validación de pertenencia al mismo propietario y tenant; el override por propiedad lo suministra la feature #6.",
+        "El email del usuario es opcional conservando la unicidad de los valores no nulos, y un usuario sin credenciales no puede iniciar sesión.",
+        "El contexto de tenant se resuelve del header validado contra el JWT y el interceptor de RLS está registrado globalmente.",
+        "Aislamiento por tenant, RBAC en backend y auditoría verificados con tests deterministas sobre las tres tablas nuevas."
+      ]
+    },
+    {
+      "id": 25,
+      "name": "retencion_codeudor_referencias",
+      "phase": "1a",
+      "sdd": true,
+      "status": "spec_ready",
+      "title": "Retención en la fuente por tenant, codeudores y referencias del inquilino",
+      "prd_refs": ["RF-C4", "RF-C5"],
+      "note": "Separada de la feature #5 el 2026-07-26 por decisión del humano. Implementa las decisiones D-2 (la tarifa de retención es configuración del tenant y por año, no una columna del propietario) y D-6 (codeudor/coarrendatario y referencias entran como captura de datos; el amarre a la firma es de #14/#17). Dependencia dura: no puede implementarse antes de que la #5 esté done.",
+      "acceptance": [
+        "La tarifa de retención en la fuente se configura por tenant y por año, y solo el rol admin puede consultarla o modificarla.",
+        "El sistema resuelve el porcentaje aplicable a un propietario marcado como sujeto de retención y falla explícitamente si el año no está configurado, sin asumir un valor por defecto.",
+        "Un propietario no sujeto a retención se resuelve sin consultar la tabla de tarifas, y perfil_propietario no adquiere ninguna columna de tarifa.",
+        "CRUD de codeudor/coarrendatario y de referencias del inquilino, con baja lógica.",
+        "Registrar un codeudor o una referencia no exige contrato ni firma, y sus tablas no declaran ninguna FK hacia entidades de contrato, firma, inventario u OTP.",
+        "Aislamiento por tenant, RBAC en backend y auditoría verificados con tests deterministas sobre las tres tablas nuevas."
       ]
     },
     {
