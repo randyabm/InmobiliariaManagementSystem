@@ -8,7 +8,7 @@
       "name": "project_scaffold",
       "phase": "1a",
       "sdd": true,
-      "status": "pending",
+      "status": "done",
       "title": "Andamiaje del monorepo y stack base",
       "prd_refs": ["D1", "D2", "11.2"],
       "acceptance": [
@@ -17,6 +17,39 @@
         "Los scripts lint, typecheck y test están definidos y pasan en un proyecto vacío.",
         "Existe una migración inicial versionada y un comando para aplicarla.",
         "Existe al menos un test de humo que arranca la API y responde a un healthcheck."
+      ]
+    },
+    {
+      "id": 23,
+      "name": "ci_pipeline",
+      "phase": "1a",
+      "sdd": true,
+      "status": "pending",
+      "title": "Pipeline de CI self-hosted que bloquea la integración",
+      "prd_refs": ["RF-QA1", "D10"],
+      "note": "Añadida el 2026-07-26. No es alcance nuevo: RF-QA1 ya estaba en el PRD (§16.2) y se había quedado sin feature asignada. Se secuencia antes de multitenancy_rls por decisión del humano, para que la puerta de calidad bloquee de verdad antes de que entre el código de RLS y auth.",
+      "acceptance": [
+        "El pipeline se ejecuta en CI self-hosted (Gitea Actions / Forgejo) en cada cambio.",
+        "Ejecuta lint, typecheck, test, build y test:db, y bloquea la integración si alguno falla.",
+        "El runner dispone de Docker, de modo que Testcontainers levanta PostgreSQL real y test:db corre de verdad.",
+        "Un cambio que rompe un test no puede integrarse.",
+        "El pipeline no requiere que un humano recuerde ejecutar ./init.sh."
+      ]
+    },
+    {
+      "id": 24,
+      "name": "http_hardening",
+      "phase": "1a",
+      "sdd": true,
+      "status": "pending",
+      "title": "Endurecimiento de cabeceras HTTP",
+      "prd_refs": ["RF-INT4", "D7"],
+      "note": "Añadida el 2026-07-26 por decisión explícita del humano. ATENCIÓN spec_author: el PRD NO cubre cabeceras de seguridad — no menciona Helmet, CSP, HSTS ni OWASP. Solo el control de embebido se deriva del PRD (D7 embebe los portales en el WordPress del tenant, y RF-INT4 fija la lógica por dominio de tenant que frame-ancestors debe replicar). El resto es alcance acordado fuera del PRD: no inventes requisitos adicionales sobre esta base.",
+      "acceptance": [
+        "La API no revela el framework ni su versión en las cabeceras de respuesta (no se emite X-Powered-By).",
+        "Se emiten las cabeceras de seguridad estándar: HSTS, X-Content-Type-Options, Referrer-Policy y CSP.",
+        "El control de embebido (frame-ancestors) admite solo los dominios registrados del tenant, coherente con el CORS por tenant de RF-INT4.",
+        "Existe un test que falla si una cabecera se pierde o si se admite un origen de embebido arbitrario."
       ]
     },
     {

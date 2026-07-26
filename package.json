@@ -1,0 +1,41 @@
+{
+  "name": "inmobiliaria-management-system",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Sistema SaaS multi-tenant de gestion inmobiliaria (Colombia) — monorepo",
+  "license": "UNLICENSED",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "tsc --noEmit -p tsconfig.json && npm run typecheck --workspaces --if-present",
+    "test": "vitest run",
+    "test:db": "npm run test:db --workspace apps/api",
+    "build": "npm run build --workspace packages/types && npm run build --workspace apps/api && npm run build --workspace apps/web",
+    "dev": "npm run dev --workspace apps/api & npm run dev --workspace apps/web & wait",
+    "db:migrate": "npm run db:migrate --workspace apps/api",
+    "db:generate": "npm run db:generate --workspace apps/api"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.0.0",
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^22.0.0",
+    "eslint": "^9.0.0",
+    "eslint-config-prettier": "^10.0.0",
+    "globals": "^16.0.0",
+    "js-yaml": "^4.1.0",
+    "prettier": "^3.0.0",
+    "typescript": "^5.6.0",
+    "typescript-eslint": "^8.0.0",
+    "vitest": "^3.0.0"
+  }
+}

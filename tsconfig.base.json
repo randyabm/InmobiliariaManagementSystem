@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "compilerOptions": {
+    // `strict` es obligatorio en TODOS los workspaces (docs/conventions.md).
+    "strict": true,
+    "noImplicitOverride": true,
+    "noUncheckedIndexedAccess": true,
+    "noFallthroughCasesInSwitch": true,
+    "forceConsistentCasingInFileNames": true,
+    "target": "ES2022",
+    "lib": ["ES2023"],
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "declaration": false,
+    "sourceMap": true,
+    "baseUrl": ".",
+    // Los tipos compartidos SIEMPRE se importan por el alias del workspace,
+    // nunca por rutas relativas que crucen paquetes (docs/architecture.md).
+    "paths": {
+      "@inmobiliaria/types": ["packages/types/src/index.ts"],
+      "@inmobiliaria/types/*": ["packages/types/src/*"]
+    }
+  }
+}

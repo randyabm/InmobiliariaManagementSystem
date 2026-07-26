@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "rootDir": "src",
+    "outDir": "dist",
+    // En build resolvemos `@inmobiliaria/types` por node_modules (dist del
+    // paquete), no por el alias a su código fuente: así el `rootDir` sigue
+    // siendo `src` y el JS emitido es ejecutable por Node tal cual.
+    // El script `build` de la raíz compila `packages/types` antes que la API.
+    "paths": {}
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["src/**/__tests__/**", "src/**/*.test.ts"]
+}

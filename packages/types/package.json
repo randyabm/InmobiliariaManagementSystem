@@ -1,0 +1,23 @@
+{
+  "name": "@inmobiliaria/types",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Tipos y constantes compartidos entre apps/api y apps/web",
+  "license": "UNLICENSED",
+  "type": "commonjs",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  }
+}

@@ -4,12 +4,25 @@
 
 ## Idioma
 
-- **Código en inglés:** nombres de variables, funciones, clases, tablas,
-  columnas y endpoints.
-- **Dominio en español donde es un término del negocio colombiano**, sin
-  traducirlo mal: `canon`, `arrendatario`, `poliza`, `matriculaInmobiliaria`.
-  Es preferible `canonAmount` a una traducción inventada como `rentFee`.
-- **Comentarios y documentación en español.** El equipo trabaja en español.
+> **Decisión del humano (2026-07-26):** todo en español. Esta sección se
+> enmendó tras la feature #1: la regla anterior exigía código en inglés y el
+> `reviewer` detectó que la implementación real era español en internals y
+> tests. Se resolvió a favor del español, no renombrando el código.
+
+- **Código en español:** nombres de variables, funciones, clases, tablas,
+  columnas y endpoints. El equipo trabaja en español y el dominio es
+  colombiano; traducir `canon`, `arrendatario` o `poliza` a inglés produce
+  nombres peores, no mejores.
+- **Sin tildes ni `ñ` en identificadores.** `poliza`, no `póliza`;
+  `anio`, no `año`. Aplica a código, tablas, columnas y rutas HTTP: los
+  identificadores acentuados rompen herramientas, drivers y URLs.
+- **Se respeta el término técnico establecido en inglés** cuando traducirlo
+  sería peor o inventado: `tenant`, `token`, `hash`, `commit`, `endpoint`,
+  `timestamp`, `healthcheck`. No se traducen a `arrendatarioDelSistema` ni
+  `marcaDeTiempo`.
+- **Cuidado con `tenant`:** en este proyecto significa *inmobiliaria cliente
+  del SaaS*, no *inquilino*. El inquilino es `inquilino`. No los mezcles.
+- **Comentarios y documentación en español.**
 - **Mensajes de error de cara al usuario en español.**
 
 ## TypeScript

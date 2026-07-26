@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "types": ["node"],
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "@inmobiliaria/types": ["packages/types/src/index.ts"],
+      "@inmobiliaria/types/*": ["packages/types/src/*"]
+    }
+  },
+  "include": ["tests/**/*.ts", "vitest.config.ts", "vitest.repo.config.ts"]
+}
