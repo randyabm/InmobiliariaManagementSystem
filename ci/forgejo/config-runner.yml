@@ -1,0 +1,20 @@
+# Configuracion del runner de Forgejo.
+# capacity: 3 = los 3 jobs del workflow corren en paralelo (DA-6).
+# container.docker_host: apunta al daemon dind en la red interna de Compose.
+# container.options: --add-host permite que dentro del contenedor de job el
+#   nombre "docker" resuelva al gateway (= dind). Se ajusta empiricamente en T13.
+
+runner:
+  capacity: 3
+  labels:
+    - "host"
+    - "docker:docker://node:20"
+  envs: {}
+
+container:
+  docker_host: "tcp://docker:2375"
+  options: "--add-host=docker:host-gateway"
+
+cache:
+  enabled: true
+  dir: "/data/.cache"
