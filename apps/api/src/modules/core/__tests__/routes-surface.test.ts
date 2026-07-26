@@ -15,7 +15,7 @@ import { usarEntornoDePrueba } from '../../../../test/support/test-env';
  * tres tests (camino feliz autorizado, rechazo por rol, rechazo por tenant
  * ajeno) en cuanto existan roles y tenants (features #2 y #3).
  */
-const RUTAS_PERMITIDAS = ['GET /health'] as const;
+const RUTAS_PERMITIDAS = ['GET /auth/me', 'GET /health', 'POST /auth/login'] as const;
 
 function normalizar(segmento: unknown): string {
   const valor = typeof segmento === 'string' ? segmento : '';

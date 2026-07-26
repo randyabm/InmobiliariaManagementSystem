@@ -8,6 +8,34 @@
       "when": 1753488000000,
       "tag": "0000_init",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1753574400000,
+      "tag": "0001_tenant_rls",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1753660800000,
+      "tag": "0002_fix_rls_policy",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1753747200000,
+      "tag": "0003_auth_rbac",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1753833600000,
+      "tag": "0004_auditoria",
+      "breakpoints": true
     }
   ]
 }

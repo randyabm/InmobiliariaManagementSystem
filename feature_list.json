@@ -41,7 +41,7 @@
       "name": "http_hardening",
       "phase": "1a",
       "sdd": true,
-      "status": "pending",
+      "status": "done",
       "title": "Endurecimiento de cabeceras HTTP",
       "prd_refs": ["RF-INT4", "D7"],
       "note": "Añadida el 2026-07-26 por decisión explícita del humano. ATENCIÓN spec_author: el PRD NO cubre cabeceras de seguridad — no menciona Helmet, CSP, HSTS ni OWASP. Solo el control de embebido se deriva del PRD (D7 embebe los portales en el WordPress del tenant, y RF-INT4 fija la lógica por dominio de tenant que frame-ancestors debe replicar). El resto es alcance acordado fuera del PRD: no inventes requisitos adicionales sobre esta base.",
@@ -57,7 +57,7 @@
       "name": "multitenancy_rls",
       "phase": "1a",
       "sdd": true,
-      "status": "pending",
+      "status": "done",
       "title": "Multi-tenancy con Row-Level Security",
       "prd_refs": ["RF-A1", "D2", "11.3"],
       "acceptance": [
@@ -73,7 +73,7 @@
       "name": "auth_rbac",
       "phase": "1a",
       "sdd": true,
-      "status": "pending",
+      "status": "done",
       "title": "Autenticación, identidad multi-rol y RBAC",
       "prd_refs": ["RF-AU1", "RF-C2", "RF-C3", "RF-AU6"],
       "acceptance": [
@@ -86,10 +86,10 @@
     },
     {
       "id": 4,
-      "name": "audit_log",
+      "name": "auditoria",
       "phase": "1a",
       "sdd": true,
-      "status": "pending",
+      "status": "done",
       "title": "Auditoría inmutable de acciones críticas",
       "prd_refs": ["RF-W4", "11.3", "7"],
       "acceptance": [
@@ -104,7 +104,7 @@
       "name": "owner_tenant_profiles",
       "phase": "1a",
       "sdd": true,
-      "status": "pending",
+      "status": "spec_ready",
       "title": "Hoja de vida de propietario e inquilino",
       "prd_refs": ["RF-C1", "RF-C4", "RF-C5", "RF-C6"],
       "acceptance": [

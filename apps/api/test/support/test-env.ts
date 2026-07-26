@@ -12,6 +12,8 @@ export const ENTORNO_DE_PRUEBA: Readonly<Record<string, string>> = {
   DATABASE_URL:
     'postgres://test-user:test-password@127.0.0.1:5432/inmobiliaria_test',
   CORS_ORIGINS: 'http://localhost:5173,https://panel.example.com',
+  JWT_SECRET: 'test-secret-for-unit-tests',
+  JWT_EXPIRATION: '3600',
 };
 
 /**

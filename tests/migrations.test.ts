@@ -25,16 +25,17 @@ const archivosSql = readdirSync(rutaRepo(CARPETA))
   .sort();
 
 /**
- * Tablas cuya creación se permite en la migración inicial.
+ * Tablas cuya creación se permite en las migraciones.
  *
- * Está VACÍA a propósito (R11): la primera tabla de negocio (`tenant`) y su
- * `ENABLE`/`FORCE ROW LEVEL SECURITY` pertenecen a la feature #2
- * `multitenancy_rls`. Crear aquí una tabla sin RLS sería un defecto aunque los
- * tests pasaran (docs/conventions.md).
+ * La primera tabla de negocio (`tenant`) se creó en la feature #2
+ * `multitenancy_rls` con su RLS (docs/conventions.md).
+ * Las tablas `user` y `user_role` se crearon en la feature #3
+ * `auth_rbac` (specs/auth_rbac/).
+ * La tabla `audit_log` se creó en la feature #4 `auditoria`.
  */
-const TABLAS_PERMITIDAS: readonly string[] = [];
+const TABLAS_PERMITIDAS: readonly string[] = ['tenant', 'user', 'user_role', 'audit_log'];
 
-describe('Migración inicial (R10, R11)', () => {
+describe('Migración inicial (R10)', () => {
   it('existe el archivo de migración inicial', () => {
     expect(archivosSql).toContain('0000_init.sql');
   });

@@ -138,6 +138,27 @@ else
 fi
 
 echo ""
+echo "── 4b. Verificando JWT_SECRET ─────────────────────────"
+
+if [ ! -f ".env" ]; then
+  warn ".env no existe — copiando desde .env.example"
+  cp .env.example .env
+fi
+
+if grep -q '^JWT_SECRET=CHANGE_ME' .env 2>/dev/null || ! grep -q '^JWT_SECRET=' .env 2>/dev/null; then
+  NEW_SECRET=$(openssl rand -hex 32 2>/dev/null || head -c 64 /dev/urandom | od -An -tx1 | tr -d ' \n' | head -c 64)
+  # Reemplazar JWT_SECRET=CHANGE_ME o añadir si falta
+  if grep -q '^JWT_SECRET=' .env; then
+    sed -i "s|^JWT_SECRET=.*|JWT_SECRET=${NEW_SECRET}|" .env
+  else
+    echo "JWT_SECRET=${NEW_SECRET}" >> .env
+  fi
+  ok "JWT_SECRET generado y guardado en .env"
+else
+  ok "JWT_SECRET ya configurado en .env"
+fi
+
+echo ""
 echo "── 5. Lint, typecheck y tests ──────────────────────────"
 
 if [ ! -f "package.json" ]; then
