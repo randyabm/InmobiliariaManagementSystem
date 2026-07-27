@@ -454,10 +454,236 @@ feature_list.json                                  (#5 → spec_ready)
 
 ---
 
-## 14. Estado de las ambigüedades
+## 14. Estado de las ambigüedades (v3)
 
 Las 7 preguntas abiertas de la v1 están **resueltas por el humano** y
-registradas como D-1 … D-7 en la tabla final de `requirements.md`. No queda
-ninguna decisión de producto pendiente. Las dos consecuencias que conviene tener
-presentes al revisar son §7.3 (identidad duplicada posible sin email) y §10
-(RF-C5 y RF-C4 parcialmente cubiertos).
+registradas como D-1 … D-7 en la tabla final de `requirements.md`. Las dos
+consecuencias que conviene tener presentes al revisar son §7.3 (identidad
+duplicada posible sin email) y §10 (RF-C5 y RF-C4 parcialmente cubiertos).
+Tras la revisión hay **cuatro preguntas nuevas** (PA-8 … PA-11): §18.
+
+---
+
+# v4 — Diseño de la corrección tras la revisión (B1–B4)
+
+## 15. Por qué esta deuda se absorbe en #5 y no en una feature aparte
+
+**Decisión del humano (2026-07-27).** El `reviewer` ofrecía la alternativa de
+diferir B3 a una feature propia
+(`progress/review_owner_tenant_profiles.md` §10.4). Se descarta. Razones que
+quedan escritas para que nadie las tenga que reconstruir:
+
+1. **Dos de los cuatro hallazgos son de código propio de #5 o alcanzables desde
+   sus rutas.** B1 es una vulnerabilidad viva en `propietarios.repository.ts` e
+   `inquilinos.repository.ts`, ambos escritos por esta feature. No es deuda
+   heredada: es un defecto nuevo.
+2. **Los otros dos no se pueden separar de B1 sin dejar el arreglo a medias.**
+   La corrección de B1 en el código de aplicación (R38) es exactamente la regla
+   que B4 debe escribir en el motor (R50). Arreglar solo una capa reproduce la
+   causa del defecto: una única barrera que la siguiente feature puede olvidar.
+3. **§C7 se comprueba en *cada* feature, no solo en la que introduce el
+   invariante** (`CHECKPOINTS.md` §C7, `AGENTS.md` §3). Con aislamiento y
+   auditoría en rojo, ninguna feature posterior podría cerrarse tampoco: diferir
+   solo mueve el bloqueo.
+4. **Diferir B3 exigía dejar constancia de que el aislamiento es "defensa en
+   papel"** hasta que llegase esa feature. Eso convierte cada feature intermedia
+   en una entrega sobre un invariante que se sabe incumplido — precisamente lo
+   que llevó a revertir #2, #3 y #4 (§17).
+
+**Consecuencia de alcance:** #5 pasa de 37 requirements / 47 tasks a **58 / 68**,
+y su diff incluye cambios en migraciones de #3 y #4, en `init.sh`,
+`docker-compose.yml` y `.env.example`. Es un ensanchamiento consciente del
+alcance de una feature en curso, aprobado por el humano, no un descuido de
+frontera.
+
+## 16. B3 + B4: orden que nunca deja el login roto
+
+El riesgo del corte está en que **la corrección de B3 activa el defecto de B4**:
+mientras la app sea superusuario, la política rota de `user` es inofensiva; en
+cuanto deje de serlo, `POST /auth/login` devuelve 401 a todo el mundo y crear
+identidades es imposible. El orden es, por tanto, parte del diseño y no una
+preferencia de estilo:
+
+```
+  (0) puerta          T48–T49   test:db en init.sh + guard anti-DDL en tests
+  (1) B1              T50–T52   filtro de exclusividad + 409 + test HTTP
+  (2) B2              T53       migración de triggers append-only
+  (3) B4 esquema      T54–T56   políticas por comando + funciones acotadas
+  (4) B4 aplicación   T57–T59   login e identidad pasan por las funciones
+  (5) B3 rol          T60–T64   rol sin BYPASSRLS, GRANTs, fail-fast, entorno
+  (6) re-verificación T65–T68   §C7 con el rol real
+```
+
+Lo que hace segura la secuencia:
+
+- **(3) y (4) se hacen mientras la app sigue siendo superusuario.** Las políticas
+  nuevas y las funciones `SECURITY DEFINER` son inertes para un superusuario, así
+  que la suite sigue verde tras cada task y el repositorio nunca queda en un
+  estado con el login roto.
+- **(5) es el único conmutador.** Cuando se cambia `DATABASE_URL` al rol de
+  aplicación, todo lo que ese cambio activa ya está escrito y probado.
+- **La inversa —(5) antes de (3)/(4)— rompe el login entre dos tasks**, que es
+  justo lo que hay que evitar.
+- **(0) va primero a propósito:** sin `test:db` en la puerta, ninguna de las
+  aserciones de RLS y de forma de migración de los pasos siguientes entra en el
+  semáforo, que es la causa de fondo de todo este episodio.
+
+### B1 — filtro de exclusividad (R38, R39)
+
+La condición correcta **no** es "la identidad tiene rol en mi tenant" (el paso 1
+del ataque crea ese rol), sino que no lo tenga en ningún otro:
+
+```sql
+UPDATE "user" SET nombre = $1, email = $2, telefono = $3, updated_at = now()
+ WHERE id = $4
+   AND NOT EXISTS (
+     SELECT 1 FROM user_role ur
+      WHERE ur.user_id = "user".id
+        AND ur.tenant_id <> $5
+   );
+```
+
+El repositorio devuelve el número de filas afectadas; si es 0 habiendo campos de
+contacto que cambiar, el servicio lanza `IdentidadCompartidaNoEditableError`
+(409). El mismo predicado se escribe como `USING`/`WITH CHECK` de la política de
+`UPDATE` sobre `user` (R50): dos capas, la misma regla.
+
+### B4 — política de `user` y ruta de identidad acotada
+
+`user` es una tabla de **identidad global**: no tiene `tenant_id`, así que una
+política pensada para tablas con `tenant_id` nunca iba a encajar. El diseño
+mínimo que satisface R6, R8, R22 y R25 sin ampliar visibilidad:
+
+| Comando | Política | Motivo |
+|---|---|---|
+| `SELECT` | `USING (id IN (SELECT user_id FROM user_role WHERE tenant_id = current_setting(...) AND activo))` | Mantiene la visibilidad actual: un tenant ve las identidades que tiene vinculadas, nada más. |
+| `INSERT` | `WITH CHECK (true)` | Crear identidad es global y no revela nada. Rompe el bloqueo circular de R22. |
+| `UPDATE` | `USING` + `WITH CHECK` con el predicado de exclusividad de R38 | Defensa en profundidad de B1 (R50). |
+| `DELETE` | **sin política** → denegado | La identidad no se borra (`docs/conventions.md`). |
+
+Las dos operaciones que ocurren **antes** de que exista contexto de tenant no
+pueden pasar por esas políticas, así que se resuelven con dos funciones
+`SECURITY DEFINER` de superficie mínima, propiedad del rol de migración y con
+`EXECUTE` concedido solo al rol de aplicación (R52):
+
+```sql
+identidad_buscar_por_email(p_email text) RETURNS uuid
+-- Coincidencia EXACTA. Devuelve solo el id. Para la vinculación de R25/R53.
+
+identidad_credenciales_por_email(p_email text)
+  RETURNS TABLE (id uuid, nombre text, email text, password_hash text)
+-- Coincidencia EXACTA. Solo lo que necesita el login (R51).
+```
+
+Ninguna acepta patrones ni devuelve listados: no habilitan enumeración más allá
+de lo que ya permite cualquier formulario de login. **Residuo conocido:**
+`identidad_buscar_por_email` permite a un tenant confirmar que un email existe en
+el sistema. No es un descuido, es el precio de RF-AU6, y es exactamente lo que se
+pregunta en **PA-9**.
+
+### B3 — rol de aplicación y provisión
+
+- **Rol:** `NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE LOGIN`, **no dueño**
+  de ninguna tabla (R43).
+- **GRANTs mínimos (R45):** `USAGE` en el esquema; `SELECT, INSERT, UPDATE` en
+  las tablas de negocio; `SELECT, INSERT` en `audit_log`; `EXECUTE` en las dos
+  funciones de identidad. **Ningún `DELETE` en ninguna tabla** — las bajas son
+  lógicas, así que negarlo en el motor convierte la convención en barrera.
+- **Provisión (R46):** un único procedimiento
+  `asegurarRolDeAplicacion(urlDeMigracion, { usuario, clave })` en
+  `apps/api/src/database/rol-aplicacion.ts`, idempotente, que se ejecuta
+  **después** de las migraciones (los `GRANT` no alcanzan a tablas que aún no
+  existían) y que usan por igual `db:migrate`, `init.sh`, la CI y los entornos de
+  prueba. Que producción y tests usen **el mismo código** es lo que evita repetir
+  el defecto de B2, donde el test se fabricaba su propio sujeto.
+- **Credenciales (R47):** `DATABASE_MIGRATION_URL` (rol privilegiado, solo
+  migraciones y provisión) y `DATABASE_URL` (rol de aplicación). Sujeto a
+  **PA-11**.
+- **Fail-fast (R44):** al arrancar, la app consulta
+  `SELECT rolsuper, rolbypassrls FROM pg_roles WHERE rolname = current_user` y
+  aborta con `ConfigurationError` si alguno es `true`. Es la única forma de que
+  una regresión de despliegue —volver a poner la cadena del superusuario— falle
+  ruidosamente en vez de desactivar el RLS en silencio.
+
+### B2 — triggers de auditoría
+
+La migración nueva crea `audit_log_prevent_mutation()` y los dos triggers
+`BEFORE UPDATE` / `BEFORE DELETE`, exactamente los que hoy fabrica el test
+(`audit-log.test.ts:30-52`). El `beforeAll` de ese test deja de crearlos: si la
+migración no los instala, el test **falla**, que es lo que debía ocurrir desde
+#4. El trigger protege incluso al rol dueño (R41), cosa que ninguna política RLS
+puede hacer.
+
+## 17. Contradicciones y estado del repositorio
+
+- **#2, #3 y #4 han sido revertidas a `in_progress`** en `feature_list.json` por
+  el humano. Estaban `done` sobre invariantes que no se cumplían en ejecución: el
+  RLS de #2 es inerte con el rol actual (B3), la política de `user` de #3
+  contradice el modelo de identidad (B4) y la inmutabilidad de #4 no existe en el
+  producto (B2). **Se cierran cuando #5 las demuestre con el rol real** (R58);
+  los tests que las cierran son T65 y T66, y viven en #5.
+- **La cabecera de `0004_auditoria.sql` no se edita** (R42), pese a que el
+  reviewer pedía corregirla in situ. `docs/conventions.md` prohíbe editar una
+  migración aplicada, y el migrador de Drizzle la identifica por hash: cambiar un
+  comentario la convierte en otra migración para el runner. La corrección va en
+  la cabecera de la migración nueva, que declara qué faltaba. **Es una desviación
+  consciente de la instrucción literal del reviewer, por una razón técnica;
+  queda escrita aquí para que él la valide o la rebata.**
+- **R1 ("los datos de contacto no se duplican") queda en tensión con PA-8(a).**
+  Si el humano elige copiar el contacto al perfil, R1 tendrá que enmendarse. Con
+  la opción mínima provisional (409) R1 sigue intacto.
+- **`AuthService` sigue siendo el único punto que consulta fuera de una
+  transacción con contexto de tenant**, ahora a través de una función acotada. Es
+  una excepción deliberada y documentada a la regla de §3, no un olvido: el login
+  es previo al tenant por naturaleza.
+- **Deuda registrada por el reviewer que NO entra en esta ampliación:** O2
+  (fallback al header crudo en `audit.interceptor.ts`), O3 (`actor_email` en cada
+  entrada de auditoría), O4 (`AuditService.log` se traga los errores), O5 (los
+  tests de `src/**` levantan Docker pese al comentario de `vitest.config.ts`) y
+  O6 (`getProfile` tipa `email: string`). El humano no las incluyó en el encargo;
+  siguen abiertas y conviene decidir sobre O4 y O5 antes de la siguiente feature.
+
+## 18. Preguntas abiertas de la v4
+
+Están al final de `requirements.md`: **PA-8** (propiedad de los datos de contacto
+de una identidad compartida), **PA-9** (qué ve un tenant de una identidad ajena),
+**PA-10** (vinculación sin consentimiento) y **PA-11** (gestión de la credencial
+del rol de aplicación).
+
+**PA-9 y PA-10 bloquean la política definitiva de `user`.** Lo especificado aquí
+es la opción mínima que no amplía visibilidad respecto de lo que ya hace el
+sistema; si el humano elige (b) o (c) de PA-9, cambian R52, R53 y el diseño de
+las funciones de identidad, y R25 tendría que enmendarse.
+
+## 19. Archivos que toca la ampliación
+
+### Se crean
+
+```
+apps/api/drizzle/0006_auditoria_append_only.sql          (B2 — R40, R41, R42)
+apps/api/drizzle/0007_politica_identidad.sql             (B4 — R49, R50, R52)
+apps/api/src/database/rol-aplicacion.ts                  (B3 — R46)
+apps/api/src/database/__tests__/identidad-rls.test.ts    (B4 — R49–R55)
+apps/api/src/database/__tests__/rol-aplicacion.test.ts   (B3 — R43–R45)
+apps/api/src/modules/core/clientes/errors/identidad-compartida-no-editable.error.ts
+tests/ddl-en-tests.test.ts                               (R57 — guard anti-DDL)
+```
+
+### Se modifican
+
+```
+init.sh                                            (run_script test:db — R56; provisión del rol)
+docker-compose.yml, .env.example                   (APP_DB_USER/APP_DB_PASSWORD, DATABASE_MIGRATION_URL — R47)
+apps/api/src/config/app-config.ts                  (variables nuevas + fail-fast — R44, R47)
+apps/api/src/database/migrate.ts                   (usa DATABASE_MIGRATION_URL y provisiona el rol — R46)
+apps/api/src/modules/core/auth/auth.service.ts     (login por función acotada — R51, R52)
+apps/api/src/modules/core/clientes/identidad.service.ts (vinculación por función acotada + auditoría — R53, R54)
+apps/api/src/modules/core/clientes/propietarios.repository.ts (UPDATE con exclusividad — R38)
+apps/api/src/modules/core/clientes/inquilinos.repository.ts   (idem — R38)
+apps/api/src/modules/core/clientes/{propietarios,inquilinos}.service.ts (409 — R39)
+apps/api/test/support/entorno-clientes.ts          (la app corre con el rol de aplicación — R48)
+apps/api/src/database/__tests__/audit-log.test.ts  (deja de crear el trigger — R40, R57)
+apps/api/src/database/__tests__/clientes-rls.test.ts (usa el rol provisionado, no uno ad hoc — R57)
+apps/api/test/db/migrations.db.test.ts             (triggers, políticas nuevas, GRANTs)
+apps/api/drizzle/meta/_journal.json                (entradas 6 y 7)
+```

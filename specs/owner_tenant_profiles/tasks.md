@@ -122,3 +122,79 @@
 - [x] T46 — Ejecutar `npm run lint`, `npm run typecheck`, `npm run test`, `npm run test:db` y `npm run build`; todo verde. **Verificación final.**
 
 - [x] T47 — Ejecutar `./init.sh` y verificar exit code 0. **Cierre de sesión.**
+
+---
+
+# v4 — Corrección de los hallazgos de la revisión (T48–T68)
+
+> El `reviewer` rechazó la feature el 2026-07-27 con cuatro hallazgos críticos
+> (`progress/review_owner_tenant_profiles.md`). El humano decidió arreglarlos
+> **dentro de #5** (`design.md` §15). Cobertura: **R38–R58 en 21 tasks**
+> (T48–T68), de las cuales 11 son tasks de test.
+>
+> **El orden NO es negociable** (`design.md` §16): los pasos de esquema y de
+> aplicación de B4 (bloques 12 y 13) se hacen mientras la app todavía se conecta
+> como superusuario, de modo que las políticas nuevas son inertes y la suite
+> queda verde tras cada task. El conmutador al rol sin `BYPASSRLS` (T61) va
+> **después**. Hacerlo antes deja el login devolviendo 401 a todo el mundo entre
+> dos tasks.
+>
+> **Antes de T50 y T54 hace falta la respuesta del humano a PA-8, PA-9 y
+> PA-10.** Sin ellas se puede implementar la opción mínima provisional, pero el
+> reviewer volvería a encontrarse una decisión de producto tomada por un agente.
+
+## Bloque 9 — Puerta de verificación (va primero: es la causa de fondo)
+
+- [ ] T48 — Añadir `run_script test:db` a `init.sh`, junto a `lint`, `typecheck` y `test`, y dejar escrito en el propio script por qué esa suite es parte del semáforo. Verificar que `./init.sh` sigue en verde. **Cubre: R56.**
+
+- [ ] T49 — Crear `tests/ddl-en-tests.test.ts`: recorre los archivos de test de `apps/api/**` y falla si encuentra `CREATE TRIGGER`, `CREATE POLICY`, `CREATE FUNCTION`, `CREATE ROLE` o `GRANT` fuera de una **lista blanca justificada** (hoy: la inyección de fallos del test de atomicidad de R22). La lista lleva archivo + motivo, como `TABLAS_PERMITIDAS`. **Cubre: R57.**
+
+## Bloque 10 — B1: escritura cruzada sobre `user`
+
+- [ ] T50 — Modificar `propietarios.repository.ts` e `inquilinos.repository.ts`: el `UPDATE "user"` añade `AND NOT EXISTS (SELECT 1 FROM user_role ur WHERE ur.user_id = "user".id AND ur.tenant_id <> $tenant)` y devuelve el número de filas afectadas. **Cubre: R38.**
+
+- [ ] T51 — Crear `IdentidadCompartidaNoEditableError` (`IDENTIDAD_COMPARTIDA_NO_EDITABLE`, 409) y lanzarlo desde `propietarios.service.ts` e `inquilinos.service.ts` cuando el `UPDATE` no afecte ninguna fila habiendo campos de contacto que cambiar. Los campos del perfil siguen actualizándose con normalidad. **Cubre: R39.**
+
+- [ ] T52 — Test HTTP determinista sobre el escenario de identidad compartida que ya existe (`propietarios.api.test.ts:400`, Irene en A y en B): el `PATCH` desde A de `nombre`, `email` y `telefono` responde **409**, y un `SELECT` independiente confirma que las tres columnas de `user` quedaron intactas; el mismo `PATCH` sobre una identidad exclusiva de A sí funciona; y el `PATCH` de campos del perfil funciona incluso con identidad compartida. **Cubre: R38, R39.**
+
+## Bloque 11 — B2: auditoría realmente inmutable
+
+- [ ] T53 — Crear la migración `0006_auditoria_append_only.sql` con `audit_log_prevent_mutation()` y los triggers `BEFORE UPDATE` y `BEFORE DELETE` sobre `audit_log`, idempotentes. Su cabecera declara explícitamente qué faltaba en `0004_auditoria.sql:4` y por qué ese archivo **no** se edita (hash de Drizzle). Añadir la entrada al journal. **Cubre: R40, R41, R42.**
+
+## Bloque 12 — B4, esquema (la app sigue siendo superusuario: nada se rompe)
+
+- [ ] T54 — Crear la migración `0007_politica_identidad.sql`: `DROP POLICY user_tenant_isolation` y crear políticas explícitas `FOR SELECT`, `FOR INSERT` (`WITH CHECK (true)`) y `FOR UPDATE` (con el predicado de exclusividad de R38 en `USING` y en `WITH CHECK`); sin política de `DELETE`. **Cubre: R49, R50.**
+
+- [ ] T55 — En la misma migración, crear las dos funciones `SECURITY DEFINER` de coincidencia exacta por email —`identidad_buscar_por_email` (devuelve solo el `uuid`) e `identidad_credenciales_por_email` (devuelve solo `id`, `nombre`, `email`, `password_hash`)—, con `REVOKE ALL … FROM PUBLIC` y un comentario que declare su superficie. **Cubre: R52.**
+
+- [ ] T56 — Crear `identidad-rls.test.ts` (Testcontainers, rol sin `BYPASSRLS` provisionado por el helper, **no creado por el test**): INSERT de identidad permitido; SELECT limitado a las identidades vinculadas al tenant; UPDATE de identidad exclusiva permitido; UPDATE de identidad compartida **rechazado por la política**; DELETE rechazado; y las dos funciones devuelven exactamente las columnas declaradas y no aceptan patrones. **Cubre: R49, R50, R52.**
+
+## Bloque 13 — B4, aplicación (todavía con la app como superusuario)
+
+- [ ] T57 — Modificar `auth.service.ts` para resolver las credenciales con `identidad_credenciales_por_email`, conservando el 401 previo por email nulo/vacío (R8) y por `password_hash` NULL (R6). **Cubre: R51, R52.**
+
+- [ ] T58 — Modificar `identidad.service.ts` para que `vincularPorEmail` use `identidad_buscar_por_email`, y registrar en `audit_log` la acción `vincular_identidad` cuando se reutilice una identidad existente, sin el email en `metadata`. **Cubre: R53, R54.**
+
+- [ ] T59 — Ampliar los tests de login e identidad para que se ejecuten **con el rol sujeto a RLS**: login válido responde 200 con `access_token`; la creación de propietario con email ya existente en otro tenant reutiliza el `user_id`; la creación de identidad nueva inserta `user` + `user_role` en la misma transacción; y existe la entrada `vincular_identidad` en `audit_log` sin el email. **Cubre: R51, R53, R54, R55.**
+
+## Bloque 14 — B3: rol de aplicación (el conmutador)
+
+- [ ] T60 — Crear `apps/api/src/database/rol-aplicacion.ts` con `asegurarRolDeAplicacion(urlDeMigracion, credenciales)`: idempotente, crea el rol `NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE LOGIN` y aplica los GRANT mínimos (USAGE en el esquema; SELECT/INSERT/UPDATE en tablas de negocio; SELECT/INSERT en `audit_log`; EXECUTE en las dos funciones de identidad; **ningún DELETE**). Invocarlo desde `db:migrate` después de aplicar las migraciones. **Cubre: R45, R46.**
+
+- [ ] T61 — Separar credenciales: `DATABASE_MIGRATION_URL` (rol privilegiado) y `DATABASE_URL` (rol de aplicación) en `.env.example`, `docker-compose.yml`, `init.sh` y `app-config.ts`, con `APP_DB_USER` y `APP_DB_PASSWORD`. `migrate.ts` pasa a leer `DATABASE_MIGRATION_URL`. **Cubre: R43, R47.**
+
+- [ ] T62 — Añadir el fail-fast de arranque: la app consulta `SELECT rolsuper, rolbypassrls FROM pg_roles WHERE rolname = current_user` y aborta con `ConfigurationError` accionable si alguno es `true`. **Cubre: R44.**
+
+- [ ] T63 — Migrar los entornos de prueba al rol provisionado: `entorno-clientes.ts` levanta la app con la cadena del rol de aplicación (no la del contenedor) y `clientes-rls.test.ts` deja de crear `app_test_user` a mano y usa `asegurarRolDeAplicacion`. **Cubre: R48, R57, R58.**
+
+- [ ] T64 — Tests del rol: `rol-aplicacion.test.ts` afirma contra la base real que el rol de la app **no** es superusuario, **no** tiene `BYPASSRLS` y **no** es dueño de las tablas; que no tiene privilegio `DELETE` en ninguna tabla ni `UPDATE`/`DELETE` sobre `audit_log` (`has_table_privilege`); y un test unitario de que el arranque aborta con un rol privilegiado. **Cubre: R43, R44, R45.**
+
+## Bloque 15 — Re-verificación de §C7 con el rol real
+
+- [ ] T65 — Re-ejecutar la suite de aislamiento con la app corriendo bajo el rol de aplicación: los 9 accesos cruzados siguen en 404 **y**, además, una consulta cruda sin `WHERE` lanzada por la conexión de la app devuelve solo filas del tenant activo (prueba de que ahora mide el motor y no el `WHERE` del repositorio). Incluir el caso de escritura cruzada sobre `user` de T52. **Cubre: R38, R48, R58.**
+
+- [ ] T66 — Reescribir `audit-log.test.ts`: eliminar del `beforeAll` la creación de la función y los triggers; las aserciones de inmutabilidad corren contra el esquema que dejan las migraciones y, además, con el rol de aplicación (que ni siquiera tiene privilegio de UPDATE/DELETE). Verificar que el test **falla** si se comenta el `CREATE TRIGGER` de la migración. **Cubre: R40, R41, R57, R58.**
+
+- [ ] T67 — Actualizar `progress/impl_owner_tenant_profiles.md` con el mapa de trazabilidad `R38..R58 → test concreto`, el estado de #2/#3/#4 (revertidas a `in_progress`, cerradas por T65/T66) y las respuestas del humano a PA-8…PA-11 tal como se aplicaron. **Cubre: trazabilidad (`docs/specs.md`), `design.md` §17.**
+
+- [ ] T68 — Ejecutar `npm run lint`, `npm run typecheck`, `npm run test`, `npm run test:db` y `npm run build`; después `./init.sh` con exit code 0 —ahora incluyendo `test:db` en el semáforo—. **Verificación final.**
