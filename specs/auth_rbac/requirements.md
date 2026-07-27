@@ -19,9 +19,10 @@
 | Unicidad del correo | `UNIQUE (email)` global | `UNIQUE (tenant_id, email)` — los NULL siguen conviviendo |
 | `user_role` | FK simple a `user(id)` | FK **compuesta** `(user_id, tenant_id)`: el rol no puede apuntar a otro tenant que el de su identidad |
 | Política RLS de `user` | `FOR ALL USING (id IN (SELECT user_id FROM user_role …))`, sin `WITH CHECK` | Política estándar del proyecto: `tenant_id = current_setting('app.current_tenant', true)::uuid` en `USING` y en `WITH CHECK` |
-| `POST /auth/login` (R3) | `{ email, password }` | `{ nit, email, password }` — **400** si falta el `nit`; 401 uniforme si el correo es de otro tenant o el `nit` no existe |
+| `POST /auth/login` (R3) | `{ email, password }` | `{ codigo, email, password }` — **400** si falta el `codigo` o no cumple el formato; 401 uniforme si el correo es de otro tenant o el `codigo` no existe |
 | JWT (R4) | `roles: [{tenant_id, rol}]` de **varios** tenants | roles de **un solo** tenant: una identidad pertenece a una única inmobiliaria |
 | Consulta del login | `pool.query` sin contexto de tenant | dentro de transacción, con `SET LOCAL app.current_tenant`, **bajo RLS** |
+| Identificador de inmobiliaria | no existía | `tenant.codigo` (D-12), código legible tipo `arrendamientos-sion`, único, con formato de etiqueta DNS para servir de subdominio en RF-INT2 |
 
 **Motivo (D-8).** La política `FOR ALL` sin `WITH CHECK` de esta feature
 contradecía el modelo de identidad de #5: con un rol sujeto a RLS impedía crear
@@ -36,8 +37,8 @@ inmobiliaria.
 endpoints) siguen vigentes tal cual. El `RolesGuard` sigue rechazando con 403
 cualquier `x-tenant-id` que no coincida con el token (#5 R33).
 
-**Dónde está el detalle:** `specs/owner_tenant_profiles/requirements.md` grupo M
-(R59–R67) y `design.md` §20.1, §20.2 y §20.4 (qué parte de RF-AU6 queda cubierta
+**Dónde está el detalle:** `specs/owner_tenant_profiles/requirements.md` grupos M
+(R59–R67) y O (R73–R77) y `design.md` §20.1, §20.2 y §20.4 (qué parte de RF-AU6 queda cubierta
 y cuál no).
 
 ---
@@ -123,8 +124,8 @@ La tabla debe tener RLS habilitado con FORCE. La política de RLS debe filtrar p
 
 ### R3 — Login (RF-AU1)
 
-> ⚠️ **Enmendado por #5 (D-8):** el endpoint exige `nit` además de `email` y
-> `password`. Ver ENMIENDA 2 al inicio.
+> ⚠️ **Enmendado por #5 (D-8 y D-12):** el endpoint exige el `codigo` de la
+> inmobiliaria además de `email` y `password`. Ver ENMIENDA 2 al inicio.
 
 El endpoint `POST /auth/login` debe:
 1. Aceptar `{ email, password }`.

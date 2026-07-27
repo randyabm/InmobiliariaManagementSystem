@@ -738,15 +738,16 @@ construida**. Si el correo deja de ser único global, `POST /auth/login` con
 `{email, password}` es ambiguo: puede haber dos personas distintas con el mismo
 correo en dos inmobiliarias.
 
-**Diseño mínimo (R63, R66):** el login pasa a exigir el **`nit`** de la
-inmobiliaria —columna que ya existe en `tenant`, única desde la feature #2— y
-resuelve así:
+**Diseño (R63, R66, y D-12):** el login pasa a exigir el **`codigo`** de la
+inmobiliaria —columna nueva en `tenant`, ver §20.7— y resuelve así:
 
 ```
-1. tenant_por_nit(nit) → tenant_id            (SECURITY DEFINER, coincidencia exacta)
-2. BEGIN; SET LOCAL app.current_tenant = tenant_id
-3. SELECT … FROM "user" WHERE email = $1      (ya filtrado por RLS)
-4. 401 uniforme si: no hay nit, no hay fila, password_hash NULL o clave incorrecta
+1. normalizar(codigo)                          (trim + minúsculas, R74)
+2. tenant_por_codigo(codigo) → tenant_id       (SECURITY DEFINER, coincidencia exacta)
+3. BEGIN; SET LOCAL app.current_tenant = tenant_id
+4. SELECT … FROM "user" WHERE email = $1       (ya filtrado por RLS)
+5. 401 uniforme si: el código no existe, no hay fila, password_hash NULL o clave incorrecta
+   400 solo si el código falta o no cumple el formato
 ```
 
 Dos propiedades que no son accidentales:
@@ -755,14 +756,11 @@ Dos propiedades que no son accidentales:
   crudo, fuera de toda transacción con contexto de tenant (`auth.service.ts:44`),
   que es exactamente lo que la revisión señaló en B4.3. Ahora corre bajo RLS como
   todo lo demás, y §3 ya no necesita tolerar una excepción.
-- **El 401 es uniforme (R64).** Correo de otro tenant, `nit` inexistente y clave
-  incorrecta responden lo mismo. Si el `nit` inexistente diera un error distinto,
-  el login se convertiría en un oráculo para descubrir qué inmobiliarias son
-  clientes del SaaS.
-
-**No se inventa producto:** el PRD no define subdominios ni SSO para el MVP
-(RF-INT2/RF-INT3 son fase 3-4), así que el selector es el `nit` y la incomodidad
-de cara al usuario queda planteada como **PA-12**, no resuelta por un agente.
+- **El 401 es uniforme (R64).** Correo de otro tenant, código inexistente y
+  clave incorrecta responden lo mismo. Si el código inexistente diera un error
+  distinto, el login se convertiría en un oráculo para descubrir qué
+  inmobiliarias son clientes del SaaS. El **400** se reserva para lo que es
+  error de forma —falta el código o no cumple el formato—, que no revela nada.
 
 ### 20.3 D-9: el contacto se muda al perfil (delta, no rediseño)
 
@@ -801,7 +799,17 @@ cuenta de identidad **puede** ser única, pero con acceso segmentado por tenant.
 | Soportar que una persona se relacione con varias inmobiliarias | **Cubierto.** Nada lo impide: tendrá un perfil y una identidad en cada una. |
 | Acceso **segmentado por tenant** | **Cubierto, y más fuerte que antes.** La segmentación ya no depende de filtrar roles en el token: la identidad misma pertenece a un solo tenant y el RLS la aísla. |
 | Cuenta de identidad **única** | **No cubierto, a propósito.** El PRD dice "puede", no "debe". D-8 elige que no lo sea. |
-| Consecuencia práctica | Esa persona tendrá **dos cuentas, dos contraseñas y dos portales**, y al entrar tendrá que indicar con qué inmobiliaria. Confirmación pedida en **PA-13**. |
+| Consecuencia práctica | Esa persona tendrá **dos cuentas, dos contraseñas y dos portales**, y al entrar tendrá que indicar con qué inmobiliaria (su `codigo`). |
+
+> **Aceptado explícitamente por el humano (D-13, 2026-07-27),** también para el
+> **portal del inquilino** (RF-AU2/AU4), que es donde el coste se nota de
+> verdad: el inquilino que arrienda con dos inmobiliarias mantendrá dos
+> credenciales y entrará a dos portales distintos. No es un efecto colateral que
+> se haya deslizado en el diseño: es la opción elegida, con su precio conocido.
+
+La lectura estrecha, para que quede escrita sin ambigüedad: **RF-AU6 se cumple
+en su parte de segmentación y se renuncia a su parte de cuenta única**, que el
+propio PRD deja opcional.
 
 También queda afectado **RF-C2** ("un mismo usuario puede tener múltiples
 roles/relaciones"): sigue siendo cierto **dentro de un tenant** (una persona
@@ -853,3 +861,40 @@ D-8 introduce:
   que `perfil_inquilino` tiene ahora `email_contacto` y que no debe volver a
   introducir vinculación de identidades entre tenants.
 - **Feature #6 y siguientes:** ninguna dependencia declarada en §6 cambia.
+
+### 20.7 D-12: el código de inmobiliaria
+
+El selector del login no es el NIT sino un **código corto legible**
+(`arrendamientos-sion`). Decisión del humano; los motivos que dio:
+
+1. **Legible para el usuario.** Escribir un NIT en un formulario de acceso es
+   incómodo y propenso a error; un código con el nombre de la inmobiliaria se
+   recuerda.
+2. **No expone la lista de clientes del SaaS**, a diferencia de un desplegable
+   de inmobiliarias.
+3. **Sirve tal cual como subdominio** cuando llegue RF-INT2/RF-INT3 (fase 3-4):
+   `arrendamientos-sion.portal.example.com`. El login no habrá que rehacerlo.
+
+De (3) sale toda la validación (**R73**): el formato es el de una **etiqueta DNS
+válida** —`^[a-z0-9]+(-[a-z0-9]+)*$`, de 3 a 63 caracteres—, que además cumple
+por construcción la regla de `docs/conventions.md` de no usar tildes ni `ñ` en
+identificadores. Y de ahí sale también la lista de **códigos reservados**
+(**R75**): permitir `www` o `api` hoy garantiza una colisión el día del
+despliegue de los subdominios. Es una salvaguarda técnica barata ahora y cara
+después.
+
+**Backfill (R76).** Los tenants existentes reciben su código derivado del
+`nombre` de forma determinista (minúsculas, sin tildes, separadores a guiones,
+recorte a 63) con sufijo numérico ante colisión. Determinista importa: el mismo
+dato de partida produce el mismo código en desarrollo, en CI y en cualquier
+entorno, así que ningún test depende del orden de inserción.
+
+**Quién lo asigna (R77).** Hoy, quien da de alta la inmobiliaria, que es una
+operación directa sobre la base: **no existe endpoint de alta de tenant**, y el
+PRD describe el rol Super Admin (§3) pero no un `RF-*` de onboarding. El spec no
+inventa ese flujo: se limita a exigir que el motor valide el código venga de
+donde venga. Queda como **PA-14**, sin bloquear nada.
+
+**Qué NO cambia el código.** El `nit` sigue en `tenant` (feature #2) como dato
+fiscal de la inmobiliaria; simplemente deja de usarse como identificador de
+acceso. Ningún requirement lo elimina.

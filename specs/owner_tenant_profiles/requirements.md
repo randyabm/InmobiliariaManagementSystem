@@ -585,13 +585,14 @@ responder 200 con `access_token`.
 ### R52 — (RF-AU1, RF-C3, §11.3, D-8) Única ruta previa al contexto de tenant
 
 EL sistema DEBE resolver el tenant del login mediante una **única** función
-`SECURITY DEFINER` de coincidencia exacta por `nit`
-(`tenant_por_nit(text) RETURNS uuid`), sin patrones ni listados, y NO DEBE
+`SECURITY DEFINER` de coincidencia exacta por código de inmobiliaria
+(`tenant_por_codigo(text) RETURNS uuid`), sin patrones ni listados, y NO DEBE
 exponer ninguna otra ruta de lectura que evite el RLS.
 
 > Antes de D-8 hacían falta dos funciones sobre `user` (una para el login y otra
-> para vincular por email). Con D-8 solo queda esta, y su superficie es menor:
-> el NIT es un identificador público de empresa, no un dato personal.
+> para vincular por email). Con D-8 solo queda esta, y su superficie es mínima:
+> devuelve un `uuid` a partir de un código que el propio tenant reparte a sus
+> usuarios. **D-12** cambió el parámetro de `nit` a `codigo`.
 
 ### R53 — ~~La vinculación por email sigue cumpliéndose~~ — **ELIMINADO por D-8**
 
@@ -686,30 +687,32 @@ ninguna identidad existente de otro tenant, coincida o no el correo.
 
 ### R63 — (RF-AU1, D-8) El login identifica la inmobiliaria
 
-CUANDO se invoca `POST /auth/login`, el sistema DEBE exigir el `nit` de la
-inmobiliaria además de `email` y `password`, y DEBE responder 400 si falta.
+CUANDO se invoca `POST /auth/login`, el sistema DEBE exigir el `codigo` de la
+inmobiliaria además de `email` y `password`, y DEBE responder 400 si falta o si
+no cumple el formato de **R73**.
 
-> El `nit` ya existe en `tenant` y es único (feature #2). Es el único
-> identificador de inmobiliaria que hay hoy en el esquema: **no se inventan
-> subdominios, slugs ni SSO**, que en el PRD son RF-INT2/RF-INT3 (fase 3-4).
-> Si el humano prefiere otro selector de cara al usuario, ver **PA-12**.
+> **D-12.** El humano descartó el `nit`: un código legible
+> (`arrendamientos-sion`) es más usable, no expone la lista de clientes del SaaS
+> y **sirve tal cual como subdominio** cuando llegue RF-INT2/RF-INT3 (fase 3-4),
+> sin rehacer el login.
 
 ### R64 — (RF-AU1, D-8, RF-A1) Un correo de otra inmobiliaria no autentica
 
-SI las credenciales corresponden a un `user` de un tenant distinto al `nit`
-recibido ENTONCES el sistema DEBE responder 401, con el mismo mensaje y el
-mismo código que unas credenciales inválidas.
+SI las credenciales corresponden a un `user` de un tenant distinto al `codigo`
+recibido, o el `codigo` no corresponde a ninguna inmobiliaria, ENTONCES el
+sistema DEBE responder 401 con el mismo mensaje y el mismo código de error que
+unas credenciales inválidas.
 
 ### R65 — (RF-AU1, RF-AU6, D-8) Mismo correo en dos inmobiliarias
 
 CUANDO dos personas registradas con el **mismo correo** en tenants distintos se
-autentican cada una con el `nit` de su inmobiliaria, el sistema DEBE emitir a
+autentican cada una con el `codigo` de su inmobiliaria, el sistema DEBE emitir a
 cada una el token de su propio tenant.
 
 ### R66 — (RF-AU1, D-8, D2) El login se ejecuta con contexto de tenant
 
-CUANDO se procesa un login, el sistema DEBE resolver el `nit` a `tenant_id` con
-la función acotada de **R52**, establecer `app.current_tenant` y consultar
+CUANDO se procesa un login, el sistema DEBE resolver el `codigo` a `tenant_id`
+con la función acotada de **R52**, establecer `app.current_tenant` y consultar
 `user` **bajo RLS**, en lugar de consultar la tabla sin contexto de tenant.
 
 > Cierra el defecto de `auth.service.ts:44` señalado en la revisión (B4.3) y
@@ -775,7 +778,68 @@ perfil, sin leer la tabla `user`.
 
 ---
 
-## DECISIONES DEL HUMANO (v4) — D-8 … D-11
+---
+
+## Grupo O — D-12: código legible de inmobiliaria
+
+> **Decisión del humano (D-12):** el selector del login es un **código corto
+> legible** (`arrendamientos-sion`), no el NIT. Motivos dados: es legible, no
+> expone la lista de clientes del SaaS y **sirve tal cual como subdominio**
+> cuando llegue RF-INT2/RF-INT3, sin rehacer el login.
+
+### R73 — (D-12, RF-INT2, `docs/conventions.md`) Columna `tenant.codigo`
+
+EL sistema DEBE añadir a `tenant` la columna `codigo text NOT NULL UNIQUE` con
+un `CHECK` que solo admita cadenas de 3 a 63 caracteres que casen
+`^[a-z0-9]+(-[a-z0-9]+)*$`.
+
+> El formato es el de una **etiqueta DNS válida** (minúsculas, dígitos y
+> guiones interiores, máximo 63): así el mismo valor sirve de subdominio en
+> fase 3-4 sin migrar nada. Sin tildes ni `ñ`, como exige
+> `docs/conventions.md` para todo identificador.
+
+### R74 — (D-12) Normalización del código recibido
+
+CUANDO el sistema recibe un `codigo` en el login, DEBE normalizarlo recortando
+espacios y pasándolo a minúsculas antes de resolverlo.
+
+> Mismo criterio que ya se aplica al email (`normalizarEmail`). Evita que
+> `Arrendamientos-Sion ` falle por un espacio o una mayúscula.
+
+### R75 — (D-12, RF-INT2) Códigos reservados
+
+EL sistema NO DEBE permitir como `codigo` ninguno de los nombres reservados
+para subdominios de servicio: `www`, `api`, `app`, `admin`, `portal`, `static`,
+`mail`, `cdn`.
+
+> Salvaguarda técnica, no decisión de producto: si el código va a ser un
+> subdominio, permitir `www` garantiza una colisión el día que se despliegue
+> RF-INT2. Reservarlos ahora cuesta una lista; hacerlo después cuesta renombrar
+> a un cliente en producción.
+
+### R76 — (D-12, `docs/conventions.md`) Backfill determinista
+
+CUANDO se aplica la migración de D-12, el sistema DEBE derivar el `codigo` de
+cada tenant existente de su `nombre` —minúsculas, sin tildes, espacios y signos
+a guiones, recortado a 63 caracteres— y, ante colisión, añadir el sufijo
+numérico más bajo disponible (`-2`, `-3`, …), antes de imponer `NOT NULL` y
+`UNIQUE`.
+
+> Determinista a propósito: dos ejecuciones sobre los mismos datos producen los
+> mismos códigos, así que el resultado es reproducible en cualquier entorno.
+
+### R77 — (D-12) Asignación del código a una inmobiliaria nueva
+
+EL sistema DEBE validar el `codigo` con las mismas reglas (R73, R75) en
+cualquier alta de tenant, y NO DEBE generarlo automáticamente para altas
+nuevas.
+
+> Hoy los tenants se crean por operación directa sobre la base (no existe
+> endpoint de alta de inmobiliaria: el PRD describe el rol Super Admin en §3
+> pero no un `RF-*` de onboarding). El código lo asigna quien da de alta la
+> inmobiliaria, y el motor lo valida. Ver **PA-14**.
+
+## DECISIONES DEL HUMANO (v4) — D-8 … D-13
 
 Resuelven PA-8 … PA-11. Se conserva el enunciado de la pregunta y el motivo dado,
 para que nadie tenga que reconstruir por qué el diseño es el que es.
@@ -786,6 +850,8 @@ para que nadie tenga que reconstruir por qué el diseño es el que es.
 | **D-9** | **PA-8** — ¿de quién son los datos de contacto de una identidad compartida? | **El contacto vive en el perfil**; `user` conserva solo la credencial de acceso. | Correo y teléfono de contacto son un dato *de la relación comercial* con esa inmobiliaria, no de la persona en abstracto: dos inmobiliarias pueden tener datos distintos del mismo propietario y ninguna debe pisar los de la otra. | Añade el **Grupo N** (R68–R72). Enmienda R1, R2, R10, R12 y R19. `user.email` queda NULL en los clientes (R71). |
 | **D-10** | **PA-11** — gestión de la credencial del rol de aplicación | **Dos URLs por entorno:** `DATABASE_URL` (rol de aplicación, sin `BYPASSRLS` y no superusuario) y `DATABASE_MIGRATION_URL` (rol privilegiado, solo migraciones). Se mantiene el fail-fast de arranque. | Separar quién migra de quién sirve es la forma estándar y auditable de que el RLS deje de ser decorativo; el fail-fast impide que una regresión de despliegue lo desactive en silencio. | Confirma R43–R48 sin cambios. Afecta a `docker-compose.yml`, `.env.example`, `init.sh` y al arranque. |
 | **D-11** | Alcance del arreglo | **Los cuatro hallazgos se corrigen dentro de #5**, no en una feature aparte. | Dos son defectos de código propio de #5 y §C7 se comprueba en cada feature: diferir solo movía el bloqueo. | `design.md` §15. #2, #3 y #4 quedan reabiertas (`blocked`) y se cierran cuando #5 demuestre los invariantes con el rol real (R58). |
+| **D-12** | **PA-12** — ¿cómo elige el usuario su inmobiliaria al iniciar sesión? | **Código corto legible** en `tenant` (`arrendamientos-sion`), único, que sustituye al `nit` en el login. | Es legible para el usuario, no expone la lista de clientes del SaaS —a diferencia de un desplegable— y **sirve tal cual como subdominio** cuando llegue RF-INT2/RF-INT3, sin rehacer el login. | Añade el **Grupo O** (R73–R77). Reescribe R51, R52, R63, R64, R65 y R66: `tenant_por_nit` pasa a ser `tenant_por_codigo`. |
+| **D-13** | **PA-13** — alcance real de RF-AU6 | **Confirmado:** quien arriende con dos inmobiliarias tendrá **dos cuentas, dos contraseñas y dos portales**, también en el portal del inquilino (RF-AU2/AU4). | El PRD dice que la cuenta "puede" ser única, no que deba serlo; la segmentación por tenant es más fuerte si la identidad misma pertenece a un solo tenant. | No añade requirements. Se registra en `design.md` §20.4 junto con la lectura más estrecha de RF-C2 y RF-AU6. |
 
 **Estado tras D-8 y D-9:** B2 está cerrado (T53), y B1 y B4 encogen de forma
 notable — el detalle de qué se elimina y por qué está en cada requirement
@@ -795,35 +861,20 @@ tachado, nunca borrado en silencio.
 
 ## PREGUNTAS ABIERTAS
 
-**PA-8, PA-9, PA-10 y PA-11 están RESUELTAS** por las decisiones D-8, D-9, D-10
-y D-11 de la tabla anterior. Se conserva el enunciado de cada una allí, con su
-motivo, para que no haya que reconstruir por qué el diseño es el que es.
+**PA-8 … PA-13 están RESUELTAS** (D-8 … D-13). El enunciado de cada una y su
+motivo se conservan en la tabla anterior.
 
-Quedan dos preguntas nuevas, surgidas al especificar D-8. Ninguna se ha resuelto
-por cuenta propia; ambas llevan marcada la **opción mínima provisional** —la que
-no inventa producto fuera del PRD— y qué cambia si el humano decide otra cosa.
+Queda una sola pregunta, que surge al especificar D-12 y que **no bloquea la
+implementación**: el spec entrega la opción mínima y el motor valida el dato.
 
-- **PA-12 — ¿Cómo elige el usuario su inmobiliaria al iniciar sesión?**
-  (afecta a R63). Con D-8 el correo ya no identifica a nadie: hacen falta
-  `nit` + `email` + `password`. *Opción mínima provisional (R63):* el **`nit`**,
-  que ya existe en `tenant`, es único y no obliga a tocar el esquema.
-  Alternativas: **(a)** añadir a `tenant` un `codigo`/`slug` legible
-  (`inmobiliaria-lopez`) —mejor de cara al usuario, pero es una columna nueva y
-  una decisión de producto—; **(b)** deducir el tenant del **dominio o
-  subdominio** desde el que se sirve el portal, que es lo que el PRD prevé en
-  **RF-INT2/RF-INT3**… pero eso es **fase 3-4** y no existe hoy; **(c)** que el
-  formulario ofrezca un desplegable de inmobiliarias, lo que expondría
-  públicamente la lista de clientes del SaaS (no recomendable). **No he elegido
-  (a) ni (b) por mi cuenta: pedir un NIT en un formulario de login es feo, y si
-  el humano quiere un `slug`, es una columna y un requisito de producto que le
-  corresponde decidir.**
-
-- **PA-13 — Confirmación del alcance real de RF-AU6.** El PRD (§10.3, línea 556)
-  dice que la cuenta del inquilino *"puede ser única, pero con acceso segmentado
-  por tenant"*. Con D-8 **nunca** es única: una persona que arrienda con dos
-  inmobiliarias tendrá **dos cuentas, dos contraseñas y dos portales**, y tendrá
-  que saber con cuál entra. `design.md` §20.4 detalla qué parte de RF-AU6 queda
-  cubierta y cuál no. *Opción mínima provisional:* se asume aceptado, porque es
-  la consecuencia directa e inevitable de D-8. **Confirmar** que el humano lo da
-  por bueno también para el portal del inquilino (RF-AU2/AU4, features
-  posteriores), que es donde ese coste se nota de verdad.
+- **PA-14 — ¿Quién da de alta una inmobiliaria y le asigna su `codigo`?**
+  (afecta a R77). El PRD describe el rol **Super Admin** (§3: *"Administra
+  tenants, paquetes contratados, facturación"*) pero **no define ningún `RF-*`
+  de onboarding**: no hay endpoint de alta de tenant, ni pantalla, ni feature en
+  `feature_list.json`. *Opción mínima especificada:* el alta sigue siendo una
+  operación directa sobre la base de datos, el `codigo` lo escribe quien la
+  ejecuta y las reglas de R73/R75 lo validan en el motor —así ningún código
+  inválido entra, venga de donde venga—. **No he inventado el flujo de alta**:
+  cuándo y cómo se crea una inmobiliaria (¿autoservicio? ¿comercial? ¿con qué
+  validación del NIT?) es producto que el PRD no cubre. Si el humano quiere
+  resolverlo, es una feature propia, no un añadido a #5.

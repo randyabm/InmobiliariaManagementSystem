@@ -132,7 +132,7 @@
 > **dentro de #5** (`design.md` §15, D-11). Cobertura: **R38–R72 en 25 tasks**
 > (T48–T72), de las cuales 12 son tasks de test.
 >
-> **Reescrito el 2026-07-27 tras D-8 … D-11.** B2 quedó cerrado (T48, T49 y T53
+> **Reescrito el 2026-07-27 tras D-8 … D-13.** B2 quedó cerrado (T48, T49 y T53
 > están hechas); B1 y B4 encogieron; entran los bloques de identidad por tenant
 > (D-8) y de contacto en el perfil (D-9).
 >
@@ -142,8 +142,8 @@
 > hechas        T48 T49        puerta: test:db en init.sh + guard anti-DDL
 > hechas        T53            B2: triggers append-only en migración
 >  1            T50 T51 T52    B1: toda escritura sobre `user` va acotada al tenant
->  2            T54 T55 T56    D-8 esquema: user.tenant_id + política estándar + tenant_por_nit
->  3            T57 T58 T59    D-8 aplicación: login por (nit,email) e identidad siempre nueva
+>  2            T54 T73 T55 T56  D-8/D-12 esquema: user.tenant_id, tenant.codigo, política estándar, tenant_por_codigo
+>  3            T57 T58 T59    D-8 aplicación: login por (codigo,email) e identidad siempre nueva
 >  4            T69 T70 T71 T72  D-9: el contacto se muda al perfil
 >  5            T60 T61 T62 T63 T64  B3/D-10: rol sin BYPASSRLS (el conmutador)
 >  6            T65 T66 T67 T68  re-verificación de §C7 con el rol real
@@ -195,11 +195,16 @@
 > La app sigue conectándose como superusuario durante todo este bloque: las
 > políticas nuevas son inertes y nada se rompe.
 
-- [ ] T54 — Crear la migración `0007_identidad_por_tenant.sql`: añade `user.tenant_id` (backfill desde `user_role`, **abortando** si alguna identidad tiene roles en más de un tenant), lo deja `NOT NULL` con FK a `tenant(id)`, sustituye la `UNIQUE(email)` global por `UNIQUE (tenant_id, email)`, añade `UNIQUE (id, tenant_id)` y la FK compuesta `(user_id, tenant_id)` desde `user_role`, y reemplaza la política `user_tenant_isolation` (`FOR ALL` sin `WITH CHECK`) por la política estándar del proyecto con `USING` y `WITH CHECK` sobre `tenant_id`. En la misma corrida: adaptar las semillas y fixtures que ya no son representables —`entorno-clientes.ts` crea hoy una identidad `multiTenant` con roles en A y B—, reescribir el caso de R33 que la usaba para que el 403 se pruebe con un `x-tenant-id` ajeno, y simplificar el predicado de T50 a `AND tenant_id = $tenant`. **Cubre: R33, R38, R49, R59, R60, R61.**
+- [ ] T54 — Crear la migración `0007_identidad_por_tenant.sql`: añade `user.tenant_id` (backfill desde `user_role`, **abortando** si alguna identidad tiene roles en más de un tenant), lo deja `NOT NULL` con FK a `tenant(id)`, sustituye la `UNIQUE(email)` global por `UNIQUE (tenant_id, email)`, añade `UNIQUE (id, tenant_id)` y la FK compuesta `(user_id, tenant_id)` desde `user_role`, y reemplaza la política `user_tenant_isolation` (`FOR ALL` sin `WITH CHECK`) por la política estándar del proyecto con `USING` y `WITH CHECK` sobre `tenant_id`. En la misma migración: añadir `tenant.codigo text NOT NULL UNIQUE` con el `CHECK` de formato de R73, derivándolo del `nombre` de cada tenant existente de forma determinista antes de imponer las restricciones (R76). En la misma corrida: adaptar las semillas y fixtures que ya no son representables —`entorno-clientes.ts` crea hoy una identidad `multiTenant` con roles en A y B—, reescribir el caso de R33 que la usaba para que el 403 se pruebe con un `x-tenant-id` ajeno, y simplificar el predicado de T50 a `AND tenant_id = $tenant`. **Cubre: R33, R38, R49, R59, R60, R61, R73, R76.**
 
-- [ ] T55 — En la misma migración, crear `tenant_por_nit(text) RETURNS uuid` (`SECURITY DEFINER`, coincidencia exacta, `REVOKE ALL … FROM PUBLIC` y `GRANT EXECUTE` al rol de aplicación), con un comentario que declare su superficie. Es la **única** ruta de lectura previa al contexto de tenant. **Cubre: R52.**
+- [ ] T55 — En la misma migración, crear `tenant_por_codigo(text) RETURNS uuid` (`SECURITY DEFINER`, coincidencia exacta sobre `tenant.codigo`, `REVOKE ALL … FROM PUBLIC` y `GRANT EXECUTE` al rol de aplicación), con un comentario que declare su superficie. Es la **única** ruta de lectura previa al contexto de tenant. **Cubre: R52.**
 
 - [ ] T56 — Crear `identidad-rls.test.ts` (Testcontainers, rol sin `BYPASSRLS` provisionado por el helper, **nunca creado por el test**): `INSERT` de identidad con el `tenant_id` propio permitido y con uno ajeno rechazado; `SELECT` limitado al tenant; `UPDATE` de fila ajena rechazado; `DELETE` sin privilegio; el mismo correo en dos tenants convive y repetido dentro del mismo tenant da `23505`; y la FK compuesta impide un `user_role` en otro tenant. **Cubre: R49, R59, R60.**
+
+- [ ] T73 — Tests deterministas del código de inmobiliaria (`migrations.db.test.ts` y unitarios): el `CHECK` rechaza mayúsculas, tildes, guion inicial/final, menos de 3 y más de 63 caracteres, y acepta `arrendamientos-sion`; dos tenants no pueden compartir código (`23505`); el backfill produce códigos derivados del `nombre` y resuelve colisiones con el sufijo más bajo, dando el **mismo** resultado en dos ejecuciones; y los nombres reservados (`www`, `api`, `app`, `admin`, `portal`, `static`, `mail`, `cdn`) se rechazan. **Cubre: R73, R75, R76, R77.**
+
+> *Se ejecuta en el paso 2, justo después de T54; el número es posterior solo
+> porque no se renumera lo ya hecho.*
 
 ## Bloque 13 — D-8, aplicación: login por inmobiliaria e identidad siempre nueva
 
@@ -207,11 +212,11 @@
 > depende de que el correo sea único global, que es la condición para que el
 > conmutador del bloque 14 sea seguro.
 
-- [ ] T57 — Modificar `auth.service.ts`: `POST /auth/login` exige `nit` además de `email` y `password` (400 si falta); resuelve el tenant con `tenant_por_nit`; abre transacción, fija `app.current_tenant` y consulta `user` **bajo RLS**; conserva los 401 de R6 (sin `password_hash`) y R8 (email nulo o vacío) y responde 401 —mismo mensaje y mismo código— si el correo pertenece a otro tenant o si el `nit` no existe. **Cubre: R51, R63, R64, R66.**
+- [ ] T57 — Modificar `auth.service.ts`: `POST /auth/login` exige `codigo` además de `email` y `password` (400 si falta o si no cumple el formato de R73), lo normaliza a minúsculas sin espacios (R74) y resuelve el tenant con `tenant_por_codigo`; abre transacción, fija `app.current_tenant` y consulta `user` **bajo RLS**; conserva los 401 de R6 (sin `password_hash`) y R8 (email nulo o vacío) y responde 401 —mismo mensaje y mismo código— si el correo pertenece a otro tenant o si el `codigo` no existe. **Cubre: R51, R63, R64, R66, R74.**
 
 - [ ] T58 — Modificar `identidad.service.ts`: eliminar `vincularPorEmail` y todo rastro de reutilización entre tenants; la identidad es **siempre nueva** y se inserta con el `tenant_id` de la petición. Retirar los tests de R25 que ya no aplican, dejando constancia en el informe de implementación. Ajustar el JWT para que lleve los roles del único tenant del usuario. **Cubre: R26, R55, R62, R67.**
 
-- [ ] T59 — Tests deterministas del login por inmobiliaria: dos personas con **el mismo correo** en tenants distintos se autentican cada una con su `nit` y obtienen el token de su tenant; ninguna de las dos autentica con el `nit` de la otra (401); `nit` inexistente → 401; falta el `nit` → 400; siguen en verde los 401 de R6 y R8. **Cubre: R51, R63, R64, R65.**
+- [ ] T59 — Tests deterministas del login por inmobiliaria: dos personas con **el mismo correo** en tenants distintos se autentican cada una con su `codigo` y obtienen el token de su tenant; ninguna de las dos autentica con el `codigo` de la otra (401); `codigo` inexistente → 401 (mismo cuerpo que unas credenciales inválidas); falta el `codigo` o tiene formato inválido → 400; el `codigo` en mayúsculas o con espacios sobrantes autentica igual (R74); siguen en verde los 401 de R6 y R8. **Cubre: R51, R63, R64, R65, R74.**
 
 ## Bloque 16 — D-9: el contacto se muda al perfil
 
