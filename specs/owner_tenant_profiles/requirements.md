@@ -41,9 +41,12 @@ EL sistema DEBE persistir la hoja de vida del propietario en la tabla
 
 La tabla NO DEBE tener columna de **tarifa** de retención
 (`porcentaje_retencion` ni equivalente): por **D-2** la tarifa es
-configuración del tenant y se especifica en la feature #25. Los datos de
-contacto (`nombre`, `email`, `telefono`) no se duplican: viven en `user`
-(feature #3).
+configuración del tenant y se especifica en la feature #25.
+
+> ⚠️ **Enmendado por D-9 → ver R68.** La frase original *"los datos de contacto
+> (`nombre`, `email`, `telefono`) no se duplican: viven en `user`"* queda
+> superada: el **contacto** (`email_contacto`, `telefono_contacto`) pasa a vivir
+> en el perfil y `user` conserva solo la credencial de acceso.
 
 ### R2 — (RF-C4, RF-C1, D2) Tabla `perfil_inquilino`
 
@@ -63,6 +66,10 @@ EL sistema DEBE persistir la hoja de vida del inquilino en la tabla
 - `updated_at` timestamptz NOT NULL DEFAULT now()
 - UNIQUE (`tenant_id`, `user_id`)
 - UNIQUE (`tenant_id`, `tipo_documento`, `documento`)
+
+> ⚠️ **Enmendado por D-9 → ver R69.** Se añade `email_contacto text NOT NULL`
+> (RF-C4 exige correo del inquilino, y desde D-9 el correo de contacto es del
+> perfil, no de `user`).
 
 ### R3 — (RF-C5, RF-P1, D2) Tabla `cuenta_bancaria`
 
@@ -113,6 +120,11 @@ registros de `user` con el **mismo** email no nulo.
 
 > Consecuencia de **D-5** (email del propietario opcional). Modifica el
 > esquema entregado por la feature #3, ya cerrada: ver `design.md` §7.2.
+>
+> ⚠️ **Enmendado por D-8 → ver R59.** La unicidad deja de ser global y pasa a ser
+> **por tenant**: `UNIQUE (tenant_id, email)`. Dos personas distintas en dos
+> inmobiliarias distintas pueden tener el mismo correo; dentro de una misma
+> inmobiliaria siguen colisionando. Los NULL siguen conviviendo.
 
 ### R8 — (RF-AU1, D-5) El login por email sigue siendo correcto
 
@@ -242,21 +254,29 @@ SI `POST /propietarios` o `POST /inquilinos` envía un
 ENTONCES el sistema DEBE responder 409 con el código `PERFIL_YA_EXISTE` y NO
 DEBE crear un perfil duplicado.
 
-### R25 — (RF-C2, RF-AU6, RF-C6) Reutilización de identidad por email sin fuga
+### R25 — ~~(RF-C2, RF-AU6, RF-C6) Reutilización de identidad por email~~ — **ELIMINADO por D-8**
 
-CUANDO el `email` recibido ya corresponde a un `user` existente, el sistema
-DEBE reutilizar ese `user_id` creando únicamente el `user_role` y el perfil del
-tenant de la petición, y la respuesta NO DEBE incluir ningún dato proveniente
-de perfiles de ese `user` en otros tenants.
+> **ELIMINADO (decisión D-8).** Decía: *"CUANDO el `email` recibido ya
+> corresponde a un `user` existente, el sistema DEBE reutilizar ese `user_id`
+> creando únicamente el `user_role` y el perfil del tenant de la petición…"*.
+>
+> El humano decidió que **nunca se vinculan identidades entre tenants**: cada
+> inmobiliaria tiene su propia fila de `user` para una misma persona. Lo
+> sustituye **R62**. Su desaparición arrastra a R39, R50, R53 y R54, y reduce la
+> política de `user` a la estándar por `tenant_id` (**R59** y **R49** reescrito).
+>
+> El hueco de numeración se conserva a propósito: R25 llegó a implementarse, así
+> que hay código y tests que **retirar**, no solo dejar de escribir.
 
-### R26 — (RF-C6, D-5, D-7) Sin email no se vincula por documento
+### R26 — (RF-C6, D-5, D-7, D-8) Sin email tampoco se busca por documento
 
 SI se crea un propietario sin `email` ENTONCES el sistema DEBE crear una
-identidad `user` nueva y NO DEBE vincularla a ninguna identidad existente
-buscándola por `documento`.
+identidad `user` nueva y NO DEBE buscar ninguna identidad existente por
+`documento`.
 
-> Buscar por documento fuera del tenant revelaría que la persona ya es cliente
-> de otra inmobiliaria (§11.3). Consecuencia asumida en `design.md` §7.3.
+> Sigue vigente y ahora es un caso particular de **R62** (con D-8 la identidad
+> es *siempre* nueva). Buscar por documento fuera del tenant revelaría que la
+> persona ya es cliente de otra inmobiliaria (§11.3).
 
 ---
 
@@ -396,28 +416,38 @@ este archivo (**PA-8 … PA-11**).
 > cuenta. Los 9 tests de acceso cruzado existentes no lo ven: solo tocan
 > `perfil_*` y `cuenta_bancaria`.
 >
-> Nota para quien implemente: filtrar por *"la identidad tiene un `user_role`
-> en mi tenant"* **NO cierra el ataque**, porque el paso 1 del ataque crea
-> precisamente ese `user_role`. La condición tiene que ser de **exclusividad**.
+> **Reescrito el 2026-07-27 tras D-8 y D-9.** Las decisiones del humano
+> **desactivan la cadena de ataque en su paso 1**: si las identidades nunca se
+> comparten entre tenants (D-8), el tenant A no puede vincularse la identidad
+> del admin de B; y si el contacto vive en el perfil (D-9), el `PATCH` del
+> perfil ya no escribe `email` ni `telefono` en `user`. Lo que queda de B1 es
+> más simple —y sigue siendo obligatorio— porque `UPDATE "user" … WHERE id = $N`
+> sin condición de tenant es un defecto por sí mismo: basta un `user_id` mal
+> resuelto para escribir en la fila de otra inmobiliaria.
 
-### R38 — (RF-A1, RF-C3, §11.3) La identidad compartida no se puede reescribir
+### R38 — (RF-A1, RF-C3, §11.3) Toda escritura sobre `user` va acotada al tenant
 
-CUANDO se actualiza `nombre`, `email` o `telefono` de un propietario o un
-inquilino, el sistema DEBE ejecutar el `UPDATE` sobre `user` únicamente si esa
-identidad **no tiene ningún `user_role` en un tenant distinto** al de la
-petición.
+CUANDO se actualiza un campo de `user` desde el CRUD de propietarios o
+inquilinos, el sistema DEBE incluir en la sentencia la condición de que esa
+identidad pertenece al tenant de la petición.
 
-### R39 — (RF-A1, §11.3, PA-8) Rechazo explícito ante identidad compartida
+> Predicado válido antes y después de la migración de D-8 (`design.md` §20.1):
+> `EXISTS (SELECT 1 FROM user_role ur WHERE ur.user_id = "user".id AND ur.tenant_id = $tenant)`
+> `AND NOT EXISTS (SELECT 1 FROM user_role ur WHERE ur.user_id = "user".id AND ur.tenant_id <> $tenant)`.
+> Una vez `user` tenga su propia columna `tenant_id` (**R59**), se simplifica a
+> `AND tenant_id = $tenant`.
 
-SI se intenta actualizar `nombre`, `email` o `telefono` de una identidad
-vinculada a otro tenant ENTONCES el sistema DEBE responder 409 con el código
-`IDENTIDAD_COMPARTIDA_NO_EDITABLE` y NO DEBE modificar ninguna fila de `user`.
+### R39 — ~~Rechazo 409 ante identidad compartida~~ — **ELIMINADO por D-8**
 
-> Alcance provisional a la espera de **PA-8**: los campos del **perfil**
-> (`documento`, `ciudad`, `sujeto_retencion`, `celular`,
-> `medio_preferido_contacto`…) siguen siendo editables con normalidad, porque
-> son del tenant. Solo se bloquean los tres campos que viven en la identidad
-> global.
+> **ELIMINADO (decisión D-8).** Decía: *"SI se intenta actualizar `nombre`,
+> `email` o `telefono` de una identidad vinculada a otro tenant ENTONCES el
+> sistema DEBE responder 409 `IDENTIDAD_COMPARTIDA_NO_EDITABLE`…"*.
+>
+> Con D-8 **no existen identidades compartidas**, así que el 409 no tiene caso
+> de uso: nunca podría dispararse en operación normal y el error sería código
+> muerto. El caso residual —un `user_id` que no pertenece al tenant— se trata
+> como cualquier otro recurso ajeno: **404**, sin confirmar su existencia
+> (R31 y `docs/conventions.md`). No se crea `IdentidadCompartidaNoEditableError`.
 
 ---
 
@@ -523,55 +553,62 @@ del contenedor.
 > el mundo** porque `auth.service.ts:44` consulta `user` sin contexto de tenant.
 > **B3 y B4 son inseparables** y su orden está fijado en `design.md` §16.
 
-### R49 — (RF-C3, D2) Políticas de `user` explícitas por comando
+> **Reescrito el 2026-07-27 tras D-8.** La política era retorcida porque `user`
+> era una tabla **global** con una política pensada para tablas con `tenant_id`.
+> Al decidir el humano que las identidades nunca se comparten, `user` pasa a ser
+> una tabla de negocio normal, con `tenant_id` propio (**R59**) y la **misma
+> política estándar** que el resto. Desaparecen el bloqueo circular, la función
+> de búsqueda por email y toda la casuística de visibilidad entre tenants.
 
-EL sistema DEBE sustituir la política `FOR ALL` de `user` por políticas
-explícitas por comando (`SELECT`, `INSERT`, `UPDATE`) con su `WITH CHECK` propio
-donde aplique, y NO DEBE definir política de `DELETE` (la identidad no se
-borra).
+### R49 — (RF-C3, D2, D-8) Política estándar por tenant en `user`
 
-### R50 — (RF-A1, §11.3) El motor también impide reescribir identidad compartida
+EL sistema DEBE sustituir la política `FOR ALL` sin `WITH CHECK` de `user`
+(`0003_auth_rbac.sql:48-54`) por la política estándar del proyecto —
+`USING (tenant_id = current_setting('app.current_tenant', true)::uuid)` con el
+mismo predicado en `WITH CHECK` — y NO DEBE conceder al rol de aplicación
+privilegio de `DELETE` sobre la tabla.
 
-SI el rol de aplicación intenta un `UPDATE` sobre una fila de `user` cuya
-identidad tiene `user_role` en otro tenant ENTONCES la política RLS DEBE
-rechazar la sentencia, con independencia de lo que haga el código de
-aplicación.
+### R50 — ~~El motor impide reescribir identidad compartida~~ — **ELIMINADO por D-8**
 
-> Defensa en profundidad de **R38**: la misma regla escrita dos veces, una en el
-> repositorio y otra en el motor. B1 existe justamente porque una sola capa se
-> olvidó.
+> **ELIMINADO (decisión D-8).** Era la defensa en profundidad del 409 de R39.
+> Sin identidades compartidas, el predicado de exclusividad se vuelve redundante:
+> la política estándar de R49 ya impide tocar filas de otro tenant, que es la
+> propiedad que de verdad se quería. La defensa en profundidad de **R38** la da
+> ahora R49 (repositorio + motor, la misma regla escrita dos veces).
 
-### R51 — (RF-AU1, RF-C3) El login sigue funcionando con RLS activo
+### R51 — (RF-AU1, RF-C3, D-8) El login funciona con RLS activo
 
-CUANDO `POST /auth/login` recibe credenciales válidas y la aplicación corre con
-el rol sujeto a RLS, el sistema DEBE responder 200 con `access_token`.
+CUANDO `POST /auth/login` recibe un identificador de inmobiliaria y credenciales
+válidas, y la aplicación corre con el rol sujeto a RLS, el sistema DEBE
+responder 200 con `access_token`.
 
-### R52 — (RF-AU1, RF-C3, §11.3) Ruta de identidad acotada
+### R52 — (RF-AU1, RF-C3, §11.3, D-8) Única ruta previa al contexto de tenant
 
-EL sistema DEBE resolver la identidad previa al contexto de tenant (login y
-vinculación por email) mediante funciones `SECURITY DEFINER` de **coincidencia
-exacta por email**, sin patrones, sin listados y sin devolver más columnas de
-las que necesita cada caso de uso.
+EL sistema DEBE resolver el tenant del login mediante una **única** función
+`SECURITY DEFINER` de coincidencia exacta por `nit`
+(`tenant_por_nit(text) RETURNS uuid`), sin patrones ni listados, y NO DEBE
+exponer ninguna otra ruta de lectura que evite el RLS.
 
-### R53 — (RF-C2, RF-AU6, RF-C6) La vinculación por email sigue cumpliéndose
+> Antes de D-8 hacían falta dos funciones sobre `user` (una para el login y otra
+> para vincular por email). Con D-8 solo queda esta, y su superficie es menor:
+> el NIT es un identificador público de empresa, no un dato personal.
 
-CUANDO se crea un cliente cuyo email ya corresponde a un `user` existente y la
-aplicación corre con el rol sujeto a RLS, el sistema DEBE reutilizar ese
-`user_id` (R25) obteniéndolo por la función acotada, que DEBE devolver
-únicamente el identificador.
+### R53 — ~~La vinculación por email sigue cumpliéndose~~ — **ELIMINADO por D-8**
 
-### R54 — (RF-W4, §11.3) La vinculación de identidad queda auditada
+> **ELIMINADO (decisión D-8).** Dependía de R25, también eliminado. Lo sustituye
+> **R62**: la identidad es siempre nueva dentro del tenant.
 
-CUANDO se reutiliza una identidad ya existente para darla de alta en otro
-tenant, el sistema DEBE registrar en `audit_log` una entrada con
-`accion = 'vincular_identidad'`, sin incluir el email en `metadata` (R36).
+### R54 — ~~Auditoría de la vinculación de identidad~~ — **ELIMINADO por D-8**
 
-### R55 — (RF-C6, RF-PI2) La creación de identidad sigue siendo posible
+> **ELIMINADO (decisión D-8).** No hay vinculación que auditar. La creación de
+> cliente ya se audita por R35 (`accion = 'crear'`).
+
+### R55 — (RF-C6, RF-PI2, D-8) La creación de identidad no la bloquea ninguna política
 
 CUANDO se crea un propietario o un inquilino con la aplicación corriendo bajo el
-rol sujeto a RLS, el sistema DEBE insertar la fila de `user` y la de `user_role`
-en la misma transacción sin que ninguna política las bloquee (R22 sigue
-vigente).
+rol sujeto a RLS, el sistema DEBE insertar la fila de `user` —con el `tenant_id`
+de la petición— y la de `user_role` en la misma transacción sin que ninguna
+política las rechace (R22 sigue vigente).
 
 ---
 
@@ -608,51 +645,185 @@ privilegiado.
 
 ---
 
-## PREGUNTAS ABIERTAS tras la revisión (requieren decisión del humano)
+## Grupo M — D-8: la identidad es de un solo tenant
 
-Ninguna se ha resuelto por cuenta propia. Donde hacía falta elegir para poder
-redactar, se marca la **opción mínima provisional** —la que satisface los
-requirements existentes sin ampliar visibilidad— y qué cambia si el humano
-decide otra cosa.
+> **Decisión del humano (D-8):** nunca se vinculan identidades entre
+> inmobiliarias. Cada tenant tiene su propia fila de `user` para una misma
+> persona física. Esto convierte `user` en una tabla de negocio normal y obliga
+> a que el login sepa **en qué inmobiliaria** entra, porque el correo ya no
+> identifica a nadie por sí solo.
 
-- **PA-8 — ¿De quién son los datos de contacto de una identidad compartida?**
-  (bloquea B1). Hoy `nombre`, `email` y `telefono` viven en `user`, que es
-  global, y el PATCH del perfil los edita. *Opción mínima provisional (R38,
-  R39):* **se bloquean** con 409 en cuanto la identidad tiene rol en otro
-  tenant. Alternativas: **(a)** copiar los datos de contacto al perfil, de modo
-  que cada inmobiliaria tenga los suyos y `user` guarde solo la credencial;
-  **(b)** que solo los edite el tenant que creó la identidad; **(c)** que
-  `email` deje de ser editable desde el perfil en cualquier caso, por ser la
-  credencial de acceso. La opción (a) es la única que evita el 409 en operación
-  normal, pero cambia el esquema y contradice el "no se duplican" de R1.
+### R59 — (D-8, D2, RF-C3) `user` pasa a ser una tabla con `tenant_id`
 
-- **PA-9 — ¿Qué puede saber una inmobiliaria de una identidad de otra?**
-  (bloquea B4). R25/RF-C2/RF-AU6 obligan a reutilizar el `user` cuando el email
-  coincide, aunque sea de otro tenant. *Opción mínima provisional (R52, R53):*
-  una función acotada que, dado un email exacto, devuelve **solo el
-  identificador** —lo que implica que el tenant A puede **confirmar que un email
-  existe en el sistema**, aunque no vea de quién es—. Alternativas: **(a)**
-  aceptar esa confirmación implícita como coste de RF-AU6; **(b)** no vincular
-  nunca entre tenants (crear identidades separadas, lo que rompe R25 y RF-C2);
-  **(c)** vincular solo tras verificación del titular (OTP al correo), lo que
-  convierte "crear en línea" (RF-C6) en un flujo con espera. **Sin esta decisión
-  no se puede escribir la política definitiva de `user`.**
+EL sistema DEBE añadir a `user` la columna `tenant_id uuid NOT NULL` con FK a
+`tenant(id)`, y su unicidad de correo DEBE pasar de global a
+`UNIQUE (tenant_id, email)` conservando la convivencia de los valores NULL
+(D-5, R7).
 
-- **PA-10 — ¿Puede un tenant vincularse una identidad ajena sin consentimiento?**
-  El paso 1 de la cadena de ataque de B1 es legítimo según R25: basta conocer el
-  email para insertar un `user_role` sobre la identidad del admin de otra
-  inmobiliaria, que además queda visible en el `GET /propietarios/:id` del
-  tenant atacante (nombre y teléfono de la identidad global). *Opción mínima
-  provisional:* se permite —R25 lo exige— y se **audita** (R54). Alternativas:
-  exigir consentimiento (ligado a PA-9c), o limitar lo que devuelve la ficha de
-  un perfil cuya identidad es compartida. **PA-9 y PA-10 son la misma decisión
-  de producto vista desde dos sitios; conviene contestarlas juntas.**
+### R60 — (D-8, RF-C3) El rol no puede apuntar a otro tenant que el de su identidad
 
-- **PA-11 — Gestión de la credencial del rol de aplicación** (B3). *Opción
-  mínima provisional (R46, R47):* dos variables nuevas (`APP_DB_USER`,
-  `APP_DB_PASSWORD`) en `.env.example` e `init.sh`, con el procedimiento de
-  provisión leyéndolas del entorno; `DATABASE_URL` pasa a ser la del rol de
-  aplicación y se añade `DATABASE_MIGRATION_URL`. ¿Se acepta este reparto, o se
-  prefiere otro medio (gestor de secretos, autenticación por certificado, un
-  único usuario con `SET ROLE`)? Afecta a `docker-compose.yml`, `.env.example`,
-  `init.sh` y al despliegue.
+EL sistema DEBE impedir en el motor que un `user_role` tenga un `tenant_id`
+distinto al de su `user`, mediante `UNIQUE (id, tenant_id)` en `user` y una FK
+compuesta `(user_id, tenant_id)` desde `user_role`.
+
+### R61 — (D-8, `docs/conventions.md`) La migración no adivina el tenant
+
+SI al aplicar la migración de D-8 existe algún `user` con roles activos en más
+de un tenant ENTONCES la migración DEBE abortar con un mensaje accionable y NO
+DEBE elegir un tenant por su cuenta.
+
+> No hay datos de producción todavía, así que abortar es seguro. Adivinar
+> repartiría identidades entre inmobiliarias sin traza.
+
+### R62 — (RF-C1, RF-C6, D-8) La identidad de un cliente es siempre nueva
+
+CUANDO se crea un propietario o un inquilino, el sistema DEBE crear una fila de
+`user` nueva en el tenant de la petición, y NO DEBE consultar ni reutilizar
+ninguna identidad existente de otro tenant, coincida o no el correo.
+
+> Sustituye a **R25** (eliminado). Dentro del mismo tenant sigue vigente R24:
+> un documento ya registrado responde 409 `PERFIL_YA_EXISTE`.
+
+### R63 — (RF-AU1, D-8) El login identifica la inmobiliaria
+
+CUANDO se invoca `POST /auth/login`, el sistema DEBE exigir el `nit` de la
+inmobiliaria además de `email` y `password`, y DEBE responder 400 si falta.
+
+> El `nit` ya existe en `tenant` y es único (feature #2). Es el único
+> identificador de inmobiliaria que hay hoy en el esquema: **no se inventan
+> subdominios, slugs ni SSO**, que en el PRD son RF-INT2/RF-INT3 (fase 3-4).
+> Si el humano prefiere otro selector de cara al usuario, ver **PA-12**.
+
+### R64 — (RF-AU1, D-8, RF-A1) Un correo de otra inmobiliaria no autentica
+
+SI las credenciales corresponden a un `user` de un tenant distinto al `nit`
+recibido ENTONCES el sistema DEBE responder 401, con el mismo mensaje y el
+mismo código que unas credenciales inválidas.
+
+### R65 — (RF-AU1, RF-AU6, D-8) Mismo correo en dos inmobiliarias
+
+CUANDO dos personas registradas con el **mismo correo** en tenants distintos se
+autentican cada una con el `nit` de su inmobiliaria, el sistema DEBE emitir a
+cada una el token de su propio tenant.
+
+### R66 — (RF-AU1, D-8, D2) El login se ejecuta con contexto de tenant
+
+CUANDO se procesa un login, el sistema DEBE resolver el `nit` a `tenant_id` con
+la función acotada de **R52**, establecer `app.current_tenant` y consultar
+`user` **bajo RLS**, en lugar de consultar la tabla sin contexto de tenant.
+
+> Cierra el defecto de `auth.service.ts:44` señalado en la revisión (B4.3) y
+> elimina la excepción que `design.md` §3 tenía que tolerar.
+
+### R67 — (RF-C3, RF-AU6, D-8) El token lleva un solo tenant
+
+EL sistema DEBE emitir el JWT con los roles del usuario **en su único tenant**,
+y `RolesGuard` DEBE seguir rechazando con 403 cualquier `x-tenant-id` que no
+coincida con él (R33 sigue vigente).
+
+---
+
+## Grupo N — D-9: el contacto vive en el perfil, no en la identidad
+
+> **Decisión del humano (D-9):** `user` conserva solo la credencial de acceso;
+> el correo y el teléfono **de contacto** son del perfil. Lo que sigue es el
+> **delta** sobre el esquema ya implementado en T1–T47, no un rediseño.
+
+### R68 — (RF-C5, D-9) Contacto del propietario en su perfil
+
+EL sistema DEBE añadir a `perfil_propietario` las columnas
+`email_contacto text NULL` y `telefono_contacto text NULL`, y el CRUD de
+propietarios DEBE leer y escribir el contacto en ellas.
+
+> Enmienda la frase de **R1** que decía que el contacto vive en `user`. Siguen
+> siendo opcionales: **D-5** (propietario sin correo) no cambia.
+
+### R69 — (RF-C4, D-9) Contacto del inquilino en su perfil
+
+EL sistema DEBE añadir a `perfil_inquilino` la columna
+`email_contacto text NOT NULL`, y el CRUD de inquilinos DEBE leer y escribir en
+ella el correo que RF-C4 exige.
+
+> Enmienda **R2** y traslada a esta columna la obligatoriedad que **R19** ya
+> exigía. `celular` (NOT NULL) ya estaba en el perfil y hace de teléfono de
+> contacto: no se añade `telefono_contacto` al inquilino.
+
+### R70 — (D-9, `docs/conventions.md`) El traslado no pierde datos
+
+CUANDO se aplica la migración de D-9, el sistema DEBE copiar `user.email` y
+`user.telefono` de cada cliente a las columnas nuevas de su perfil **antes** de
+imponer el `NOT NULL` de `perfil_inquilino.email_contacto`.
+
+### R71 — (RF-C1, RF-AU1, D-9) `user.email` es credencial, no contacto
+
+CUANDO se registra un cliente, el sistema NO DEBE escribir su correo de contacto
+en `user.email`, que DEBE quedar NULL mientras el cliente no tenga acceso al
+portal.
+
+> Coherente con **R6**: sin `password_hash` no hay login, y sin correo de acceso
+> tampoco. El portal del cliente (RF-AU2/AU4) decidirá cómo se puebla.
+
+### R72 — (RF-N1, RF-C4, D-9) El perfil basta para notificar
+
+EL sistema DEBE poder resolver el destinatario y el canal de una notificación
+—correo o celular más `medio_preferido_contacto`— consultando **solo** el
+perfil, sin leer la tabla `user`.
+
+> Requisito de disponibilidad del dato, verificable hoy con una consulta al
+> perfil. El motor de notificaciones es la feature #10; esto garantiza que
+> encontrará el dato donde le corresponde.
+
+---
+
+## DECISIONES DEL HUMANO (v4) — D-8 … D-11
+
+Resuelven PA-8 … PA-11. Se conserva el enunciado de la pregunta y el motivo dado,
+para que nadie tenga que reconstruir por qué el diseño es el que es.
+
+| Id | Pregunta que cierra | Decisión | Motivo dado | Efecto en el spec |
+|---|---|---|---|---|
+| **D-8** | **PA-9 + PA-10** — ¿qué ve una inmobiliaria de las identidades de otra, y puede vincularse una ajena? | **NUNCA se vinculan identidades entre tenants.** Cada inmobiliaria tiene su propia fila de `user` para una misma persona. | Es la única respuesta que elimina la pregunta en vez de administrarla: sin identidades compartidas no hay nada que ver de otro tenant, ni fuga por confirmación de correo, ni vinculación sin consentimiento. | **Elimina R25, R39, R50, R53 y R54.** Reescribe R38, R49, R51, R52 y R55. Añade el **Grupo M** (R59–R67): `user` gana `tenant_id`, la unicidad de correo pasa a ser por tenant, y el login exige identificar la inmobiliaria. |
+| **D-9** | **PA-8** — ¿de quién son los datos de contacto de una identidad compartida? | **El contacto vive en el perfil**; `user` conserva solo la credencial de acceso. | Correo y teléfono de contacto son un dato *de la relación comercial* con esa inmobiliaria, no de la persona en abstracto: dos inmobiliarias pueden tener datos distintos del mismo propietario y ninguna debe pisar los de la otra. | Añade el **Grupo N** (R68–R72). Enmienda R1, R2, R10, R12 y R19. `user.email` queda NULL en los clientes (R71). |
+| **D-10** | **PA-11** — gestión de la credencial del rol de aplicación | **Dos URLs por entorno:** `DATABASE_URL` (rol de aplicación, sin `BYPASSRLS` y no superusuario) y `DATABASE_MIGRATION_URL` (rol privilegiado, solo migraciones). Se mantiene el fail-fast de arranque. | Separar quién migra de quién sirve es la forma estándar y auditable de que el RLS deje de ser decorativo; el fail-fast impide que una regresión de despliegue lo desactive en silencio. | Confirma R43–R48 sin cambios. Afecta a `docker-compose.yml`, `.env.example`, `init.sh` y al arranque. |
+| **D-11** | Alcance del arreglo | **Los cuatro hallazgos se corrigen dentro de #5**, no en una feature aparte. | Dos son defectos de código propio de #5 y §C7 se comprueba en cada feature: diferir solo movía el bloqueo. | `design.md` §15. #2, #3 y #4 quedan reabiertas (`blocked`) y se cierran cuando #5 demuestre los invariantes con el rol real (R58). |
+
+**Estado tras D-8 y D-9:** B2 está cerrado (T53), y B1 y B4 encogen de forma
+notable — el detalle de qué se elimina y por qué está en cada requirement
+tachado, nunca borrado en silencio.
+
+---
+
+## PREGUNTAS ABIERTAS
+
+**PA-8, PA-9, PA-10 y PA-11 están RESUELTAS** por las decisiones D-8, D-9, D-10
+y D-11 de la tabla anterior. Se conserva el enunciado de cada una allí, con su
+motivo, para que no haya que reconstruir por qué el diseño es el que es.
+
+Quedan dos preguntas nuevas, surgidas al especificar D-8. Ninguna se ha resuelto
+por cuenta propia; ambas llevan marcada la **opción mínima provisional** —la que
+no inventa producto fuera del PRD— y qué cambia si el humano decide otra cosa.
+
+- **PA-12 — ¿Cómo elige el usuario su inmobiliaria al iniciar sesión?**
+  (afecta a R63). Con D-8 el correo ya no identifica a nadie: hacen falta
+  `nit` + `email` + `password`. *Opción mínima provisional (R63):* el **`nit`**,
+  que ya existe en `tenant`, es único y no obliga a tocar el esquema.
+  Alternativas: **(a)** añadir a `tenant` un `codigo`/`slug` legible
+  (`inmobiliaria-lopez`) —mejor de cara al usuario, pero es una columna nueva y
+  una decisión de producto—; **(b)** deducir el tenant del **dominio o
+  subdominio** desde el que se sirve el portal, que es lo que el PRD prevé en
+  **RF-INT2/RF-INT3**… pero eso es **fase 3-4** y no existe hoy; **(c)** que el
+  formulario ofrezca un desplegable de inmobiliarias, lo que expondría
+  públicamente la lista de clientes del SaaS (no recomendable). **No he elegido
+  (a) ni (b) por mi cuenta: pedir un NIT en un formulario de login es feo, y si
+  el humano quiere un `slug`, es una columna y un requisito de producto que le
+  corresponde decidir.**
+
+- **PA-13 — Confirmación del alcance real de RF-AU6.** El PRD (§10.3, línea 556)
+  dice que la cuenta del inquilino *"puede ser única, pero con acceso segmentado
+  por tenant"*. Con D-8 **nunca** es única: una persona que arrienda con dos
+  inmobiliarias tendrá **dos cuentas, dos contraseñas y dos portales**, y tendrá
+  que saber con cuál entra. `design.md` §20.4 detalla qué parte de RF-AU6 queda
+  cubierta y cuál no. *Opción mínima provisional:* se asume aceptado, porque es
+  la consecuencia directa e inevitable de D-8. **Confirmar** que el humano lo da
+  por bueno también para el portal del inquilino (RF-AU2/AU4, features
+  posteriores), que es donde ese coste se nota de verdad.

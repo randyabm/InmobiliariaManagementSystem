@@ -498,6 +498,12 @@ frontera.
 
 ## 16. B3 + B4: orden que nunca deja el login roto
 
+> ⚠️ **Reescrito por D-8 y D-9 → ver §20.5 para el orden vigente.** Lo que sigue
+> es el razonamiento original (B1–B4 antes de las decisiones del humano); se
+> conserva porque el *criterio* —el login nunca puede quedar roto entre dos
+> tasks, y el conmutador de rol va el último— no ha cambiado, solo la lista de
+> pasos.
+
 El riesgo del corte está en que **la corrección de B3 activa el defecto de B4**:
 mientras la app sea superusuario, la política rota de `user` es inofensiva; en
 cuanto deje de serlo, `POST /auth/login` devuelve 401 a todo el mundo y crear
@@ -687,3 +693,163 @@ apps/api/src/database/__tests__/clientes-rls.test.ts (usa el rol provisionado, n
 apps/api/test/db/migrations.db.test.ts             (triggers, políticas nuevas, GRANTs)
 apps/api/drizzle/meta/_journal.json                (entradas 6 y 7)
 ```
+
+
+---
+
+## 20. D-8 … D-11: diseño tras las decisiones del humano
+
+Las cuatro preguntas abiertas de la v4 (PA-8 … PA-11) están resueltas. El efecto
+neto es que **la corrección encoge**: B2 quedó cerrado, y B1 y B4 pierden la
+mayor parte de su complejidad porque desaparece el concepto que la causaba —la
+identidad compartida entre inmobiliarias—.
+
+### 20.1 D-8: `user` deja de ser global y pasa a ser una tabla por tenant
+
+El defecto de fondo de B4 no era la política: era que `user` **no tenía
+`tenant_id`** y se le había puesto una política diseñada para tablas que sí lo
+tienen. Con D-8 esa contradicción desaparece de raíz.
+
+| Antes (v3/v4) | Después (D-8) |
+|---|---|
+| `user` global, sin `tenant_id` | `user.tenant_id NOT NULL` → tabla de negocio como las demás |
+| `UNIQUE(email)` global | `UNIQUE (tenant_id, email)`; los NULL siguen conviviendo (D-5) |
+| Política `FOR ALL` con subconsulta a `user_role`, sin `WITH CHECK` | Política estándar del proyecto: `tenant_id = current_setting('app.current_tenant', true)::uuid` en `USING` **y** en `WITH CHECK` |
+| Bloqueo circular al insertar (`WITH CHECK` exigía un `user_role` que aún no podía existir) | El `INSERT` lleva el `tenant_id` de la petición y pasa el `WITH CHECK` |
+| Dos funciones `SECURITY DEFINER` sobre `user` (login + vinculación por email) | **Una** función, y no sobre `user`: `tenant_por_nit(text) RETURNS uuid` |
+| Predicado de exclusividad en el `UPDATE` (R38 + R50) | `AND tenant_id = $tenant`, la misma condición que el resto de repositorios |
+
+La coherencia entre identidad y rol se fuerza en el motor con `UNIQUE (id,
+tenant_id)` en `user` y una **FK compuesta** `(user_id, tenant_id)` desde
+`user_role` (**R60**): así es imposible que un rol apunte a un tenant distinto
+del de su identidad, que es la forma en que este modelo podría degradarse en
+silencio con el tiempo.
+
+**Migración de datos (R61).** `user.tenant_id` se rellena desde `user_role`. Si
+alguna identidad tuviera roles activos en más de un tenant, la migración
+**aborta** con un mensaje accionable en vez de elegir: repartir personas entre
+inmobiliarias sin traza es peor que parar. Hoy solo existe un caso así y es una
+semilla de test (`entorno-clientes.ts`), que T54 adapta.
+
+### 20.2 D-8: el login necesita saber en qué inmobiliaria entra
+
+Es la consecuencia menos obvia de D-8 y la que **toca la feature #3, ya
+construida**. Si el correo deja de ser único global, `POST /auth/login` con
+`{email, password}` es ambiguo: puede haber dos personas distintas con el mismo
+correo en dos inmobiliarias.
+
+**Diseño mínimo (R63, R66):** el login pasa a exigir el **`nit`** de la
+inmobiliaria —columna que ya existe en `tenant`, única desde la feature #2— y
+resuelve así:
+
+```
+1. tenant_por_nit(nit) → tenant_id            (SECURITY DEFINER, coincidencia exacta)
+2. BEGIN; SET LOCAL app.current_tenant = tenant_id
+3. SELECT … FROM "user" WHERE email = $1      (ya filtrado por RLS)
+4. 401 uniforme si: no hay nit, no hay fila, password_hash NULL o clave incorrecta
+```
+
+Dos propiedades que no son accidentales:
+
+- **El login deja de ser la excepción.** Antes consultaba `user` con el pool
+  crudo, fuera de toda transacción con contexto de tenant (`auth.service.ts:44`),
+  que es exactamente lo que la revisión señaló en B4.3. Ahora corre bajo RLS como
+  todo lo demás, y §3 ya no necesita tolerar una excepción.
+- **El 401 es uniforme (R64).** Correo de otro tenant, `nit` inexistente y clave
+  incorrecta responden lo mismo. Si el `nit` inexistente diera un error distinto,
+  el login se convertiría en un oráculo para descubrir qué inmobiliarias son
+  clientes del SaaS.
+
+**No se inventa producto:** el PRD no define subdominios ni SSO para el MVP
+(RF-INT2/RF-INT3 son fase 3-4), así que el selector es el `nit` y la incomodidad
+de cara al usuario queda planteada como **PA-12**, no resuelta por un agente.
+
+### 20.3 D-9: el contacto se muda al perfil (delta, no rediseño)
+
+Sobre el esquema **ya implementado** en T1–T47, el cambio es de tres columnas:
+
+| Tabla | Se añade | Motivo |
+|---|---|---|
+| `perfil_propietario` | `email_contacto text NULL`, `telefono_contacto text NULL` | D-5 mantiene el correo opcional para el propietario |
+| `perfil_inquilino` | `email_contacto text NOT NULL` | RF-C4 exige correo del inquilino; `celular` ya estaba y hace de teléfono |
+| `user` | *(nada)* | Conserva `email` y `password_hash` como **credencial**; en un cliente recién registrado `email` queda **NULL** (R71) |
+
+`user.telefono` **no se elimina**: lo siguen usando los usuarios internos que
+crea la feature #3. Simplemente deja de ser el teléfono de contacto de un
+cliente. Borrarlo sería un cambio destructivo sin necesidad.
+
+**Origen del dato para notificar (R72).** El motor de notificaciones (RF-N1,
+feature #10) toma el destinatario y el canal **del perfil**:
+`email_contacto` / `celular` + `medio_preferido_contacto` (RF-C4). Nunca de
+`user`, que puede tener el correo a NULL y en todo caso es la credencial de
+acceso, no un canal de aviso. R72 lo convierte en un requisito verificable hoy,
+antes de que #10 exista.
+
+**Por qué D-9 mejora el modelo y no solo resuelve B1:** dos inmobiliarias pueden
+tener datos de contacto distintos del mismo propietario —uno le da su correo
+personal a una y el de su empresa a otra— y ninguna debe pisar los de la otra.
+Con el contacto en `user` eso era imposible de representar.
+
+### 20.4 Qué queda de RF-AU6 (y qué no)
+
+RF-AU6 (PRD §10.3, línea 556) dice: *"Debe soportarse el caso de un inquilino
+que tiene relación con **más de una inmobiliaria** (distintos tenants) — su
+cuenta de identidad **puede** ser única, pero con acceso segmentado por tenant."*
+
+| Parte de RF-AU6 | Estado con D-8 |
+|---|---|
+| Soportar que una persona se relacione con varias inmobiliarias | **Cubierto.** Nada lo impide: tendrá un perfil y una identidad en cada una. |
+| Acceso **segmentado por tenant** | **Cubierto, y más fuerte que antes.** La segmentación ya no depende de filtrar roles en el token: la identidad misma pertenece a un solo tenant y el RLS la aísla. |
+| Cuenta de identidad **única** | **No cubierto, a propósito.** El PRD dice "puede", no "debe". D-8 elige que no lo sea. |
+| Consecuencia práctica | Esa persona tendrá **dos cuentas, dos contraseñas y dos portales**, y al entrar tendrá que indicar con qué inmobiliaria. Confirmación pedida en **PA-13**. |
+
+También queda afectado **RF-C2** ("un mismo usuario puede tener múltiples
+roles/relaciones"): sigue siendo cierto **dentro de un tenant** (una persona
+puede ser propietaria e inquilina de la misma inmobiliaria, §7.4), pero deja de
+serlo *entre* tenants. Es una lectura más estrecha del PRD que la de la v3, y es
+la que el humano eligió.
+
+### 20.5 Orden de ejecución vigente
+
+```
+hechas   T48 T49 T53        puerta (test:db + guard anti-DDL) y B2 cerrado
+ 1       T50 T51 T52        B1: escritura sobre `user` acotada al tenant
+ 2       T54 T55 T56        D-8 esquema: tenant_id, política estándar, tenant_por_nit
+ 3       T57 T58 T59        D-8 aplicación: login por (nit, email); identidad siempre nueva
+ 4       T69 T70 T71 T72    D-9: contacto al perfil
+ 5       T60 … T64          B3/D-10: rol sin BYPASSRLS (el conmutador)
+ 6       T65 … T68          re-verificación de §C7 con el rol real
+```
+
+El invariante de secuencia sigue siendo el mismo, con una condición nueva que
+D-8 introduce:
+
+- **Los pasos 2, 3 y 4 se hacen con la app todavía como superusuario.** Las
+  políticas nuevas son inertes para él, así que la suite queda verde tras cada
+  task.
+- **El paso 3 va inmediatamente después del 2.** En cuanto la unicidad de correo
+  es por tenant (T54), un login que busque solo por `email` podría resolver una
+  fila ambigua. Entre T54 y T57 no hay correos repetidos —nadie los ha sembrado
+  todavía—, así que el login sigue funcionando; **la regla operativa es no
+  sembrar ningún correo duplicado hasta que T57 esté hecha**, y por eso el test
+  que los crea (T59) va después.
+- **El paso 4 va después del 3** para no mezclar dos cambios sobre la misma
+  columna: en T57 el login deja de depender de `user.email` como identificador
+  global, y solo entonces T70 la vacía en los clientes.
+- **El paso 5 sigue siendo el único conmutador** y va el último de los cambios,
+  igual que en la v4.
+
+### 20.6 Efecto en otros specs
+
+- **`specs/auth_rbac/` (feature #3, reabierta):** cambia el contrato de su R3
+  (`POST /auth/login` ahora exige `nit`), su R4 (el JWT lleva un solo tenant) y
+  su R1 (unicidad de correo por tenant, `tenant_id` en `user`). Queda registrada
+  la **ENMIENDA 2** en su `requirements.md`, con el mismo rigor que la ENMIENDA
+  de D-5.
+- **`specs/retencion_codeudor_referencias/` (feature #25, `spec_ready`):** no
+  cambia ningún requirement. Sus tablas cuelgan de `perfil_inquilino`, no de
+  `user`, y sus codeudores y referencias **nunca fueron identidades** del
+  sistema. Se le añade una nota de enmienda para que quien la implemente sepa
+  que `perfil_inquilino` tiene ahora `email_contacto` y que no debe volver a
+  introducir vinculación de identidades entre tenants.
+- **Feature #6 y siguientes:** ninguna dependencia declarada en §6 cambia.

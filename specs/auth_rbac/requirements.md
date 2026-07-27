@@ -5,6 +5,43 @@
 
 ---
 
+## ENMIENDA 2 (2026-07-27) — identidad por tenant y login por inmobiliaria (D-8, #5)
+
+> Segunda enmienda, posterior a la de más abajo. Origen: **decisión D-8** del
+> humano en `specs/owner_tenant_profiles/` — *nunca se vinculan identidades
+> entre tenants*. Afecta a **R1, R2, R3 y R4** de esta feature.
+
+**Qué cambia.**
+
+| Elemento | Original de #3 | Estado tras #5 (D-8) |
+|---|---|---|
+| `user.tenant_id` | no existe (`user` era global) | `uuid NOT NULL` FK → `tenant(id)` |
+| Unicidad del correo | `UNIQUE (email)` global | `UNIQUE (tenant_id, email)` — los NULL siguen conviviendo |
+| `user_role` | FK simple a `user(id)` | FK **compuesta** `(user_id, tenant_id)`: el rol no puede apuntar a otro tenant que el de su identidad |
+| Política RLS de `user` | `FOR ALL USING (id IN (SELECT user_id FROM user_role …))`, sin `WITH CHECK` | Política estándar del proyecto: `tenant_id = current_setting('app.current_tenant', true)::uuid` en `USING` y en `WITH CHECK` |
+| `POST /auth/login` (R3) | `{ email, password }` | `{ nit, email, password }` — **400** si falta el `nit`; 401 uniforme si el correo es de otro tenant o el `nit` no existe |
+| JWT (R4) | `roles: [{tenant_id, rol}]` de **varios** tenants | roles de **un solo** tenant: una identidad pertenece a una única inmobiliaria |
+| Consulta del login | `pool.query` sin contexto de tenant | dentro de transacción, con `SET LOCAL app.current_tenant`, **bajo RLS** |
+
+**Motivo (D-8).** La política `FOR ALL` sin `WITH CHECK` de esta feature
+contradecía el modelo de identidad de #5: con un rol sujeto a RLS impedía crear
+identidades (bloqueo circular con la FK de `user_role`) y dejaba el login
+devolviendo 401 a todo el mundo. El humano resolvió la contradicción por el lado
+del producto: si ninguna identidad se comparte entre inmobiliarias, `user` es una
+tabla de negocio normal y le aplica la política estándar. El coste es que el
+correo deja de identificar a una persona y el login necesita saber la
+inmobiliaria.
+
+**Qué NO cambia.** R5 (`JwtAuthGuard`), R7 (`RolesGuard`) y R8 (protección de
+endpoints) siguen vigentes tal cual. El `RolesGuard` sigue rechazando con 403
+cualquier `x-tenant-id` que no coincida con el token (#5 R33).
+
+**Dónde está el detalle:** `specs/owner_tenant_profiles/requirements.md` grupo M
+(R59–R67) y `design.md` §20.1, §20.2 y §20.4 (qué parte de RF-AU6 queda cubierta
+y cuál no).
+
+---
+
 ## ENMIENDA (2026-07-27) — R1 superado por R7 de la feature #5
 
 > Esta feature está `done`. Su **R1 queda parcialmente superado** por la
@@ -70,6 +107,9 @@ La tabla debe tener RLS habilitado con FORCE.
 
 ### R2 — Tabla `user_role` (RF-C2, RF-C3, RF-AU6)
 
+> ⚠️ **Enmendado por #5 (D-8):** FK compuesta `(user_id, tenant_id)` hacia
+> `user`. Ver ENMIENDA 2 al inicio.
+
 El sistema debe almacenar roles de usuario por tenant con:
 - `id` uuid PK (gen_random_uuid)
 - `user_id` uuid NOT NULL FK → `user(id)`
@@ -83,6 +123,9 @@ La tabla debe tener RLS habilitado con FORCE. La política de RLS debe filtrar p
 
 ### R3 — Login (RF-AU1)
 
+> ⚠️ **Enmendado por #5 (D-8):** el endpoint exige `nit` además de `email` y
+> `password`. Ver ENMIENDA 2 al inicio.
+
 El endpoint `POST /auth/login` debe:
 1. Aceptar `{ email, password }`.
 2. Verificar credenciales contra `password_hash` (bcrypt/argon2).
@@ -90,6 +133,9 @@ El endpoint `POST /auth/login` debe:
 4. Retornar 401 si las credenciales son inválidas.
 
 ### R4 — JWT payload (RF-C3, RF-AU6)
+
+> ⚠️ **Enmendado por #5 (D-8):** `roles` contiene los roles de un **único**
+> tenant. Ver ENMIENDA 2 al inicio.
 
 El token JWT debe contener:
 - `sub`: user_id (uuid)

@@ -16,6 +16,40 @@
 
 Notación EARS estricta (`docs/specs.md`). Un solo `DEBE` por requirement.
 
+## NOTA DE ENMIENDA (2026-07-27) — D-8 y D-9 de la feature #5
+
+> Este spec **no cambia**: ningún requirement se añade, se elimina ni se
+> reescribe. La nota existe para que quien lo implemente no reintroduzca algo
+> que #5 acaba de retirar.
+
+**Qué pasó en #5.** El humano decidió que **nunca se vinculan identidades entre
+inmobiliarias** (D-8) y que **el contacto vive en el perfil, no en `user`**
+(D-9). En consecuencia: `user` tiene ahora `tenant_id`, la unicidad del correo es
+por tenant, el login exige el `nit` de la inmobiliaria y `perfil_inquilino` tiene
+una columna nueva `email_contacto text NOT NULL`.
+
+**Por qué no afecta a #25.**
+
+- `codeudor_inquilino` y `referencia_inquilino` cuelgan de `perfil_inquilino`,
+  no de `user`, y sus FK siguen siendo exactamente las declaradas en R2 y R3.
+- Un codeudor o una referencia **nunca fueron identidades del sistema**: no se
+  les crea `user` ni `user_role` (`design.md` §9). D-8 no tiene nada que
+  cambiarles.
+- `tarifa_retencion` es configuración del tenant y no toca identidad.
+
+**Lo que sí debe tener en cuenta el implementer de #25:**
+
+1. El `email` de un codeudor (R2) y el de una referencia (R3) son **datos de
+   contacto de un tercero**, igual que `perfil_inquilino.email_contacto`.
+   **No** se convierten en credenciales ni se copian a `user`.
+2. Al leer el correo del inquilino, la fuente es `perfil_inquilino.email_contacto`
+   —no `user.email`, que en un cliente queda NULL—.
+3. **No reintroducir vinculación de identidades entre tenants** por ninguna vía:
+   la unicidad del documento del codeudor es y sigue siendo **dentro del tenant**
+   (R2), que es el mismo criterio D-7 ya aplicado.
+
+---
+
 ## Dependencia dura de la feature #5
 
 Esta feature **no puede implementarse antes de que la #5 esté `done`**. Da por

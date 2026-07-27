@@ -47,7 +47,7 @@
 
 ## Bloque 3 — Identidad y revisión del login de #3 (D-5)
 
-- [x] T15 — Crear `identidad.service.ts` con `crearOVincularIdentidad(cliente, datos, tenantId, rol)`: vincula por email **solo si el email no es nulo**, inserta `user_role`, todo sobre el `PoolClient` recibido. **Cubre: R22, R25, R26.**
+- [x] T15 — Crear `identidad.service.ts` con `crearOVincularIdentidad(cliente, datos, tenantId, rol)`: vincula por email **solo si el email no es nulo**, inserta `user_role`, todo sobre el `PoolClient` recibido. **Cubre: R22, R25, R26.** ⚠️ *R25 quedó eliminado por D-8: la vinculación por email que esta task construyó la **retira** T58.*
 
 - [x] T16 — Modificar `AuthService.login`: 401 si `password_hash IS NULL` sin invocar `bcrypt.compare`; 401 si el `email` recibido es nulo, ausente o vacío, y la consulta nunca puede casar `email IS NULL`. **Cubre: R6, R8.**
 
@@ -59,7 +59,7 @@
 
 - [x] T20 — Test de atomicidad (Testcontainers): forzar el fallo del INSERT del perfil y verificar que no quedan filas nuevas en `user` ni en `user_role`. **Cubre: R22.**
 
-- [x] T21 — Test de identidad: (a) email ya existente en el tenant B → se crea solo `user_role` + perfil en el tenant A y la respuesta no contiene datos del perfil del tenant B; (b) creación **sin email** de una persona cuyo `documento` ya existe en el tenant B → se crea un `user` nuevo y no se vincula al existente. **Cubre: R25, R26.**
+- [x] T21 — Test de identidad: (a) email ya existente en el tenant B → se crea solo `user_role` + perfil en el tenant A y la respuesta no contiene datos del perfil del tenant B; (b) creación **sin email** de una persona cuyo `documento` ya existe en el tenant B → se crea un `user` nuevo y no se vincula al existente. **Cubre: R25, R26.** ⚠️ *El caso (a) prueba R25, eliminado por D-8: T58 lo retira. El caso (b) sigue vigente (R26/R62).*
 
 ## Bloque 4 — Propietarios
 
@@ -129,19 +129,44 @@
 
 > El `reviewer` rechazó la feature el 2026-07-27 con cuatro hallazgos críticos
 > (`progress/review_owner_tenant_profiles.md`). El humano decidió arreglarlos
-> **dentro de #5** (`design.md` §15). Cobertura: **R38–R58 en 21 tasks**
-> (T48–T68), de las cuales 11 son tasks de test.
+> **dentro de #5** (`design.md` §15, D-11). Cobertura: **R38–R72 en 25 tasks**
+> (T48–T72), de las cuales 12 son tasks de test.
 >
-> **El orden NO es negociable** (`design.md` §16): los pasos de esquema y de
-> aplicación de B4 (bloques 12 y 13) se hacen mientras la app todavía se conecta
-> como superusuario, de modo que las políticas nuevas son inertes y la suite
-> queda verde tras cada task. El conmutador al rol sin `BYPASSRLS` (T61) va
-> **después**. Hacerlo antes deja el login devolviendo 401 a todo el mundo entre
-> dos tasks.
+> **Reescrito el 2026-07-27 tras D-8 … D-11.** B2 quedó cerrado (T48, T49 y T53
+> están hechas); B1 y B4 encogieron; entran los bloques de identidad por tenant
+> (D-8) y de contacto en el perfil (D-9).
 >
-> **Antes de T50 y T54 hace falta la respuesta del humano a PA-8, PA-9 y
-> PA-10.** Sin ellas se puede implementar la opción mínima provisional, pero el
-> reviewer volvería a encontrarse una decisión de producto tomada por un agente.
+> ## Orden de ejecución (invariante de secuencia: el login nunca queda roto)
+>
+> ```
+> hechas        T48 T49        puerta: test:db en init.sh + guard anti-DDL
+> hechas        T53            B2: triggers append-only en migración
+>  1            T50 T51 T52    B1: toda escritura sobre `user` va acotada al tenant
+>  2            T54 T55 T56    D-8 esquema: user.tenant_id + política estándar + tenant_por_nit
+>  3            T57 T58 T59    D-8 aplicación: login por (nit,email) e identidad siempre nueva
+>  4            T69 T70 T71 T72  D-9: el contacto se muda al perfil
+>  5            T60 T61 T62 T63 T64  B3/D-10: rol sin BYPASSRLS (el conmutador)
+>  6            T65 T66 T67 T68  re-verificación de §C7 con el rol real
+> ```
+>
+> **Por qué este orden y no otro** (`design.md` §16 y §20.5):
+> - Los pasos 2, 3 y 4 se hacen mientras la app **todavía** se conecta como
+>   superusuario: las políticas nuevas son inertes y la suite queda verde tras
+>   cada task.
+> - El paso 3 **debe** ir inmediatamente después del 2: en cuanto `user` tiene
+>   `tenant_id` y la unicidad de correo pasa a ser por tenant, un login que
+>   busque solo por `email` puede resolver una fila ambigua. Entre T54 y T57 el
+>   login sigue funcionando (no hay correos repetidos todavía), pero **no se debe
+>   sembrar ningún correo duplicado hasta que T57 esté hecha**.
+> - El paso 5 es el **único conmutador**: cuando `DATABASE_URL` pasa al rol sin
+>   `BYPASSRLS`, todo lo que ese cambio activa ya está escrito y probado.
+>   Adelantarlo deja el login devolviendo 401 a todo el mundo.
+> - El bloque de D-9 (T69–T72) va **después** de T57–T59 porque mueve el correo
+>   de contacto fuera de `user`: hacerlo antes de que el login deje de depender
+>   de `user.email` mezclaría dos cambios sobre la misma columna.
+>
+> Los números T69–T72 son posteriores por no renumerar lo ya hecho; su lugar en
+> la secuencia es el paso 4, tal como muestra la tabla.
 
 ## Bloque 9 — Puerta de verificación (va primero: es la causa de fondo)
 
@@ -149,37 +174,63 @@
 
 - [x] T49 — Crear `tests/ddl-en-tests.test.ts`: recorre los archivos de test de `apps/api/**` y falla si encuentra `CREATE TRIGGER`, `CREATE POLICY`, `CREATE FUNCTION`, `CREATE ROLE` o `GRANT` fuera de una **lista blanca justificada** (hoy: la inyección de fallos del test de atomicidad de R22). La lista lleva archivo + motivo, como `TABLAS_PERMITIDAS`. **Cubre: R57.**
 
-## Bloque 10 — B1: escritura cruzada sobre `user`
+## Bloque 10 — B1: toda escritura sobre `user` va acotada al tenant
 
-- [ ] T50 — Modificar `propietarios.repository.ts` e `inquilinos.repository.ts`: el `UPDATE "user"` añade `AND NOT EXISTS (SELECT 1 FROM user_role ur WHERE ur.user_id = "user".id AND ur.tenant_id <> $tenant)` y devuelve el número de filas afectadas. **Cubre: R38.**
+> Reescrito tras D-8 y D-9: desaparece el 409 (no hay identidades compartidas) y
+> el `PATCH` dejará de escribir contacto en `user` (D-9, paso 4). Lo que queda es
+> el defecto de fondo: una escritura sin condición de tenant.
 
-- [ ] T51 — Crear `IdentidadCompartidaNoEditableError` (`IDENTIDAD_COMPARTIDA_NO_EDITABLE`, 409) y lanzarlo desde `propietarios.service.ts` e `inquilinos.service.ts` cuando el `UPDATE` no afecte ninguna fila habiendo campos de contacto que cambiar. Los campos del perfil siguen actualizándose con normalidad. **Cubre: R39.**
+- [ ] T50 — Modificar `propietarios.repository.ts` e `inquilinos.repository.ts`: el `UPDATE "user"` incorpora la condición de pertenencia al tenant —`EXISTS (… ur.tenant_id = $tenant)` **y** `NOT EXISTS (… ur.tenant_id <> $tenant)`, predicado válido antes y después de la migración de D-8— y devuelve el número de filas afectadas. **Cubre: R38.**
 
-- [ ] T52 — Test HTTP determinista sobre el escenario de identidad compartida que ya existe (`propietarios.api.test.ts:400`, Irene en A y en B): el `PATCH` desde A de `nombre`, `email` y `telefono` responde **409**, y un `SELECT` independiente confirma que las tres columnas de `user` quedaron intactas; el mismo `PATCH` sobre una identidad exclusiva de A sí funciona; y el `PATCH` de campos del perfil funciona incluso con identidad compartida. **Cubre: R38, R39.**
+- [ ] T51 — En `propietarios.service.ts` e `inquilinos.service.ts`, traducir "0 filas afectadas" a `ResourceNotFoundError` (**404**, no se confirma la existencia de una identidad ajena). **No** se crea `IdentidadCompartidaNoEditableError`: R39 quedó eliminado por D-8. **Cubre: R38, R31.**
+
+- [ ] T52 — Test HTTP determinista de escritura cruzada sobre `user`: partiendo de dos identidades homónimas —una por tenant, según D-8—, un `PATCH` del tenant A que apunte al `user` del tenant B responde **404** y un `SELECT` independiente confirma que ninguna columna de esa fila cambió; el `PATCH` sobre la identidad propia sí actualiza. **Cubre: R38.**
 
 ## Bloque 11 — B2: auditoría realmente inmutable
 
 - [x] T53 — Crear la migración `0006_auditoria_append_only.sql` con `audit_log_prevent_mutation()` y los triggers `BEFORE UPDATE` y `BEFORE DELETE` sobre `audit_log`, idempotentes. Su cabecera declara explícitamente qué faltaba en `0004_auditoria.sql:4` y por qué ese archivo **no** se edita (hash de Drizzle). Añadir la entrada al journal. **Cubre: R40, R41, R42.**
 
-## Bloque 12 — B4, esquema (la app sigue siendo superusuario: nada se rompe)
+## Bloque 12 — D-8, esquema: `user` pasa a ser una tabla por tenant
 
-- [ ] T54 — Crear la migración `0007_politica_identidad.sql`: `DROP POLICY user_tenant_isolation` y crear políticas explícitas `FOR SELECT`, `FOR INSERT` (`WITH CHECK (true)`) y `FOR UPDATE` (con el predicado de exclusividad de R38 en `USING` y en `WITH CHECK`); sin política de `DELETE`. **Cubre: R49, R50.**
+> La app sigue conectándose como superusuario durante todo este bloque: las
+> políticas nuevas son inertes y nada se rompe.
 
-- [ ] T55 — En la misma migración, crear las dos funciones `SECURITY DEFINER` de coincidencia exacta por email —`identidad_buscar_por_email` (devuelve solo el `uuid`) e `identidad_credenciales_por_email` (devuelve solo `id`, `nombre`, `email`, `password_hash`)—, con `REVOKE ALL … FROM PUBLIC` y un comentario que declare su superficie. **Cubre: R52.**
+- [ ] T54 — Crear la migración `0007_identidad_por_tenant.sql`: añade `user.tenant_id` (backfill desde `user_role`, **abortando** si alguna identidad tiene roles en más de un tenant), lo deja `NOT NULL` con FK a `tenant(id)`, sustituye la `UNIQUE(email)` global por `UNIQUE (tenant_id, email)`, añade `UNIQUE (id, tenant_id)` y la FK compuesta `(user_id, tenant_id)` desde `user_role`, y reemplaza la política `user_tenant_isolation` (`FOR ALL` sin `WITH CHECK`) por la política estándar del proyecto con `USING` y `WITH CHECK` sobre `tenant_id`. En la misma corrida: adaptar las semillas y fixtures que ya no son representables —`entorno-clientes.ts` crea hoy una identidad `multiTenant` con roles en A y B—, reescribir el caso de R33 que la usaba para que el 403 se pruebe con un `x-tenant-id` ajeno, y simplificar el predicado de T50 a `AND tenant_id = $tenant`. **Cubre: R33, R38, R49, R59, R60, R61.**
 
-- [ ] T56 — Crear `identidad-rls.test.ts` (Testcontainers, rol sin `BYPASSRLS` provisionado por el helper, **no creado por el test**): INSERT de identidad permitido; SELECT limitado a las identidades vinculadas al tenant; UPDATE de identidad exclusiva permitido; UPDATE de identidad compartida **rechazado por la política**; DELETE rechazado; y las dos funciones devuelven exactamente las columnas declaradas y no aceptan patrones. **Cubre: R49, R50, R52.**
+- [ ] T55 — En la misma migración, crear `tenant_por_nit(text) RETURNS uuid` (`SECURITY DEFINER`, coincidencia exacta, `REVOKE ALL … FROM PUBLIC` y `GRANT EXECUTE` al rol de aplicación), con un comentario que declare su superficie. Es la **única** ruta de lectura previa al contexto de tenant. **Cubre: R52.**
 
-## Bloque 13 — B4, aplicación (todavía con la app como superusuario)
+- [ ] T56 — Crear `identidad-rls.test.ts` (Testcontainers, rol sin `BYPASSRLS` provisionado por el helper, **nunca creado por el test**): `INSERT` de identidad con el `tenant_id` propio permitido y con uno ajeno rechazado; `SELECT` limitado al tenant; `UPDATE` de fila ajena rechazado; `DELETE` sin privilegio; el mismo correo en dos tenants convive y repetido dentro del mismo tenant da `23505`; y la FK compuesta impide un `user_role` en otro tenant. **Cubre: R49, R59, R60.**
 
-- [ ] T57 — Modificar `auth.service.ts` para resolver las credenciales con `identidad_credenciales_por_email`, conservando el 401 previo por email nulo/vacío (R8) y por `password_hash` NULL (R6). **Cubre: R51, R52.**
+## Bloque 13 — D-8, aplicación: login por inmobiliaria e identidad siempre nueva
 
-- [ ] T58 — Modificar `identidad.service.ts` para que `vincularPorEmail` use `identidad_buscar_por_email`, y registrar en `audit_log` la acción `vincular_identidad` cuando se reutilice una identidad existente, sin el email en `metadata`. **Cubre: R53, R54.**
+> Sigue con la app como superusuario. Al terminar este bloque el login ya no
+> depende de que el correo sea único global, que es la condición para que el
+> conmutador del bloque 14 sea seguro.
 
-- [ ] T59 — Ampliar los tests de login e identidad para que se ejecuten **con el rol sujeto a RLS**: login válido responde 200 con `access_token`; la creación de propietario con email ya existente en otro tenant reutiliza el `user_id`; la creación de identidad nueva inserta `user` + `user_role` en la misma transacción; y existe la entrada `vincular_identidad` en `audit_log` sin el email. **Cubre: R51, R53, R54, R55.**
+- [ ] T57 — Modificar `auth.service.ts`: `POST /auth/login` exige `nit` además de `email` y `password` (400 si falta); resuelve el tenant con `tenant_por_nit`; abre transacción, fija `app.current_tenant` y consulta `user` **bajo RLS**; conserva los 401 de R6 (sin `password_hash`) y R8 (email nulo o vacío) y responde 401 —mismo mensaje y mismo código— si el correo pertenece a otro tenant o si el `nit` no existe. **Cubre: R51, R63, R64, R66.**
+
+- [ ] T58 — Modificar `identidad.service.ts`: eliminar `vincularPorEmail` y todo rastro de reutilización entre tenants; la identidad es **siempre nueva** y se inserta con el `tenant_id` de la petición. Retirar los tests de R25 que ya no aplican, dejando constancia en el informe de implementación. Ajustar el JWT para que lleve los roles del único tenant del usuario. **Cubre: R26, R55, R62, R67.**
+
+- [ ] T59 — Tests deterministas del login por inmobiliaria: dos personas con **el mismo correo** en tenants distintos se autentican cada una con su `nit` y obtienen el token de su tenant; ninguna de las dos autentica con el `nit` de la otra (401); `nit` inexistente → 401; falta el `nit` → 400; siguen en verde los 401 de R6 y R8. **Cubre: R51, R63, R64, R65.**
+
+## Bloque 16 — D-9: el contacto se muda al perfil
+
+> **Se ejecuta aquí**, entre el bloque 13 y el 14; los números T69–T72 son
+> posteriores solo porque no se renumera lo ya hecho. Va después de T57 para no
+> mezclar dos cambios sobre `user.email` (el login deja de depender de esa
+> columna en T57; aquí deja de contener el correo de contacto).
+
+- [ ] T69 — Crear la migración `0008_contacto_en_perfil.sql`: añade `perfil_propietario.email_contacto` y `perfil_propietario.telefono_contacto` (ambas NULL) y `perfil_inquilino.email_contacto`; **copia** `user.email` y `user.telefono` de cada cliente a las columnas nuevas de su perfil; y solo entonces impone `NOT NULL` sobre `perfil_inquilino.email_contacto`. **Cubre: R68, R69, R70.**
+
+- [ ] T70 — Actualizar esquemas Drizzle, DTOs, repositorios, servicios y tipos compartidos: el contacto se lee y escribe en el perfil; al crear un cliente, `user.email` queda **NULL** y el correo recibido va a `email_contacto`. El `PATCH` deja de escribir `email` y `telefono` en `user`. **Cubre: R68, R69, R71.**
+
+- [ ] T71 — Tests del traslado: crear propietario con correo lo guarda en `perfil_propietario.email_contacto` y deja `user.email` NULL (verificado con `SELECT`); `GET /propietarios/:id` devuelve `email_contacto` y `telefono_contacto`; crear inquilino sin correo sigue dando **400** (R19, ahora sobre la columna del perfil); y un propietario sin correo se crea con `email_contacto` NULL. **Cubre: R68, R69, R71.**
+
+- [ ] T72 — Test de disponibilidad del dato de notificación: una consulta que lea **solo** el perfil devuelve destinatario (`email_contacto` o `celular`) y `medio_preferido_contacto`, sin `JOIN` a `user`. Dejar anotado en `progress/impl_owner_tenant_profiles.md` que la feature #10 (RF-N1) toma de ahí el destinatario. **Cubre: R72.**
 
 ## Bloque 14 — B3: rol de aplicación (el conmutador)
 
-- [ ] T60 — Crear `apps/api/src/database/rol-aplicacion.ts` con `asegurarRolDeAplicacion(urlDeMigracion, credenciales)`: idempotente, crea el rol `NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE LOGIN` y aplica los GRANT mínimos (USAGE en el esquema; SELECT/INSERT/UPDATE en tablas de negocio; SELECT/INSERT en `audit_log`; EXECUTE en las dos funciones de identidad; **ningún DELETE**). Invocarlo desde `db:migrate` después de aplicar las migraciones. **Cubre: R45, R46.**
+- [ ] T60 — Crear `apps/api/src/database/rol-aplicacion.ts` con `asegurarRolDeAplicacion(urlDeMigracion, credenciales)`: idempotente, crea el rol `NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE LOGIN` y aplica los GRANT mínimos (USAGE en el esquema; SELECT/INSERT/UPDATE en tablas de negocio; SELECT/INSERT en `audit_log`; EXECUTE en `tenant_por_nit`; **ningún DELETE**). Invocarlo desde `db:migrate` después de aplicar las migraciones. **Cubre: R45, R46.**
 
 - [ ] T61 — Separar credenciales: `DATABASE_MIGRATION_URL` (rol privilegiado) y `DATABASE_URL` (rol de aplicación) en `.env.example`, `docker-compose.yml`, `init.sh` y `app-config.ts`, con `APP_DB_USER` y `APP_DB_PASSWORD`. `migrate.ts` pasa a leer `DATABASE_MIGRATION_URL`. **Cubre: R43, R47.**
 
