@@ -27,32 +27,15 @@ describe('Audit log — append-only (R6, R7)', () => {
 
     await runMigrations(connectionString, carpetaMigraciones);
 
-    // Crear triggers append-only (Drizzle no maneja PL/pgSQL trigger functions)
-    await poolAdmin.query(`
-      CREATE OR REPLACE FUNCTION audit_log_prevent_mutation()
-      RETURNS TRIGGER AS $fn$
-      BEGIN
-        RAISE EXCEPTION 'audit_log es append-only: no se permiten UPDATE ni DELETE';
-        RETURN NULL;
-      END;
-      $fn$ LANGUAGE plpgsql
-    `);
-    await poolAdmin.query(`DROP TRIGGER IF EXISTS trg_audit_log_no_update ON "audit_log"`);
-    await poolAdmin.query(`
-      CREATE TRIGGER trg_audit_log_no_update
-        BEFORE UPDATE ON "audit_log"
-        FOR EACH ROW
-        EXECUTE FUNCTION audit_log_prevent_mutation()
-    `);
-    await poolAdmin.query(`DROP TRIGGER IF EXISTS trg_audit_log_no_delete ON "audit_log"`);
-    await poolAdmin.query(`
-      CREATE TRIGGER trg_audit_log_no_delete
-        BEFORE DELETE ON "audit_log"
-        FOR EACH ROW
-        EXECUTE FUNCTION audit_log_prevent_mutation()
-    `);
+    // NO se crean aquí la función ni los triggers append-only: los instala la
+    // migración `0006_auditoria_append_only.sql` (R40). Hasta la revisión de
+    // #5 este `beforeAll` los fabricaba justo antes de afirmar que existían,
+    // así que el test era verde por construcción mientras en producción
+    // `audit_log` era mutable (hallazgo B2). Si esa migración desaparece o se
+    // le comenta el `CREATE TRIGGER`, los dos tests de inmutabilidad de este
+    // archivo se ponen ROJOS, que es lo que debía ocurrir desde la #4 (R57).
 
-    await poolAdmin.query("DROP ROLE IF EXISTS app_test_user");
+    await poolAdmin.query('DROP ROLE IF EXISTS app_test_user');
     await poolAdmin.query("CREATE ROLE app_test_user NOLOGIN");
     await poolAdmin.query('GRANT USAGE ON SCHEMA public TO app_test_user');
     await poolAdmin.query('GRANT SELECT, INSERT ON ALL TABLES IN SCHEMA public TO app_test_user');
@@ -127,7 +110,27 @@ describe('Audit log — append-only (R6, R7)', () => {
     }
   });
 
-  it('UPDATE sobre audit_log lanza error — append-only (R6)', async () => {
+  it('los triggers append-only los instala la migración, no el test (R40)', async () => {
+    const { rows } = await poolAdmin.query<{ tgname: string; proname: string }>(
+      `SELECT t.tgname, p.proname
+         FROM pg_trigger t
+         JOIN pg_class c ON c.oid = t.tgrelid
+         JOIN pg_proc p ON p.oid = t.tgfoid
+        WHERE c.relname = 'audit_log' AND NOT t.tgisinternal
+        ORDER BY t.tgname`,
+    );
+
+    expect(
+      rows.map((fila) => fila.tgname),
+      'los triggers deben venir de 0006_auditoria_append_only.sql: este test ' +
+        'no los crea',
+    ).toEqual(['trg_audit_log_no_delete', 'trg_audit_log_no_update']);
+    expect(new Set(rows.map((fila) => fila.proname))).toEqual(
+      new Set(['audit_log_prevent_mutation']),
+    );
+  });
+
+  it('UPDATE sobre audit_log lanza error — append-only (R6, R41)', async () => {
     const { rows } = await poolAdmin.query<{ id: string }>('SELECT id FROM audit_log LIMIT 1');
     expect(rows.length).toBe(1);
 
@@ -136,7 +139,7 @@ describe('Audit log — append-only (R6, R7)', () => {
     ).rejects.toThrow(/append-only/i);
   });
 
-  it('DELETE sobre audit_log lanza error — append-only (R6)', async () => {
+  it('DELETE sobre audit_log lanza error — append-only (R6, R41)', async () => {
     const { rows } = await poolAdmin.query<{ id: string }>('SELECT id FROM audit_log LIMIT 1');
     expect(rows.length).toBe(1);
 

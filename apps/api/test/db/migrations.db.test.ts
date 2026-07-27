@@ -2,6 +2,8 @@ import {
   PostgreSqlContainer,
   type StartedPostgreSqlContainer,
 } from '@testcontainers/postgresql';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { Pool } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
@@ -15,12 +17,25 @@ import { runMigrations } from '../../src/database/run-migrations';
  * Docker en la máquina. Docker ya está disponible, así que la deuda se cierra
  * aquí: toda migración del repositorio tiene un test que la ejercita de verdad.
  */
+const CARPETA_MIGRACIONES = resolveMigrationsFolder(process.cwd());
+
+/**
+ * Número de migraciones que Drizzle debe registrar. Se deriva del journal en
+ * vez de codificarse a mano: así añadir una migración sin registrarla en
+ * `meta/_journal.json` se ve aquí en lugar de pasar inadvertido.
+ */
+const MIGRACIONES_ESPERADAS = (
+  JSON.parse(
+    readFileSync(join(CARPETA_MIGRACIONES, 'meta', '_journal.json'), 'utf8'),
+  ) as { entries: unknown[] }
+).entries.length;
+
 describe('Aplicación real de las migraciones (R10)', () => {
   let contenedor: StartedPostgreSqlContainer;
   let pool: Pool;
   let connectionString: string;
 
-  const carpetaMigraciones = resolveMigrationsFolder(process.cwd());
+  const carpetaMigraciones = CARPETA_MIGRACIONES;
 
   beforeAll(async () => {
     contenedor = await new PostgreSqlContainer('postgres:16.4-alpine').start();
@@ -40,7 +55,7 @@ describe('Aplicación real de las migraciones (R10)', () => {
       'SELECT count(*)::text AS total FROM drizzle.__drizzle_migrations',
     );
 
-    expect(Number(rows[0]?.total)).toBe(6);
+    expect(Number(rows[0]?.total)).toBe(MIGRACIONES_ESPERADAS);
   });
 
   it('deja disponibles las extensiones que declara', async () => {
@@ -71,7 +86,7 @@ describe('Aplicación real de las migraciones (R10)', () => {
       'SELECT count(*)::text AS total FROM drizzle.__drizzle_migrations',
     );
 
-    expect(Number(rows[0]?.total)).toBe(6);
+    expect(Number(rows[0]?.total)).toBe(MIGRACIONES_ESPERADAS);
   });
 
   it('la tabla tenant existe con RLS habilitado (R3)', async () => {
@@ -282,6 +297,73 @@ describe('Aplicación real de las migraciones (R10)', () => {
     expect(nombres).toContain('perfil_propietario_tenant_documento_key');
     expect(nombres).toContain('perfil_inquilino_tenant_user_key');
     expect(nombres).toContain('perfil_inquilino_tenant_documento_key');
+  });
+
+  it('0006 deja los triggers append-only de audit_log instalados (#5 R40)', async () => {
+    const { rows } = await pool.query<{
+      tgname: string;
+      tgenabled: string;
+      proname: string;
+      evento: string;
+    }>(
+      `SELECT t.tgname,
+              t.tgenabled,
+              p.proname,
+              CASE WHEN (t.tgtype & 16) <> 0 THEN 'update'
+                   WHEN (t.tgtype & 8)  <> 0 THEN 'delete'
+                   ELSE 'otro' END AS evento
+         FROM pg_trigger t
+         JOIN pg_class c ON c.oid = t.tgrelid
+         JOIN pg_proc p ON p.oid = t.tgfoid
+        WHERE c.relname = 'audit_log' AND NOT t.tgisinternal
+        ORDER BY t.tgname`,
+    );
+
+    expect(rows.map((fila) => fila.tgname)).toEqual([
+      'trg_audit_log_no_delete',
+      'trg_audit_log_no_update',
+    ]);
+    expect(rows.map((fila) => fila.evento)).toEqual(['delete', 'update']);
+    // 'O' = habilitado en modo origin. Un trigger deshabilitado no protege.
+    expect(rows.map((fila) => fila.tgenabled)).toEqual(['O', 'O']);
+    expect(new Set(rows.map((fila) => fila.proname))).toEqual(
+      new Set(['audit_log_prevent_mutation']),
+    );
+  });
+
+  it('UPDATE y DELETE sobre audit_log fallan incluso para el dueño (#5 R41)', async () => {
+    const { rows: tenants } = await pool.query<{ id: string }>(
+      `INSERT INTO tenant (nombre, nit) VALUES ('Auditada', '900-0006')
+       ON CONFLICT (nit) DO UPDATE SET nombre = EXCLUDED.nombre
+       RETURNING id`,
+    );
+    const tenantId = tenants[0]?.id;
+    expect(tenantId).toBeDefined();
+
+    const { rows: entradas } = await pool.query<{ id: string }>(
+      `INSERT INTO audit_log (tenant_id, accion, entity_type)
+       VALUES ($1, 'prueba_inmutabilidad', 'tenant') RETURNING id`,
+      [tenantId],
+    );
+    const entradaId = entradas[0]?.id;
+
+    // `pool` se conecta con el rol dueño de la tabla, que se salta el RLS: si
+    // la inmutabilidad dependiera de una política, esto pasaría sin ruido.
+    await expect(
+      pool.query(`UPDATE audit_log SET accion = 'alterada' WHERE id = $1`, [
+        entradaId,
+      ]),
+    ).rejects.toThrow(/append-only/i);
+
+    await expect(
+      pool.query('DELETE FROM audit_log WHERE id = $1', [entradaId]),
+    ).rejects.toThrow(/append-only/i);
+
+    const { rows: sigue } = await pool.query<{ accion: string }>(
+      'SELECT accion FROM audit_log WHERE id = $1',
+      [entradaId],
+    );
+    expect(sigue[0]?.accion).toBe('prueba_inmutabilidad');
   });
 
   it('el índice único parcial de cuenta predeterminada existe (#5 R4)', async () => {

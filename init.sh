@@ -188,6 +188,24 @@ else
   run_script lint
   run_script typecheck
   run_script test
+
+  # `test:db` es parte del semáforo, no un extra opcional (R56 de
+  # specs/owner_tenant_profiles/).
+  #
+  # Por qué: los invariantes de seguridad del proyecto —aislamiento por
+  # tenant_id con RLS real, inmutabilidad de la auditoría, forma de las
+  # migraciones— NO se pueden demostrar sin PostgreSQL de verdad, así que
+  # viven en `apps/api/test/db/` y fuera de `npm run test` (que es
+  # determinista y no abre contenedores). Mientras esa suite estuvo fuera de
+  # esta puerta, cuatro tests de políticas RLS llevaban rotos desde las
+  # features #2 y #3 —consultaban `pg_policies.polname`, una columna que no
+  # existe— sin que nadie lo viera, y la puerta seguía en verde. Esa es la
+  # causa de fondo del rechazo de la feature #5.
+  #
+  # Si Docker no está disponible, esta suite FALLA con un motivo explícito
+  # (`test/support/docker-guard.ts`) en vez de omitirse: un verde sin base de
+  # datos sería falso (docs/verification.md Nivel 2, CHECKPOINTS.md §C4).
+  run_script test:db
 fi
 
 echo ""

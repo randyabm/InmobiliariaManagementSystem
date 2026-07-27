@@ -122,6 +122,34 @@ describe('R16 — init.sh ejecutado', () => {
 });
 
 // ---------------------------------------------------------------------------
+// #5 R56 — `test:db` forma parte del semáforo de `init.sh`
+// ---------------------------------------------------------------------------
+
+describe('#5 R56 — init.sh incluye test:db en el semáforo', () => {
+  const init = leerTexto('init.sh');
+
+  it.each(['lint', 'typecheck', 'test', 'test:db'])(
+    'init.sh ejecuta el script "%s"',
+    (script) => {
+      expect(init, `init.sh no ejecuta "${script}"`).toMatch(
+        new RegExp(`^\\s*run_script ${script}\\s*$`, 'm'),
+      );
+    },
+  );
+
+  it('test:db no se ejecuta con un escape de fallo', () => {
+    // Un `|| true` alrededor de la suite de base de datos devolvería la puerta
+    // al estado que causó el rechazo de #5: verde sin haber mirado el RLS.
+    const linea = init
+      .split('\n')
+      .find((l) => l.includes('run_script test:db'));
+
+    expect(linea).toBeDefined();
+    expect(linea).not.toMatch(/\|\|\s*true/);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // R17 — Sin escapes de fallo
 // ---------------------------------------------------------------------------
 

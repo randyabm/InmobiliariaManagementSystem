@@ -41,6 +41,34 @@ mapa de trazabilidad R1–R37 → test y las contradicciones detectadas.
 
 **La feature NO se ha marcado `done`**: espera al reviewer.
 
+## Sesión 2026-07-27 (b) — implementer, alcance acotado: T48, T49, T53
+
+El reviewer rechazó #5 con 4 hallazgos. El humano encargó **solo** la puerta
+de verificación (T48, T49) y la migración de triggers append-only (T53).
+**T50–T52 y T54–T68 quedan sin tocar a propósito**: dependen de PA-8…PA-11,
+decisiones de producto que el humano todavía no ha tomado.
+
+- Línea base antes de tocar nada: `npm run test` **257** verdes (27 archivos),
+  `npm run test:db` **24** verdes (1 archivo), `./init.sh` exit 0.
+- Plan: (1) T53 migración `0006_auditoria_append_only.sql` + journal + ajuste
+  del conteo de migraciones; (2) T49 guard `tests/ddl-en-tests.test.ts`;
+  (3) T48 `run_script test:db` en `init.sh`; (4) verificación.
+- Informe: `progress/impl_owner_tenant_profiles_puerta.md`.
+
+**Resultado: T48, T49 y T53 hechas y marcadas `[x]`.** Hallazgo **B2 cerrado**
+(el trigger append-only lo crea ahora `0006`, no el test). B1, B3 y B4 siguen
+abiertos: dependen de PA-8…PA-11.
+
+- `npm run test` **269** verdes (28 archivos) · `npm run test:db` **26** verdes.
+- Verificado a mano que, neutralizando `0006`, `audit-log.test.ts` se pone en
+  **3 rojos** y `test:db` falla. El test ya no es verde por construcción.
+- **`./init.sh` sigue en ROJO por una sola causa, ajena a estas tasks:**
+  `[FAIL] Hay 4 features en in_progress (máximo 1)`. Viene de la reversión de
+  #2/#3/#4 a `in_progress` que hizo el humano (`design.md` §17) y ya estaba así
+  en `HEAD`; no he tocado `feature_list.json`. Todo lo demás del semáforo pasa,
+  `test:db` incluido. **Decisión pendiente del humano/leader.**
+- Ninguna feature marcada `done`: espera al reviewer.
+
 ## Hecho en la sesión de spec (2026-07-26)
 
 1. **Higiene de git.** El trabajo de las features #24, #2, #3 y #4 estaba

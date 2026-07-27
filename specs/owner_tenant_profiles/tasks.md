@@ -145,9 +145,9 @@
 
 ## Bloque 9 — Puerta de verificación (va primero: es la causa de fondo)
 
-- [ ] T48 — Añadir `run_script test:db` a `init.sh`, junto a `lint`, `typecheck` y `test`, y dejar escrito en el propio script por qué esa suite es parte del semáforo. Verificar que `./init.sh` sigue en verde. **Cubre: R56.**
+- [x] T48 — Añadir `run_script test:db` a `init.sh`, junto a `lint`, `typecheck` y `test`, y dejar escrito en el propio script por qué esa suite es parte del semáforo. Verificar que `./init.sh` sigue en verde. **Cubre: R56.**
 
-- [ ] T49 — Crear `tests/ddl-en-tests.test.ts`: recorre los archivos de test de `apps/api/**` y falla si encuentra `CREATE TRIGGER`, `CREATE POLICY`, `CREATE FUNCTION`, `CREATE ROLE` o `GRANT` fuera de una **lista blanca justificada** (hoy: la inyección de fallos del test de atomicidad de R22). La lista lleva archivo + motivo, como `TABLAS_PERMITIDAS`. **Cubre: R57.**
+- [x] T49 — Crear `tests/ddl-en-tests.test.ts`: recorre los archivos de test de `apps/api/**` y falla si encuentra `CREATE TRIGGER`, `CREATE POLICY`, `CREATE FUNCTION`, `CREATE ROLE` o `GRANT` fuera de una **lista blanca justificada** (hoy: la inyección de fallos del test de atomicidad de R22). La lista lleva archivo + motivo, como `TABLAS_PERMITIDAS`. **Cubre: R57.**
 
 ## Bloque 10 — B1: escritura cruzada sobre `user`
 
@@ -159,7 +159,7 @@
 
 ## Bloque 11 — B2: auditoría realmente inmutable
 
-- [ ] T53 — Crear la migración `0006_auditoria_append_only.sql` con `audit_log_prevent_mutation()` y los triggers `BEFORE UPDATE` y `BEFORE DELETE` sobre `audit_log`, idempotentes. Su cabecera declara explícitamente qué faltaba en `0004_auditoria.sql:4` y por qué ese archivo **no** se edita (hash de Drizzle). Añadir la entrada al journal. **Cubre: R40, R41, R42.**
+- [x] T53 — Crear la migración `0006_auditoria_append_only.sql` con `audit_log_prevent_mutation()` y los triggers `BEFORE UPDATE` y `BEFORE DELETE` sobre `audit_log`, idempotentes. Su cabecera declara explícitamente qué faltaba en `0004_auditoria.sql:4` y por qué ese archivo **no** se edita (hash de Drizzle). Añadir la entrada al journal. **Cubre: R40, R41, R42.**
 
 ## Bloque 12 — B4, esquema (la app sigue siendo superusuario: nada se rompe)
 
