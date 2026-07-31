@@ -53,9 +53,9 @@ describe('Escritura sobre `user` acotada al tenant (#5 R38, B1)', () => {
 
     // 1) La identidad de la misma persona en el tenant B, con SU correo.
     const { rows: usuariosB } = await entorno.poolAdmin.query<{ id: string }>(
-      `INSERT INTO "user" (email, password_hash, nombre, telefono)
-       VALUES ($1, NULL, $2, $3) RETURNING id`,
-      [EMAIL_EN_B, NOMBRE_ORIGINAL_EN_B, TELEFONO_EN_B],
+      `INSERT INTO "user" (tenant_id, email, password_hash, nombre, telefono)
+       VALUES ($1, $2, NULL, $3, $4) RETURNING id`,
+      [TENANT_B, EMAIL_EN_B, NOMBRE_ORIGINAL_EN_B, TELEFONO_EN_B],
     );
     identidadDeB = usuariosB[0]!.id;
     await entorno.poolAdmin.query(

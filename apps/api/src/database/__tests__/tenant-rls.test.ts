@@ -35,11 +35,11 @@ describe('Aislamiento multi-tenant por RLS (R8, R9)', () => {
     poolApp = new Pool({ connectionString });
 
     await poolAdmin.query(
-      `INSERT INTO tenant (id, nombre, nit) VALUES ($1, 'Inmobiliaria A', '900111') ON CONFLICT (nit) DO NOTHING`,
+      `INSERT INTO tenant (id, nombre, nit, codigo) VALUES ($1, 'Inmobiliaria A', '900111', 'inmobiliaria-a') ON CONFLICT (nit) DO NOTHING`,
       [TENANT_A],
     );
     await poolAdmin.query(
-      `INSERT INTO tenant (id, nombre, nit) VALUES ($1, 'Inmobiliaria B', '900222') ON CONFLICT (nit) DO NOTHING`,
+      `INSERT INTO tenant (id, nombre, nit, codigo) VALUES ($1, 'Inmobiliaria B', '900222', 'inmobiliaria-b') ON CONFLICT (nit) DO NOTHING`,
       [TENANT_B],
     );
   });

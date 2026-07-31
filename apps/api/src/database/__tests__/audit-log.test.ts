@@ -48,11 +48,11 @@ describe('Audit log — append-only (R6, R7)', () => {
 
     // Crear tenants (como admin, bypassa RLS)
     await poolAdmin.query(
-      `INSERT INTO tenant (id, nombre, nit) VALUES ($1, 'Inmobiliaria A', '900111') ON CONFLICT (nit) DO NOTHING`,
+      `INSERT INTO tenant (id, nombre, nit, codigo) VALUES ($1, 'Inmobiliaria A', '900111', 'inmobiliaria-a') ON CONFLICT (nit) DO NOTHING`,
       [TENANT_A],
     );
     await poolAdmin.query(
-      `INSERT INTO tenant (id, nombre, nit) VALUES ($1, 'Inmobiliaria B', '900222') ON CONFLICT (nit) DO NOTHING`,
+      `INSERT INTO tenant (id, nombre, nit, codigo) VALUES ($1, 'Inmobiliaria B', '900222', 'inmobiliaria-b') ON CONFLICT (nit) DO NOTHING`,
       [TENANT_B],
     );
 

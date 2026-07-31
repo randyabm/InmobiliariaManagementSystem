@@ -72,14 +72,17 @@ describe('Clientes — esquema y aislamiento (#5 R4, R5, R7, R31, R34)', () => {
     // Datos sembrados como admin (superusuario): bypassa RLS a propósito, así
     // el test comprueba la lectura, no la escritura.
     await poolAdmin.query(
-      `INSERT INTO tenant (id, nombre, nit) VALUES ($1, 'Inmobiliaria A', '900111'), ($2, 'Inmobiliaria B', '900222')`,
+      `INSERT INTO tenant (id, nombre, nit, codigo)
+         VALUES ($1, 'Inmobiliaria A', '900111', 'inmobiliaria-a'),
+                ($2, 'Inmobiliaria B', '900222', 'inmobiliaria-b')`,
       [TENANT_A, TENANT_B],
     );
     await poolAdmin.query(
-      `INSERT INTO "user" (id, email, password_hash, nombre)
-       VALUES ($1, 'prop-a@example.com', NULL, 'Propietario A'),
-              ($2, 'prop-b@example.com', NULL, 'Propietario B')`,
-      [USER_A, USER_B],
+      // D-8 (R59): cada identidad pertenece a su inmobiliaria.
+      `INSERT INTO "user" (id, tenant_id, email, password_hash, nombre)
+       VALUES ($1, $3, 'prop-a@example.com', NULL, 'Propietario A'),
+              ($2, $4, 'prop-b@example.com', NULL, 'Propietario B')`,
+      [USER_A, USER_B, TENANT_A, TENANT_B],
     );
     await poolAdmin.query(
       `INSERT INTO user_role (user_id, tenant_id, rol)
@@ -121,10 +124,14 @@ describe('Clientes — esquema y aislamiento (#5 R4, R5, R7, R31, R34)', () => {
       try {
         await cliente.query('BEGIN');
         await cliente.query(
-          `INSERT INTO "user" (email, password_hash, nombre) VALUES (NULL, NULL, 'Sin correo 1')`,
+          `INSERT INTO "user" (tenant_id, email, password_hash, nombre)
+             VALUES ($1, NULL, NULL, 'Sin correo 1')`,
+          [TENANT_A],
         );
         const { rowCount } = await cliente.query(
-          `INSERT INTO "user" (email, password_hash, nombre) VALUES (NULL, NULL, 'Sin correo 2')`,
+          `INSERT INTO "user" (tenant_id, email, password_hash, nombre)
+             VALUES ($1, NULL, NULL, 'Sin correo 2')`,
+          [TENANT_A],
         );
         expect(rowCount).toBe(1);
 
@@ -143,12 +150,16 @@ describe('Clientes — esquema y aislamiento (#5 R4, R5, R7, R31, R34)', () => {
       try {
         await cliente.query('BEGIN');
         await cliente.query(
-          `INSERT INTO "user" (email, password_hash, nombre) VALUES ('duplicado@example.com', NULL, 'Uno')`,
+          `INSERT INTO "user" (tenant_id, email, password_hash, nombre)
+             VALUES ($1, 'duplicado@example.com', NULL, 'Uno')`,
+          [TENANT_A],
         );
 
         await expect(
           cliente.query(
-            `INSERT INTO "user" (email, password_hash, nombre) VALUES ('duplicado@example.com', NULL, 'Dos')`,
+            `INSERT INTO "user" (tenant_id, email, password_hash, nombre)
+               VALUES ($1, 'duplicado@example.com', NULL, 'Dos')`,
+            [TENANT_A],
           ),
         ).rejects.toMatchObject({ code: '23505' });
       } finally {

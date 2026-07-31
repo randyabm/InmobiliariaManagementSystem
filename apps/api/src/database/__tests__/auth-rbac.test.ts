@@ -39,19 +39,23 @@ describe('Auth + RBAC (R9, R10)', () => {
 
     // Crear tenants
     await poolAdmin.query(
-      `INSERT INTO tenant (id, nombre, nit) VALUES ($1, 'Inmobiliaria A', '900111') ON CONFLICT (nit) DO NOTHING`,
+      `INSERT INTO tenant (id, nombre, nit, codigo) VALUES ($1, 'Inmobiliaria A', '900111', 'inmobiliaria-a') ON CONFLICT (nit) DO NOTHING`,
       [TENANT_A],
     );
     await poolAdmin.query(
-      `INSERT INTO tenant (id, nombre, nit) VALUES ($1, 'Inmobiliaria B', '900222') ON CONFLICT (nit) DO NOTHING`,
+      `INSERT INTO tenant (id, nombre, nit, codigo) VALUES ($1, 'Inmobiliaria B', '900222', 'inmobiliaria-b') ON CONFLICT (nit) DO NOTHING`,
       [TENANT_B],
     );
 
     // Crear usuario con password hasheado
     const passwordHash = await bcrypt.hash('testpass123', 10);
     await poolAdmin.query(
-      `INSERT INTO "user" (id, email, password_hash, nombre) VALUES ($1, 'test@example.com', $2, 'Test User') ON CONFLICT (email) DO NOTHING`,
-      [USER_ID, passwordHash],
+      // `tenant_id` desde D-8 (R59): la identidad pertenece a UNA
+      // inmobiliaria, y `ON CONFLICT` pasa a ser sobre (tenant_id, email).
+      `INSERT INTO "user" (id, tenant_id, email, password_hash, nombre)
+       VALUES ($1, $3, 'test@example.com', $2, 'Test User')
+       ON CONFLICT (tenant_id, email) DO NOTHING`,
+      [USER_ID, passwordHash, TENANT_A],
     );
 
     // Asignar rol admin en tenant A

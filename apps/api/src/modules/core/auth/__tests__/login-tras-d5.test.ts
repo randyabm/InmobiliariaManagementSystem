@@ -5,6 +5,7 @@ import {
   CLAVE_DE_PRUEBA,
   type EntornoClientes,
   levantarEntornoClientes,
+  TENANT_A,
 } from '../../../../../test/support/entorno-clientes';
 import { normalizarEmailDeLogin } from '../auth.service';
 
@@ -116,8 +117,9 @@ describe('Login tras D-5 (#5 R6, R8)', () => {
       // Se siembran varias identidades sin email ni credenciales: son los
       // propietarios registrados sin correo que D-5 hace posibles.
       await entorno.poolAdmin.query(
-        `INSERT INTO "user" (email, password_hash, nombre)
-         VALUES (NULL, NULL, 'Sin correo 1'), (NULL, NULL, 'Sin correo 2')`,
+        `INSERT INTO "user" (tenant_id, email, password_hash, nombre)
+         VALUES ($1, NULL, NULL, 'Sin correo 1'), ($1, NULL, NULL, 'Sin correo 2')`,
+        [TENANT_A],
       );
       const { rows: conteo } = await entorno.poolAdmin.query<{ total: string }>(
         `SELECT count(*)::text AS total FROM "user" WHERE email IS NULL`,

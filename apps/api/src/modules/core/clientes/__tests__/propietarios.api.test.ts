@@ -394,57 +394,22 @@ describe('Propietarios — CRUD y creación en línea (#5)', () => {
     });
   });
 
-  // ─── T21 — reutilización de identidad (R25, R26) ────────────────────────
+  // ─── T21 — identidad entre tenants (R26/R62) ────────────────────────────
 
-  describe('identidad entre tenants (R25, R26)', () => {
-    it('(a) reutiliza el user existente en otro tenant sin filtrar su perfil ajeno (R25)', async () => {
-      const enB = await comoAdminB('post', '/propietarios').send({
-        nombre: 'Irene Compartida',
-        tipo_documento: 'CC',
-        documento: '6001',
-        email: 'irene@example.com',
-        ciudad: 'Cartagena',
-        direccion_notificacion: 'Direccion secreta del tenant B',
-        sujeto_retencion: true,
-      });
-      expect(enB.status).toBe(201);
-
-      const enA = await comoAdminA('post', '/propietarios').send({
-        nombre: 'Irene Compartida',
-        tipo_documento: 'CC',
-        documento: '6002',
-        email: 'irene@example.com',
-        ciudad: 'Medellin',
-      });
-      expect(enA.status).toBe(201);
-
-      // Misma identidad: una sola fila de `user` con ese email.
-      const { rows: usuarios } = await entorno.poolAdmin.query<{ id: string }>(
-        `SELECT id FROM "user" WHERE email = $1`,
-        ['irene@example.com'],
-      );
-      expect(usuarios).toHaveLength(1);
-      expect(enA.body.user_id).toBe(usuarios[0]!.id);
-      expect(enB.body.user_id).toBe(usuarios[0]!.id);
-
-      // Dos perfiles distintos, uno por inmobiliaria; solo un user_role nuevo.
-      expect(enA.body.id).not.toBe(enB.body.id);
-      expect(enA.body.tenant_id).toBe(TENANT_A);
-
-      // La respuesta del tenant A no trae NADA del perfil del tenant B.
-      const serializado = JSON.stringify(enA.body);
-      expect(serializado).not.toContain('Cartagena');
-      expect(serializado).not.toContain('Direccion secreta del tenant B');
-      expect(serializado).not.toContain(TENANT_B);
-      expect(serializado).not.toContain('6001');
-      expect(enA.body.sujeto_retencion).toBe(false);
-
-      const { rows: roles } = await entorno.poolAdmin.query<{ tenant_id: string }>(
-        'SELECT tenant_id FROM user_role WHERE user_id = $1 AND rol = $2 ORDER BY tenant_id',
-        [usuarios[0]!.id, 'propietario'],
-      );
-      expect(roles.map((r) => r.tenant_id).sort()).toEqual([TENANT_A, TENANT_B].sort());
-    });
+  describe('identidad entre tenants (R26, R62)', () => {
+    // El caso (a) —"reutiliza el `user` existente en otro tenant"— probaba
+    // **R25**, que **D-8 eliminó**: las identidades nunca se comparten entre
+    // inmobiliarias. Se retira aquí, en T54, y no en T58 como decía el plan,
+    // porque el esquema de D-8 lo hace irrepresentable antes de que T58 llegue:
+    // `user.tenant_id` y la FK compuesta de R60 impiden que un `user_role` del
+    // tenant A cuelgue de una identidad del tenant B.
+    //
+    // Lo que lo sustituye es **R62** (la identidad es siempre nueva, coincida o
+    // no el correo), y su test vive en `login-por-inmobiliaria.api.test.ts`
+    // (T59): es allí donde sembrar el mismo correo en dos inmobiliarias tiene
+    // sentido, porque es allí donde se demuestra que cada una autentica con su
+    // propio `codigo`. `design.md` §20.5 prohíbe expresamente sembrar correos
+    // duplicados antes de T57, y por eso el caso no se queda aquí.
 
     it('(b) SIN email crea identidad nueva y no vincula por documento (R26)', async () => {
       const enB = await comoAdminB('post', '/propietarios').send({

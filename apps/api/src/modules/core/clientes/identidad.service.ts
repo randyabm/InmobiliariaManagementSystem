@@ -49,40 +49,51 @@ export class IdentidadService {
   ): Promise<IdentidadResuelta> {
     const email = normalizarEmail(datos.email);
     const identidad = email
-      ? await this.vincularPorEmail(cliente, email, datos)
-      : await this.crearIdentidadNueva(cliente, null, datos);
+      ? await this.vincularPorEmail(cliente, email, datos, tenantId)
+      : await this.crearIdentidadNueva(cliente, null, datos, tenantId);
 
     await this.asegurarRol(cliente, identidad.userId, tenantId, rol);
     return identidad;
   }
 
+  /**
+   * ⚠️ **Acotada al tenant por D-8 (T54).** Buscaba por `email` en toda la
+   * tabla y reutilizaba la identidad de otra inmobiliaria (R25). Con
+   * `user.tenant_id` y la FK compuesta de R60 eso dejó de ser siquiera
+   * representable: un `user_role` del tenant A sobre una identidad del tenant B
+   * viola la FK. Lo que queda es reutilización **dentro** del mismo tenant.
+   *
+   * La retira por completo **T58** (R62: la identidad es siempre nueva).
+   */
   private async vincularPorEmail(
     cliente: PoolClient,
     email: string,
     datos: DatosDeIdentidad,
+    tenantId: string,
   ): Promise<IdentidadResuelta> {
     const { rows } = await cliente.query<{ id: string }>(
-      'SELECT id FROM "user" WHERE email = $1',
-      [email],
+      'SELECT id FROM "user" WHERE email = $1 AND tenant_id = $2',
+      [email, tenantId],
     );
 
     const existente = rows[0];
     if (existente) {
       return { userId: existente.id, reutilizada: true };
     }
-    return this.crearIdentidadNueva(cliente, email, datos);
+    return this.crearIdentidadNueva(cliente, email, datos, tenantId);
   }
 
   private async crearIdentidadNueva(
     cliente: PoolClient,
     email: string | null,
     datos: DatosDeIdentidad,
+    tenantId: string,
   ): Promise<IdentidadResuelta> {
     const { rows } = await cliente.query<{ id: string }>(
-      `INSERT INTO "user" (email, password_hash, nombre, telefono)
-       VALUES ($1, NULL, $2, $3)
+      `INSERT INTO "user" (tenant_id, email, password_hash, nombre, telefono)
+       VALUES ($1, $2, NULL, $3, $4)
        RETURNING id`,
-      [email, datos.nombre, datos.telefono ?? null],
+      [tenantId, email, datos.nombre, datos.telefono ?? null],
     );
 
     const creada = rows[0];

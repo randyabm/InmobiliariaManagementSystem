@@ -46,3 +46,47 @@ responde 200 y **reescribe de verdad** la fila de `user` del tenant B. Es
 literalmente el defecto B1. Restaurado el predicado, verde.
 
 Suite tras el paso 1: `test` 29 archivos / **273 tests**, lint y typecheck en verde.
+
+### Paso 2 — D-8/D-12, esquema (T54, T73, T55, T56) ✅ — y T60 adelantada
+
+Migración **`0007_identidad_por_tenant.sql`** (entrada 7 del journal):
+
+- `tenant.codigo text NOT NULL UNIQUE` con `CHECK` de etiqueta DNS (3–63,
+  `^[a-z0-9]+(-[a-z0-9]+)*$`) **y** la lista de reservados (R73, R75, R77);
+  backfill determinista desde `nombre` con sufijo más bajo (R76), vía la
+  función `tenant_codigo_desde_nombre(text)`.
+- `user.tenant_id NOT NULL` + FK, con **aborto accionable** (R61) si alguna
+  identidad tiene roles en más de un tenant —o en ninguno—, en vez de adivinar.
+- `UNIQUE(email)` global → `UNIQUE (tenant_id, email)` (R59).
+- `UNIQUE (id, tenant_id)` + **FK compuesta** `user_role(user_id, tenant_id)` (R60).
+- Política `user_tenant_isolation` estándar: `USING` **y** `WITH CHECK` sobre
+  `tenant_id`, sustituyendo la `FOR ALL` de `0003` (R49).
+- **T55** `tenant_por_codigo(text) RETURNS uuid` `SECURITY DEFINER`, coincidencia
+  exacta, `REVOKE ALL … FROM PUBLIC` (R52). El `GRANT EXECUTE` va en el
+  procedimiento de provisión, que corre *después* de las migraciones porque el
+  rol todavía no existe cuando esta se aplica (R46).
+
+Aplicación y fixtures adaptados en la misma corrida, como pedía T54:
+`identidad.service` inserta `tenant_id`; el predicado de T50 se simplifica a
+`tenant_id = $n`; todas las semillas de `tenant`/`user` llevan `codigo` y
+`tenant_id`; la identidad `multiTenant` —**irrepresentable** bajo D-8— se
+sustituye por `tokenConRolAjeno` (token que declara dos tenants, base que solo
+respalda uno), que prueba R33 de forma más fuerte.
+
+Tests nuevos: `auth/__tests__/codigo-inmobiliaria.test.ts` (unitarios de R73–R75),
+`test/db/backfill-codigo.db.test.ts` (R76 sobre datos preexistentes, aplicando
+0000–0006, sembrando y aplicando 0007 después), bloques de `tenant.codigo` y
+`tenant_por_codigo` en `migrations.db.test.ts`, y
+`database/__tests__/identidad-rls.test.ts` (T56, 15 casos).
+
+**Pruebas por mutación.**
+1. `USING/WITH CHECK` de `user_tenant_isolation` → `(true)`: **5 tests rojos**
+   (SELECT cruzado, INSERT ajeno, UPDATE ajeno, mudanza de tenant, sin contexto).
+2. FK compuesta → FK simple sobre `user_id`: **2 tests rojos** (R60).
+3. *Mutante equivalente detectado:* quitar solo el `WITH CHECK` explícito **no**
+   pone nada rojo, porque PostgreSQL reutiliza el `USING` cuando el `WITH CHECK`
+   falta y aquí los dos predicados son idénticos. Queda anotado: el `WITH CHECK`
+   explícito de R49 aporta claridad y protege ante un cambio futuro del `USING`,
+   pero **hoy no es observable**. No se ha inflado ningún test para fingir que sí.
+
+Suite tras el paso 2: `test` 31 archivos / **311 tests**; `test:db` 2 / **56**.

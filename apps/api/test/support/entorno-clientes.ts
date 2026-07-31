@@ -29,6 +29,14 @@ export const JWT_SECRET_DE_PRUEBA = ENTORNO_DE_PRUEBA.JWT_SECRET as string;
 export const TENANT_A = '11111111-1111-1111-1111-111111111111';
 export const TENANT_B = '22222222-2222-2222-2222-222222222222';
 
+/**
+ * Códigos de inmobiliaria (D-12, R73). Son el identificador que el usuario
+ * escribe en el login desde que el correo dejó de ser único global (D-8), y
+ * cumplen el formato de etiqueta DNS que exige R73.
+ */
+export const CODIGO_TENANT_A = 'inmobiliaria-a';
+export const CODIGO_TENANT_B = 'inmobiliaria-b';
+
 /** Contraseña literal de test, no una credencial real. */
 export const CLAVE_DE_PRUEBA = 'clave-de-prueba-1234';
 
@@ -52,8 +60,20 @@ export interface EntornoClientes {
   propietarioA: UsuarioSembrado;
   /** único rol activo `inquilino` en el tenant A (R32). */
   inquilinoA: UsuarioSembrado;
-  /** admin en A y en B a la vez: identidad multi-tenant de RF-AU6 (R33). */
-  multiTenant: UsuarioSembrado;
+  /**
+   * `admin` del tenant B **con un token que además declara un rol en A**.
+   *
+   * Sustituye a la antigua identidad `multiTenant` (un `user` con roles en A y
+   * en B), que **D-8 hizo irrepresentable**: `user.tenant_id` y la FK compuesta
+   * de R60 impiden que una identidad viva en dos inmobiliarias.
+   *
+   * Lo que aquella semilla probaba de R33 —que el tenant se resuelve del header
+   * validado y no de `roles[0]`— sigue haciendo falta, y este usuario lo prueba
+   * **mejor**: el token afirma dos tenants, pero la identidad solo pertenece a
+   * uno. Un token manipulado es exactamente la amenaza contra la que R33
+   * defiende, y ahora el motor tiene la última palabra.
+   */
+  tokenConRolAjeno: UsuarioSembrado;
   /** Identidad sin email y sin `password_hash` (R6, D-5). */
   clienteSinCredenciales: { id: string };
   cerrar(): Promise<void>;
@@ -74,23 +94,34 @@ export async function levantarEntornoClientes(): Promise<EntornoClientes> {
   const poolAdmin = new Pool({ connectionString });
 
   await poolAdmin.query(
-    `INSERT INTO tenant (id, nombre, nit)
-     VALUES ($1, 'Inmobiliaria A', '900111111'), ($2, 'Inmobiliaria B', '900222222')`,
-    [TENANT_A, TENANT_B],
+    `INSERT INTO tenant (id, nombre, nit, codigo)
+     VALUES ($1, 'Inmobiliaria A', '900111111', $3),
+            ($2, 'Inmobiliaria B', '900222222', $4)`,
+    [TENANT_A, TENANT_B, CODIGO_TENANT_A, CODIGO_TENANT_B],
   );
 
   const hash = await bcrypt.hash(CLAVE_DE_PRUEBA, 10);
 
+  /**
+   * Siembra una identidad y sus roles.
+   *
+   * Desde **D-8** la identidad pertenece a **un** tenant (`user.tenant_id`), y
+   * la FK compuesta de R60 impide que sus roles apunten a otro. `rolesEnToken`
+   * existe solo para poder firmar un token que **afirme** más de lo que la base
+   * permite: es el escenario de token manipulado contra el que R33 defiende.
+   */
   async function sembrar(
+    tenantId: string,
     email: string | null,
     nombre: string,
     roles: Array<{ tenant_id: string; rol: string }>,
     conCredenciales = true,
+    rolesEnToken: Array<{ tenant_id: string; rol: string }> = roles,
   ): Promise<UsuarioSembrado> {
     const { rows } = await poolAdmin.query<{ id: string }>(
-      `INSERT INTO "user" (email, password_hash, nombre)
-       VALUES ($1, $2, $3) RETURNING id`,
-      [email, conCredenciales ? hash : null, nombre],
+      `INSERT INTO "user" (tenant_id, email, password_hash, nombre)
+       VALUES ($1, $2, $3, $4) RETURNING id`,
+      [tenantId, email, conCredenciales ? hash : null, nombre],
     );
     const id = rows[0]!.id;
 
@@ -100,29 +131,42 @@ export async function levantarEntornoClientes(): Promise<EntornoClientes> {
         [id, rol.tenant_id, rol.rol],
       );
     }
-    return { id, email, token: firmar(id, email, roles) };
+    return { id, email, token: firmar(id, email, rolesEnToken) };
   }
 
-  const adminA = await sembrar('admin-a@example.com', 'Admin A', [
+  const adminA = await sembrar(TENANT_A, 'admin-a@example.com', 'Admin A', [
     { tenant_id: TENANT_A, rol: 'admin' },
   ]);
-  const empleadoA = await sembrar('empleado-a@example.com', 'Empleado A', [
+  const empleadoA = await sembrar(TENANT_A, 'empleado-a@example.com', 'Empleado A', [
     { tenant_id: TENANT_A, rol: 'empleado' },
   ]);
-  const adminB = await sembrar('admin-b@example.com', 'Admin B', [
+  const adminB = await sembrar(TENANT_B, 'admin-b@example.com', 'Admin B', [
     { tenant_id: TENANT_B, rol: 'admin' },
   ]);
-  const propietarioA = await sembrar('propietario-a@example.com', 'Propietario A', [
-    { tenant_id: TENANT_A, rol: 'propietario' },
-  ]);
-  const inquilinoA = await sembrar('inquilino-a@example.com', 'Inquilino A', [
+  const propietarioA = await sembrar(
+    TENANT_A,
+    'propietario-a@example.com',
+    'Propietario A',
+    [{ tenant_id: TENANT_A, rol: 'propietario' }],
+  );
+  const inquilinoA = await sembrar(TENANT_A, 'inquilino-a@example.com', 'Inquilino A', [
     { tenant_id: TENANT_A, rol: 'inquilino' },
   ]);
-  const multiTenant = await sembrar('multi@example.com', 'Multi Tenant', [
-    { tenant_id: TENANT_A, rol: 'admin' },
-    { tenant_id: TENANT_B, rol: 'admin' },
-  ]);
+  // Identidad del tenant B cuyo TOKEN declara además un rol en A. En la base
+  // solo existe el rol de B (D-8, R60); el token afirma de más a propósito.
+  const tokenConRolAjeno = await sembrar(
+    TENANT_B,
+    'token-ajeno@example.com',
+    'Token Con Rol Ajeno',
+    [{ tenant_id: TENANT_B, rol: 'admin' }],
+    true,
+    [
+      { tenant_id: TENANT_A, rol: 'admin' },
+      { tenant_id: TENANT_B, rol: 'admin' },
+    ],
+  );
   const clienteSinCredenciales = await sembrar(
+    TENANT_A,
     null,
     'Cliente sin credenciales',
     [{ tenant_id: TENANT_A, rol: 'propietario' }],
@@ -148,7 +192,7 @@ export async function levantarEntornoClientes(): Promise<EntornoClientes> {
     adminB,
     propietarioA,
     inquilinoA,
-    multiTenant,
+    tokenConRolAjeno,
     clienteSinCredenciales: { id: clienteSinCredenciales.id },
     async cerrar() {
       await app.close();

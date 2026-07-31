@@ -247,20 +247,29 @@ describe('Aplicación real de las migraciones (R10)', () => {
     ]);
   });
 
-  it('la UNIQUE de user.email se conserva intacta tras D-5 (#5 R7)', async () => {
-    // D-5 relaja el NOT NULL pero NO la unicidad: en PostgreSQL cada NULL es
-    // distinto, así que no hace falta índice parcial.
+  it('la unicidad del correo pasa de global a POR TENANT (#5 R7, R59, D-8)', async () => {
+    // D-5 relajó el NOT NULL pero no la unicidad. **D-8** sí la cambia: dos
+    // personas distintas con el mismo correo, cada una en su inmobiliaria, son
+    // dos identidades legítimas. Los NULL siguen conviviendo sin índice
+    // parcial, porque PostgreSQL trata cada NULL como distinto (R7).
     const { rows } = await pool.query<{ indexdef: string }>(
       `SELECT indexdef FROM pg_indexes
         WHERE schemaname = 'public' AND tablename = 'user'`,
     );
-
     const unicos = rows
       .map((r) => r.indexdef)
-      .filter((d) => /CREATE UNIQUE INDEX/i.test(d) && /\(email\)/i.test(d));
+      .filter((d) => /CREATE UNIQUE INDEX/i.test(d) && /email/i.test(d));
 
     expect(unicos).toHaveLength(1);
+    expect(unicos[0]).toMatch(/\(tenant_id,\s*email\)/i);
     expect(unicos[0]).not.toMatch(/WHERE/i);
+
+    // Y la global ya NO existe: si sobreviviera, el mismo correo en dos
+    // inmobiliarias seguiría colisionando y R65 sería imposible.
+    const globales = rows
+      .map((r) => r.indexdef)
+      .filter((d) => /CREATE UNIQUE INDEX/i.test(d) && /\(email\)/i.test(d));
+    expect(globales).toEqual([]);
   });
 
   it('perfil_propietario tiene sujeto_retencion y NINGUNA columna de tarifa (#5 R1, D-2)', async () => {
@@ -333,7 +342,7 @@ describe('Aplicación real de las migraciones (R10)', () => {
 
   it('UPDATE y DELETE sobre audit_log fallan incluso para el dueño (#5 R41)', async () => {
     const { rows: tenants } = await pool.query<{ id: string }>(
-      `INSERT INTO tenant (nombre, nit) VALUES ('Auditada', '900-0006')
+      `INSERT INTO tenant (nombre, nit, codigo) VALUES ('Auditada', '900-0006', 'auditada')
        ON CONFLICT (nit) DO UPDATE SET nombre = EXCLUDED.nombre
        RETURNING id`,
     );
@@ -378,5 +387,122 @@ describe('Aplicación real de las migraciones (R10)', () => {
     expect(parcial).toBeDefined();
     expect(parcial?.indexdef).toMatch(/CREATE UNIQUE INDEX/i);
     expect(parcial?.indexdef).toMatch(/WHERE .*es_predeterminada.*activa/is);
+  });
+
+  // ─── T73 — D-12: el código de inmobiliaria (R73, R75, R76, R77) ──────────
+
+  describe('tenant.codigo (#5 R73, R75, R77, D-12)', () => {
+    /** Inserta un tenant con el código dado y devuelve el error, si lo hay. */
+    async function intentarAlta(codigo: string, nit: string): Promise<unknown> {
+      try {
+        await pool.query(
+          `INSERT INTO tenant (nombre, nit, codigo) VALUES ('Prueba Codigo', $1, $2)`,
+          [nit, codigo],
+        );
+        return null;
+      } catch (error) {
+        return error;
+      }
+    }
+
+    const RECHAZADOS: Array<[string, string]> = [
+      ['mayúsculas', 'Arrendamientos'],
+      ['tilde', 'arrendamientos-sión'],
+      ['eñe', 'compañia'],
+      ['guion inicial', '-arrendamientos'],
+      ['guion final', 'arrendamientos-'],
+      ['dos guiones seguidos', 'arre--ndamientos'],
+      ['espacio interior', 'arrendamientos sion'],
+      ['menos de 3 caracteres', 'ab'],
+      ['más de 63 caracteres', 'a'.repeat(64)],
+    ];
+
+    it.each(RECHAZADOS)('el CHECK rechaza %s (R73)', async (_nombre, codigo) => {
+      // `23514` = check_violation. El motor es la barrera, no el DTO: R77 exige
+      // que valga también para un alta hecha a mano contra la base.
+      await expect(intentarAlta(codigo, `nit-${codigo.length}-x`)).resolves.toMatchObject(
+        { code: '23514' },
+      );
+    });
+
+    it.each(['www', 'api', 'app', 'admin', 'portal', 'static', 'mail', 'cdn'])(
+      'el CHECK rechaza el subdominio reservado %s (R75)',
+      async (codigo) => {
+        await expect(intentarAlta(codigo, `nit-res-${codigo}`)).resolves.toMatchObject({
+          code: '23514',
+        });
+      },
+    );
+
+    it('acepta `arrendamientos-sion`, el caso del spec (R73)', async () => {
+      await expect(
+        intentarAlta('arrendamientos-sion', 'nit-ok-1'),
+      ).resolves.toBeNull();
+    });
+
+    it('dos inmobiliarias no pueden compartir código (R73)', async () => {
+      // `23505` = unique_violation. Sin esto, `tenant_por_codigo` sería
+      // ambiguo y el login podría entrar en la inmobiliaria equivocada.
+      await expect(
+        intentarAlta('arrendamientos-sion', 'nit-ok-2'),
+      ).resolves.toMatchObject({ code: '23505' });
+    });
+
+    it('tenant.codigo es NOT NULL: un alta sin código no entra (R73)', async () => {
+      await expect(
+        pool.query(`INSERT INTO tenant (nombre, nit) VALUES ('Sin Codigo', 'nit-sin')`),
+      ).rejects.toMatchObject({ code: '23502' });
+    });
+  });
+
+  describe('tenant_por_codigo, única ruta previa al tenant (#5 R52)', () => {
+    it('resuelve por coincidencia EXACTA y devuelve solo el uuid', async () => {
+      const { rows: creado } = await pool.query<{ id: string }>(
+        `INSERT INTO tenant (nombre, nit, codigo)
+         VALUES ('Resoluble', 'nit-resoluble', 'resoluble') RETURNING id`,
+      );
+
+      const { rows } = await pool.query<{ id: string | null }>(
+        'SELECT tenant_por_codigo($1) AS id',
+        ['resoluble'],
+      );
+      expect(rows[0]?.id).toBe(creado[0]?.id);
+
+      // Ni prefijos, ni sufijos, ni patrones: si admitiera `LIKE`, el login se
+      // convertiría en un enumerador de clientes del SaaS.
+      for (const parcial of ['resolubl', 'resoluble2', '%', 'reso%', 'RESOLUBLE']) {
+        const { rows: nada } = await pool.query<{ id: string | null }>(
+          'SELECT tenant_por_codigo($1) AS id',
+          [parcial],
+        );
+        expect(nada[0]?.id, `tenant_por_codigo('${parcial}')`).toBeNull();
+      }
+    });
+
+    it('es SECURITY DEFINER y no está concedida a PUBLIC (R52)', async () => {
+      const { rows } = await pool.query<{ prosecdef: boolean; proacl: string | null }>(
+        `SELECT p.prosecdef, p.proacl::text AS proacl
+           FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+          WHERE n.nspname = 'public' AND p.proname = 'tenant_por_codigo'`,
+      );
+
+      expect(rows).toHaveLength(1);
+      expect(rows[0]?.prosecdef).toBe(true);
+      // Tras el REVOKE, el ACL deja de tener la entrada `=X/` de PUBLIC.
+      expect(rows[0]?.proacl ?? '').not.toMatch(/(^|,)=X\//);
+    });
+
+    it('no hay ninguna OTRA función SECURITY DEFINER sobre `user` (R52)', async () => {
+      // R52 dice "única ruta": si mañana alguien añade otra puerta que evite el
+      // RLS, este test la ve.
+      const { rows } = await pool.query<{ proname: string }>(
+        `SELECT p.proname
+           FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+          WHERE n.nspname = 'public' AND p.prosecdef
+          ORDER BY p.proname`,
+      );
+
+      expect(rows.map((r) => r.proname)).toEqual(['tenant_por_codigo']);
+    });
   });
 });

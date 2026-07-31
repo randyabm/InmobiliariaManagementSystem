@@ -273,12 +273,24 @@ describe('Invariantes de seguridad de clientes (#5)', () => {
       expect(respuesta.body.error).toBe('TENANT_NO_AUTORIZADO');
     });
 
-    it('una identidad multi-tenant SIN header recibe 403: no se elige por ella', async () => {
+    /**
+     * Estos dos casos usaban la semilla `multiTenant` —un `user` con roles en A
+     * y en B—, que **D-8 hizo irrepresentable**: `user.tenant_id` y la FK
+     * compuesta de R60 impiden que una identidad viva en dos inmobiliarias.
+     *
+     * Lo que probaban sigue haciendo falta (R33: el tenant sale del header
+     * validado, no de `roles[0]`), así que se prueban con un **token que
+     * declara un rol que la base no respalda**. Es un caso más fuerte que el
+     * anterior: ya no existe ninguna identidad ambigua de verdad, así que la
+     * ambigüedad solo puede venir de un token manipulado, y es justo ahí donde
+     * el 403 tiene que caer.
+     */
+    it('un token que declara dos tenants SIN header recibe 403: no se elige por él', async () => {
       // Antes de #5 se usaba `roles[0].tenant_id` y la petición habría escrito
-      // en una inmobiliaria elegida por el orden del array (RF-AU6).
+      // en la inmobiliaria que decidiese el orden del array.
       const respuesta = await request(servidor())
         .post('/propietarios')
-        .set('Authorization', `Bearer ${entorno.multiTenant.token}`)
+        .set('Authorization', `Bearer ${entorno.tokenConRolAjeno.token}`)
         .send({ nombre: 'Ambiguo', tipo_documento: 'CC', documento: 'AMB-1' });
 
       expect(respuesta.status).toBe(403);
@@ -290,10 +302,10 @@ describe('Invariantes de seguridad de clientes (#5)', () => {
       expect(rows).toHaveLength(0);
     });
 
-    it('esa misma identidad multi-tenant CON header escribe en el tenant indicado', async () => {
+    it('ese mismo token CON header escribe en el tenant indicado, no en otro', async () => {
       const respuesta = await request(servidor())
         .post('/propietarios')
-        .set('Authorization', `Bearer ${entorno.multiTenant.token}`)
+        .set('Authorization', `Bearer ${entorno.tokenConRolAjeno.token}`)
         .set('x-tenant-id', TENANT_B)
         .send({ nombre: 'Explicito', tipo_documento: 'CC', documento: 'AMB-2' });
 
@@ -422,7 +434,7 @@ describe('Invariantes de seguridad de clientes (#5)', () => {
     it('la auditoría se escribe en el tenant resuelto, no en roles[0] (R33, R35)', async () => {
       const respuesta = await request(servidor())
         .post('/propietarios')
-        .set('Authorization', `Bearer ${entorno.multiTenant.token}`)
+        .set('Authorization', `Bearer ${entorno.tokenConRolAjeno.token}`)
         .set('x-tenant-id', TENANT_B)
         .send({ nombre: 'Auditoria Multi', tipo_documento: 'CC', documento: 'AUD-MT' });
 
