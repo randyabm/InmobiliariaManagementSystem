@@ -11,6 +11,12 @@
 name: inmobiliaria
 
 services:
+  # `POSTGRES_USER` es el rol PRIVILEGIADO: dueño del esquema, solo para
+  # migraciones y para provisionar. La API NO se conecta con él (D-10, R43):
+  # es superusuario, y un superusuario se salta el RLS aunque las tablas tengan
+  # `FORCE ROW LEVEL SECURITY`. El rol de la aplicación (`APP_DB_USER`) lo crea
+  # `asegurarRolDeAplicacion` tras cada migración (R46), no este compose, porque
+  # los GRANT no alcanzan a tablas que todavía no existen.
   postgres:
     image: postgres:16.4-alpine
     restart: unless-stopped

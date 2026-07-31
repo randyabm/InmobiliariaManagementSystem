@@ -11,6 +11,12 @@ export const ENTORNO_DE_PRUEBA: Readonly<Record<string, string>> = {
   PORT: '3000',
   DATABASE_URL:
     'postgres://test-user:test-password@127.0.0.1:5432/inmobiliaria_test',
+  // Rol privilegiado, solo para migrar y provisionar (D-10, R47). Igual de
+  // inerte que la de arriba: apunta a un host que no existe.
+  DATABASE_MIGRATION_URL:
+    'postgres://test-owner:test-password@127.0.0.1:5432/inmobiliaria_test',
+  APP_DB_USER: 'app_inmobiliaria',
+  APP_DB_PASSWORD: 'test-password',
   CORS_ORIGINS: 'http://localhost:5173,https://panel.example.com',
   JWT_SECRET: 'test-secret-for-unit-tests',
   JWT_EXPIRATION: '3600',

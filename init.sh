@@ -159,6 +159,33 @@ else
 fi
 
 echo ""
+echo "── 4c. Verificando la separación de roles de base de datos ──"
+
+# D-10 / R43-R47: quien migra y quien sirve son roles DISTINTOS. Es lo que hace
+# que el Row-Level Security deje de ser decorativo: `FORCE ROW LEVEL SECURITY`
+# alcanza al dueño de la tabla, pero NO a un superusuario ni a un rol con
+# BYPASSRLS. Si `DATABASE_URL` volviera a apuntar al usuario del contenedor, el
+# aislamiento por tenant no lo aplicaría nadie en ejecución (hallazgo B3).
+#
+# La aplicación además se niega a arrancar si su rol puede saltarse el RLS
+# (R44), así que esto es un aviso temprano, no la única defensa.
+for var in DATABASE_MIGRATION_URL APP_DB_USER APP_DB_PASSWORD; do
+  if ! grep -q "^${var}=" .env 2>/dev/null; then
+    warn "Falta ${var} en .env — cópiala de .env.example (D-10, R47)"
+  else
+    ok "${var} declarada en .env"
+  fi
+done
+
+if [ -f .env ]; then
+  APP_URL=$(grep '^DATABASE_URL=' .env | head -1 | cut -d= -f2-)
+  MIG_URL=$(grep '^DATABASE_MIGRATION_URL=' .env | head -1 | cut -d= -f2-)
+  if [ -n "$APP_URL" ] && [ "$APP_URL" = "$MIG_URL" ]; then
+    warn "DATABASE_URL y DATABASE_MIGRATION_URL son idénticas: la API se conectaría con el rol privilegiado y el RLS quedaría inerte (R43)"
+  fi
+fi
+
+echo ""
 echo "── 5. Lint, typecheck y tests ──────────────────────────"
 
 if [ ! -f "package.json" ]; then

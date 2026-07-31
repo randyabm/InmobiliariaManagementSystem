@@ -8,7 +8,12 @@ import * as bcrypt from 'bcrypt';
 import * as jwt from 'jsonwebtoken';
 
 import { resolveMigrationsFolder } from '../../../src/database/migrations-folder';
+import { asegurarRolDeAplicacion } from '../../../src/database/rol-aplicacion';
 import { runMigrations } from '../../../src/database/run-migrations';
+import {
+  CLAVE_APP_DE_PRUEBA,
+  USUARIO_APP_DE_PRUEBA,
+} from '../../../test/support/entorno-clientes';
 
 describe('Auth + RBAC (R9, R10)', () => {
   let contenedor: StartedPostgreSqlContainer;
@@ -30,12 +35,22 @@ describe('Auth + RBAC (R9, R10)', () => {
 
     await runMigrations(connectionString, carpetaMigraciones);
 
-    await poolAdmin.query("DROP ROLE IF EXISTS app_test_user");
-    await poolAdmin.query("CREATE ROLE app_test_user NOLOGIN");
-    await poolAdmin.query('GRANT USAGE ON SCHEMA public TO app_test_user');
-    await poolAdmin.query('GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO app_test_user');
+    // **R48, R57, R58 (hallazgo B3).** El rol sin privilegios lo provisiona
+    // `asegurarRolDeAplicacion` —el mismo procedimiento que usa la aplicación
+    // en producción (R46)— y NO este test. Un test que crea el objeto sobre el
+    // que después afirma es verde por construcción: es el defecto B2, y
+    // `tests/ddl-en-tests.test.ts` lo vigila.
+    await asegurarRolDeAplicacion(connectionString, {
+      usuario: USUARIO_APP_DE_PRUEBA,
+      clave: CLAVE_APP_DE_PRUEBA,
+    });
 
-    poolApp = new Pool({ connectionString });
+    // Conexión con el rol de aplicación de verdad, no un `SET ROLE` sobre la
+    // del superusuario: así se mide exactamente lo que medirá la aplicación.
+    const urlApp = new URL(connectionString);
+    urlApp.username = USUARIO_APP_DE_PRUEBA;
+    urlApp.password = CLAVE_APP_DE_PRUEBA;
+    poolApp = new Pool({ connectionString: urlApp.toString() });
 
     // Crear tenants
     await poolAdmin.query(

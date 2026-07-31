@@ -9,7 +9,7 @@ import { readDatabaseUrl } from '../run-migrations';
 import { hasActiveDatabasePool } from '../database.client';
 
 describe('Runner de migraciones (R10, R17)', () => {
-  it('aborta con ConfigurationError si falta DATABASE_URL', () => {
+  it('aborta con ConfigurationError si falta DATABASE_MIGRATION_URL', () => {
     let capturado: unknown;
     try {
       readDatabaseUrl({});
@@ -19,20 +19,32 @@ describe('Runner de migraciones (R10, R17)', () => {
 
     expect(capturado).toBeInstanceOf(ConfigurationError);
     expect((capturado as ConfigurationError).variables).toContain(
-      'DATABASE_URL',
+      'DATABASE_MIGRATION_URL',
     );
   });
 
-  it('trata una DATABASE_URL en blanco como ausente', () => {
-    expect(() => readDatabaseUrl({ DATABASE_URL: '   ' })).toThrow(
+  it('trata una DATABASE_MIGRATION_URL en blanco como ausente', () => {
+    expect(() => readDatabaseUrl({ DATABASE_MIGRATION_URL: '   ' })).toThrow(
       ConfigurationError,
     );
   });
 
   it('devuelve la cadena de conexión cuando está definida', () => {
     expect(
-      readDatabaseUrl({ DATABASE_URL: 'postgres://u:p@localhost:5432/db' }),
+      readDatabaseUrl({
+        DATABASE_MIGRATION_URL: 'postgres://u:p@localhost:5432/db',
+      }),
     ).toBe('postgres://u:p@localhost:5432/db');
+  });
+
+  it('NO acepta DATABASE_URL como sustituto (R47, D-10)', () => {
+    // Migrar y servir usan roles distintos a propósito (R43). Si el runner
+    // aceptara la cadena de la aplicación, el arreglo evidente ante un fallo de
+    // privilegios sería devolver el superusuario a la API, que es exactamente
+    // el hallazgo B3 que esta feature cierra.
+    expect(() =>
+      readDatabaseUrl({ DATABASE_URL: 'postgres://u:p@localhost:5432/db' }),
+    ).toThrow(ConfigurationError);
   });
 
   it('importar el cliente de base de datos no abre ninguna conexión (R14)', () => {

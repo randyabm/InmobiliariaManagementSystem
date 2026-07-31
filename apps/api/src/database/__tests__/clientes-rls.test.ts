@@ -6,7 +6,12 @@ import { Pool } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { resolveMigrationsFolder } from '../../../src/database/migrations-folder';
+import { asegurarRolDeAplicacion } from '../../../src/database/rol-aplicacion';
 import { runMigrations } from '../../../src/database/run-migrations';
+import {
+  CLAVE_APP_DE_PRUEBA,
+  USUARIO_APP_DE_PRUEBA,
+} from '../../../test/support/entorno-clientes';
 
 /**
  * Invariantes de esquema y de aislamiento de la feature #5, verificados contra
@@ -23,6 +28,8 @@ describe('Clientes — esquema y aislamiento (#5 R4, R5, R7, R31, R34)', () => {
   let contenedor: StartedPostgreSqlContainer;
   let poolAdmin: Pool;
   let poolApp: Pool;
+  /** Cadena con el rol de aplicación, para los pools nuevos de los tests. */
+  let urlApp: string;
 
   const carpetaMigraciones = resolveMigrationsFolder(__dirname);
 
@@ -43,7 +50,6 @@ describe('Clientes — esquema y aislamiento (#5 R4, R5, R7, R31, R34)', () => {
     const cliente = await poolApp.connect();
     try {
       await cliente.query('BEGIN');
-      await cliente.query('SET ROLE app_test_user');
       if (tenantId !== null) {
         await cliente.query(`SET LOCAL app.current_tenant = '${tenantId}'`);
       }
@@ -58,16 +64,26 @@ describe('Clientes — esquema y aislamiento (#5 R4, R5, R7, R31, R34)', () => {
     contenedor = await new PostgreSqlContainer('postgres:16.4-alpine').start();
     const connectionString = contenedor.getConnectionUri();
     poolAdmin = new Pool({ connectionString });
-    poolApp = new Pool({ connectionString });
 
     await runMigrations(connectionString, carpetaMigraciones);
 
-    await poolAdmin.query('DROP ROLE IF EXISTS app_test_user');
-    await poolAdmin.query('CREATE ROLE app_test_user NOLOGIN');
-    await poolAdmin.query('GRANT USAGE ON SCHEMA public TO app_test_user');
-    await poolAdmin.query(
-      'GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO app_test_user',
-    );
+    // **R48, R57, R58 (hallazgo B3).** El rol sin privilegios lo provisiona
+    // `asegurarRolDeAplicacion` —el mismo procedimiento que usa la aplicación
+    // en producción (R46)— y NO este test. Un test que crea el objeto sobre el
+    // que después afirma es verde por construcción: es el defecto B2, y
+    // `tests/ddl-en-tests.test.ts` lo vigila.
+    await asegurarRolDeAplicacion(connectionString, {
+      usuario: USUARIO_APP_DE_PRUEBA,
+      clave: CLAVE_APP_DE_PRUEBA,
+    });
+
+    urlApp = (() => {
+      const url = new URL(connectionString);
+      url.username = USUARIO_APP_DE_PRUEBA;
+      url.password = CLAVE_APP_DE_PRUEBA;
+      return url.toString();
+    })();
+    poolApp = new Pool({ connectionString: urlApp });
 
     // Datos sembrados como admin (superusuario): bypassa RLS a propósito, así
     // el test comprueba la lectura, no la escritura.
@@ -311,15 +327,11 @@ describe('Clientes — esquema y aislamiento (#5 R4, R5, R7, R31, R34)', () => {
         // true)` solo devuelve NULL si el GUC no se fijó nunca en la sesión.
         // Reutilizar una conexión del pool que ya tuvo un `SET LOCAL` deja el
         // GUC presente con valor vacío, que es el otro caso (test siguiente).
-        const poolVirgen = new Pool({
-          connectionString: contenedor.getConnectionUri(),
-          max: 1,
-        });
+        const poolVirgen = new Pool({ connectionString: urlApp, max: 1 });
         try {
           const cliente = await poolVirgen.connect();
           try {
             await cliente.query('BEGIN');
-            await cliente.query('SET ROLE app_test_user');
 
             const { rows } = await cliente.query(`SELECT * FROM ${tabla}`);
 

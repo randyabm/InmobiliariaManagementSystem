@@ -237,13 +237,13 @@
 
 - [x] T60 — Crear `apps/api/src/database/rol-aplicacion.ts` con `asegurarRolDeAplicacion(urlDeMigracion, credenciales)`: idempotente, crea el rol `NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE LOGIN` y aplica los GRANT mínimos (USAGE en el esquema; SELECT/INSERT/UPDATE en tablas de negocio; SELECT/INSERT en `audit_log`; EXECUTE en `tenant_por_nit`; **ningún DELETE**). Invocarlo desde `db:migrate` después de aplicar las migraciones. **Cubre: R45, R46.**
 
-- [ ] T61 — Separar credenciales: `DATABASE_MIGRATION_URL` (rol privilegiado) y `DATABASE_URL` (rol de aplicación) en `.env.example`, `docker-compose.yml`, `init.sh` y `app-config.ts`, con `APP_DB_USER` y `APP_DB_PASSWORD`. `migrate.ts` pasa a leer `DATABASE_MIGRATION_URL`. **Cubre: R43, R47.**
+- [x] T61 — Separar credenciales: `DATABASE_MIGRATION_URL` (rol privilegiado) y `DATABASE_URL` (rol de aplicación) en `.env.example`, `docker-compose.yml`, `init.sh` y `app-config.ts`, con `APP_DB_USER` y `APP_DB_PASSWORD`. `migrate.ts` pasa a leer `DATABASE_MIGRATION_URL`. **Cubre: R43, R47.**
 
-- [ ] T62 — Añadir el fail-fast de arranque: la app consulta `SELECT rolsuper, rolbypassrls FROM pg_roles WHERE rolname = current_user` y aborta con `ConfigurationError` accionable si alguno es `true`. **Cubre: R44.**
+- [x] T62 — Añadir el fail-fast de arranque: la app consulta `SELECT rolsuper, rolbypassrls FROM pg_roles WHERE rolname = current_user` y aborta con `ConfigurationError` accionable si alguno es `true`. **Cubre: R44.**
 
-- [ ] T63 — Migrar los entornos de prueba al rol provisionado: `entorno-clientes.ts` levanta la app con la cadena del rol de aplicación (no la del contenedor) y `clientes-rls.test.ts` deja de crear `app_test_user` a mano y usa `asegurarRolDeAplicacion`. **Cubre: R48, R57, R58.**
+- [x] T63 — Migrar los entornos de prueba al rol provisionado: `entorno-clientes.ts` levanta la app con la cadena del rol de aplicación (no la del contenedor) y `clientes-rls.test.ts` deja de crear `app_test_user` a mano y usa `asegurarRolDeAplicacion`. **Cubre: R48, R57, R58.**
 
-- [ ] T64 — Tests del rol: `rol-aplicacion.test.ts` afirma contra la base real que el rol de la app **no** es superusuario, **no** tiene `BYPASSRLS` y **no** es dueño de las tablas; que no tiene privilegio `DELETE` en ninguna tabla ni `UPDATE`/`DELETE` sobre `audit_log` (`has_table_privilege`); y un test unitario de que el arranque aborta con un rol privilegiado. **Cubre: R43, R44, R45.**
+- [x] T64 — Tests del rol: `rol-aplicacion.test.ts` afirma contra la base real que el rol de la app **no** es superusuario, **no** tiene `BYPASSRLS` y **no** es dueño de las tablas; que no tiene privilegio `DELETE` en ninguna tabla ni `UPDATE`/`DELETE` sobre `audit_log` (`has_table_privilege`); y un test unitario de que el arranque aborta con un rol privilegiado. **Cubre: R43, R44, R45.**
 
 ## Bloque 15 — Re-verificación de §C7 con el rol real
 

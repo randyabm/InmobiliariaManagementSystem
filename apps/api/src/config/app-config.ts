@@ -29,7 +29,27 @@ const corsOriginsSchema = z
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']),
   PORT: z.coerce.number().int().positive().max(65535),
+  /**
+   * Cadena del **rol de aplicación** (D-10, R43, R47): sin `BYPASSRLS`, no
+   * superusuario y no dueño de las tablas. El arranque se aborta si el rol de
+   * esta conexión puede saltarse el RLS (R44, `verificarRolDeAplicacion`).
+   */
   DATABASE_URL: z.string().min(1).startsWith('postgres'),
+
+  /**
+   * Cadena del **rol privilegiado** (R47). La usan las migraciones y la
+   * provisión del rol de aplicación, nunca la aplicación en ejecución.
+   *
+   * Es opcional en el esquema, y a propósito: un despliegue que solo *sirve*
+   * —sin migrar— no tiene por qué llevar encima la credencial privilegiada.
+   * `npm run db:migrate` sí la exige, y falla nombrándola si no está.
+   */
+  DATABASE_MIGRATION_URL: z.string().min(1).startsWith('postgres').optional(),
+
+  /** Credenciales con las que se provisiona el rol de aplicación (R46). */
+  APP_DB_USER: z.string().min(1).optional(),
+  APP_DB_PASSWORD: z.string().min(1).optional(),
+
   CORS_ORIGINS: corsOriginsSchema,
 
   // Opcionales: nada las consume todavía (feature #1). Se declaran para que
@@ -42,6 +62,9 @@ export interface AppConfig {
   readonly nodeEnv: 'development' | 'test' | 'production';
   readonly port: number;
   readonly databaseUrl: string;
+  readonly databaseMigrationUrl?: string;
+  readonly appDbUser?: string;
+  readonly appDbPassword?: string;
   readonly corsOrigins: readonly string[];
   readonly redisUrl?: string;
   readonly minioEndpoint?: string;
@@ -75,6 +98,13 @@ export function loadAppConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     nodeEnv: datos.NODE_ENV,
     port: datos.PORT,
     databaseUrl: datos.DATABASE_URL,
+    ...(datos.DATABASE_MIGRATION_URL === undefined
+      ? {}
+      : { databaseMigrationUrl: datos.DATABASE_MIGRATION_URL }),
+    ...(datos.APP_DB_USER === undefined ? {} : { appDbUser: datos.APP_DB_USER }),
+    ...(datos.APP_DB_PASSWORD === undefined
+      ? {}
+      : { appDbPassword: datos.APP_DB_PASSWORD }),
     corsOrigins: Object.freeze([...datos.CORS_ORIGINS]),
     ...(datos.REDIS_URL === undefined ? {} : { redisUrl: datos.REDIS_URL }),
     ...(datos.MINIO_ENDPOINT === undefined

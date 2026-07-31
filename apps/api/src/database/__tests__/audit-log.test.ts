@@ -6,7 +6,12 @@ import { Pool } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { resolveMigrationsFolder } from '../../../src/database/migrations-folder';
+import { asegurarRolDeAplicacion } from '../../../src/database/rol-aplicacion';
 import { runMigrations } from '../../../src/database/run-migrations';
+import {
+  CLAVE_APP_DE_PRUEBA,
+  USUARIO_APP_DE_PRUEBA,
+} from '../../../test/support/entorno-clientes';
 
 describe('Audit log — append-only (R6, R7)', () => {
   let contenedor: StartedPostgreSqlContainer;
@@ -35,16 +40,22 @@ describe('Audit log — append-only (R6, R7)', () => {
     // le comenta el `CREATE TRIGGER`, los dos tests de inmutabilidad de este
     // archivo se ponen ROJOS, que es lo que debía ocurrir desde la #4 (R57).
 
-    await poolAdmin.query('DROP ROLE IF EXISTS app_test_user');
-    await poolAdmin.query("CREATE ROLE app_test_user NOLOGIN");
-    await poolAdmin.query('GRANT USAGE ON SCHEMA public TO app_test_user');
-    await poolAdmin.query('GRANT SELECT, INSERT ON ALL TABLES IN SCHEMA public TO app_test_user');
-    await poolAdmin.query('GRANT SELECT, INSERT ON audit_log TO app_test_user');
-    await poolAdmin.query('GRANT SELECT, INSERT ON tenant TO app_test_user');
-    await poolAdmin.query('GRANT SELECT, INSERT ON "user" TO app_test_user');
-    await poolAdmin.query('GRANT SELECT, INSERT ON user_role TO app_test_user');
+    // **R48, R57, R58 (hallazgo B3).** El rol sin privilegios lo provisiona
+    // `asegurarRolDeAplicacion` —el mismo procedimiento que usa la aplicación
+    // en producción (R46)— y NO este test. Un test que crea el objeto sobre el
+    // que después afirma es verde por construcción: es el defecto B2, y
+    // `tests/ddl-en-tests.test.ts` lo vigila.
+    await asegurarRolDeAplicacion(connectionString, {
+      usuario: USUARIO_APP_DE_PRUEBA,
+      clave: CLAVE_APP_DE_PRUEBA,
+    });
 
-    poolApp = new Pool({ connectionString });
+    // Conexión con el rol de aplicación de verdad, no un `SET ROLE` sobre la
+    // del superusuario: así se mide exactamente lo que medirá la aplicación.
+    const urlApp = new URL(connectionString);
+    urlApp.username = USUARIO_APP_DE_PRUEBA;
+    urlApp.password = CLAVE_APP_DE_PRUEBA;
+    poolApp = new Pool({ connectionString: urlApp.toString() });
 
     // Crear tenants (como admin, bypassa RLS)
     await poolAdmin.query(
@@ -74,7 +85,6 @@ describe('Audit log — append-only (R6, R7)', () => {
     const cliente = await poolApp.connect();
     try {
       await cliente.query('BEGIN');
-      await cliente.query('SET ROLE app_test_user');
       await cliente.query(`SET LOCAL app.current_tenant = '${TENANT_A}'`);
 
       const { rowCount } = await cliente.query(
@@ -94,7 +104,6 @@ describe('Audit log — append-only (R6, R7)', () => {
     const cliente = await poolApp.connect();
     try {
       await cliente.query('BEGIN');
-      await cliente.query('SET ROLE app_test_user');
       await cliente.query(`SET LOCAL app.current_tenant = '${TENANT_A}'`);
 
       const { rows } = await cliente.query<{ id: string; accion: string }>(
@@ -160,7 +169,6 @@ describe('Audit log — append-only (R6, R7)', () => {
     const cliente = await poolApp.connect();
     try {
       await cliente.query('BEGIN');
-      await cliente.query('SET ROLE app_test_user');
       await cliente.query(`SET LOCAL app.current_tenant = '${TENANT_A}'`);
 
       const { rows } = await cliente.query<{ id: string; accion: string }>(
@@ -178,7 +186,6 @@ describe('Audit log — append-only (R6, R7)', () => {
     const cliente = await poolApp.connect();
     try {
       await cliente.query('BEGIN');
-      await cliente.query('SET ROLE app_test_user');
       await cliente.query(`SET LOCAL app.current_tenant = '${TENANT_A}'`);
 
       const uniqueUserId = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';

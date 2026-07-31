@@ -49,36 +49,28 @@ const EXCEPCIONES_JUSTIFICADAS: readonly ExcepcionJustificada[] = [
       'el error que se quiere observar (es el estímulo), no el objeto sobre ' +
       'el que se afirma nada. Permitido por la nota de R57. Es permanente.',
   },
-  {
-    archivo: 'apps/api/src/database/__tests__/tenant-rls.test.ts',
-    objetos: ['app_test_user'],
-    motivo:
-      'DEUDA (hallazgo B3): el rol sin privilegios se crea ad hoc en el test. ' +
-      'El sujeto de la afirmación es la política RLS, que sí viene de la ' +
-      'migración, pero el rol debe pasar a crearlo el procedimiento de ' +
-      'provisión (R46). Esta entrada la retira T63.',
-  },
-  {
-    archivo: 'apps/api/src/database/__tests__/auth-rbac.test.ts',
-    objetos: ['app_test_user'],
-    motivo: 'DEUDA (hallazgo B3), igual que tenant-rls.test.ts. La retira T63.',
-  },
-  {
-    archivo: 'apps/api/src/database/__tests__/clientes-rls.test.ts',
-    objetos: ['app_test_user'],
-    motivo:
-      'DEUDA (hallazgo B3), igual que tenant-rls.test.ts. La retira T63, que ' +
-      'este archivo nombra explícitamente en R48/R57.',
-  },
-  {
-    archivo: 'apps/api/src/database/__tests__/audit-log.test.ts',
-    objetos: ['app_test_user'],
-    motivo:
-      'DEUDA (hallazgo B3). La función y los triggers append-only YA no se ' +
-      'crean aquí: los instala 0006_auditoria_append_only.sql (R40). Queda ' +
-      'solo el rol ad hoc, que retira T63.',
-  },
 ];
+
+// ─── Deuda saldada en T63 ───────────────────────────────────────────────────
+//
+// Aquí había CUATRO entradas más —`tenant-rls`, `auth-rbac`, `clientes-rls` y
+// `audit-log`, todas por el mismo motivo: cada una creaba a mano un rol
+// `app_test_user` y después afirmaba sobre el aislamiento que ese rol veía.
+// Llevaban escrita su fecha de caducidad ("la retira T63") desde que se creó
+// este guard.
+//
+// **T63 la retiró.** Los cuatro archivos usan ahora `asegurarRolDeAplicacion`,
+// el mismo procedimiento de provisión que ejecuta `npm run db:migrate` en
+// producción (R46, R48, R57). Eso cambia lo que los tests significan: antes
+// medían un rol inventado para la ocasión, con los GRANT que el propio test
+// consideraba oportunos; ahora miden **el rol con el que corre la aplicación**,
+// con sus privilegios reales. Si mañana alguien le concediera `DELETE` a ese
+// rol, `rol-aplicacion.test.ts` se pondría rojo.
+//
+// La lista se deja vacía a propósito, no se borra: que exista y esté vacía es
+// la afirmación de que hoy **ningún** test de `apps/api` fabrica el objeto que
+// verifica, salvo la inyección de fallos de arriba, que no es el sujeto de
+// ninguna aserción.
 
 /** Directorios de `apps/api` donde viven tests o sus ayudantes. */
 const RAICES_ESCANEADAS: readonly string[] = [

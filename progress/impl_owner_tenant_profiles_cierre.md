@@ -175,3 +175,49 @@ inquilino de la misma inmobiliaria tendrá hoy **dos filas de `user`**.
   roles sobre una identidad), pero deja de producirlo el **flujo de alta**.
 - Unificarlas exigiría deduplicar por `documento` dentro del tenant. **Ningún
   requirement lo pide** y no se ha implementado. Queda para el humano.
+
+### Paso 5 — B3/D-10: el rol sin BYPASSRLS, **el conmutador** (T60–T64) ✅
+
+- **T60** (adelantada al paso 2, ver más abajo) — `database/rol-aplicacion.ts`:
+  `asegurarRolDeAplicacion(urlDeMigracion, credenciales)`, idempotente. Crea el
+  rol `NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE LOGIN`, **revoca todo** y
+  concede lo mínimo: `USAGE`; `SELECT/INSERT/UPDATE` en negocio;
+  `SELECT/INSERT` en `audit_log`; `EXECUTE` en `tenant_por_codigo`;
+  **`DELETE` en ninguna tabla**.
+- **T61 — el conmutador.** `DATABASE_MIGRATION_URL` (rol privilegiado) y
+  `DATABASE_URL` (rol de aplicación) separadas en `.env.example`,
+  `docker-compose.yml`, `init.sh` (paso 4c nuevo) y `app-config.ts`, con
+  `APP_DB_USER`/`APP_DB_PASSWORD`. `migrate.ts` lee `DATABASE_MIGRATION_URL` y
+  provisiona el rol **después** de migrar (R46). `readDatabaseUrl` **rechaza**
+  `DATABASE_URL` como sustituto, con su test.
+- **T63** — `entorno-clientes.ts` levanta la app con la cadena del rol de
+  aplicación. Los **cuatro** tests que creaban `app_test_user` a mano
+  (`tenant-rls`, `auth-rbac`, `clientes-rls`, `audit-log`) usan ahora
+  `asegurarRolDeAplicacion` y **conectan con ese rol** en vez de hacer
+  `SET ROLE`. La lista blanca de `tests/ddl-en-tests.test.ts` **queda vacía**,
+  como estaba previsto: solo sobrevive la inyección de fallos de R22.
+- **T62** — `database/verificar-rol-de-aplicacion.ts`, invocado en `main.ts`
+  antes de `listen`: si `rolsuper` o `rolbypassrls`, `ConfigurationError`
+  accionable. `undefined` también aborta: "no lo sé" no es "está bien".
+- **T64** — `database/__tests__/rol-aplicacion.test.ts` (12 casos) contra la
+  base real: atributos del rol, no es dueño de ninguna tabla, sin `DELETE` en
+  ninguna, sin `UPDATE`/`DELETE` en `audit_log`, idempotencia y fail-fast.
+
+> **Reordenación dentro del bloque, y por qué.** El plan lista T62 antes de
+> T63. Hacerlo así habría dejado la suite **roja entre dos tasks**: el fail-fast
+> aborta el arranque con un rol privilegiado, y hasta T63 los tests levantaban
+> la app justamente con ese rol. Se ejecutó **T61 → T63 → T62 → T64**. El
+> invariante que el orden protege —*el login nunca queda roto y T61 es el único
+> conmutador*— se respeta íntegro.
+
+**Pruebas por mutación (las de §C7, las importantes).**
+
+| Mutación | Efecto |
+|---|---|
+| `NOBYPASSRLS` → `BYPASSRLS` en la provisión | **19 tests rojos** en `identidad-rls` y `clientes-rls`: `SELECT *` sin `WHERE` devuelve filas de los dos tenants, el `INSERT` ajeno deja de fallar, la conexión sin contexto ve todo. |
+| `GRANT … UPDATE` → `… UPDATE, DELETE` | **4 tests rojos**, entre ellos "NO tiene privilegio DELETE en NINGUNA tabla". |
+
+Esa primera fila es la demostración de que **B3 está cerrado**: antes de T63 esa
+misma mutación no habría puesto nada rojo, porque el rol ya era superusuario.
+
+Suite tras el paso 5: `test` 34 archivos / **358 tests**; `test:db` 2 / **56**.

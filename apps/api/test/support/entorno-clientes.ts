@@ -9,6 +9,7 @@ import { Pool } from 'pg';
 
 import { closeDatabasePool } from '../../src/database/database.client';
 import { resolveMigrationsFolder } from '../../src/database/migrations-folder';
+import { asegurarRolDeAplicacion } from '../../src/database/rol-aplicacion';
 import { runMigrations } from '../../src/database/run-migrations';
 import { crearAppDePrueba } from './create-test-app';
 import { ENTORNO_DE_PRUEBA } from './test-env';
@@ -39,6 +40,16 @@ export const CODIGO_TENANT_B = 'inmobiliaria-b';
 
 /** Contraseña literal de test, no una credencial real. */
 export const CLAVE_DE_PRUEBA = 'clave-de-prueba-1234';
+
+/**
+ * Rol de aplicación con el que corre la app en los tests (**R48**).
+ *
+ * Lo provisiona `asegurarRolDeAplicacion`, el mismo procedimiento que usa
+ * `npm run db:migrate`. La clave es un literal inerte de test, no una
+ * credencial (CHECKPOINTS.md §C7).
+ */
+export const USUARIO_APP_DE_PRUEBA = 'app_inmobiliaria';
+export const CLAVE_APP_DE_PRUEBA = 'clave-inerte-de-test';
 
 export interface UsuarioSembrado {
   id: string;
@@ -91,6 +102,28 @@ export async function levantarEntornoClientes(): Promise<EntornoClientes> {
 
   await runMigrations(connectionString, resolveMigrationsFolder(__dirname));
 
+  // **R48, R58 (hallazgo B3).** La aplicación se levanta con el **rol de
+  // aplicación sujeto a RLS**, no con el usuario del contenedor. Es la
+  // diferencia entre medir el motor y medir el `WHERE tenant_id` del
+  // repositorio: el usuario del contenedor es superusuario y se salta el RLS,
+  // así que los nueve accesos cruzados que devolvían 404 no demostraban
+  // aislamiento, solo que el repositorio filtraba bien.
+  //
+  // El rol lo crea el **mismo procedimiento que en producción** (R46), nunca
+  // este archivo: un test que fabrica su propio sujeto es verde por
+  // construcción (R57, `tests/ddl-en-tests.test.ts`).
+  await asegurarRolDeAplicacion(connectionString, {
+    usuario: USUARIO_APP_DE_PRUEBA,
+    clave: CLAVE_APP_DE_PRUEBA,
+  });
+  const urlApp = new URL(connectionString);
+  urlApp.username = USUARIO_APP_DE_PRUEBA;
+  urlApp.password = CLAVE_APP_DE_PRUEBA;
+  const connectionStringApp = urlApp.toString();
+
+  // El pool privilegiado se conserva SOLO para sembrar datos y para verificar
+  // efectos con `SELECT` independientes. Ninguna aserción de aislamiento pasa
+  // por él.
   const poolAdmin = new Pool({ connectionString });
 
   await poolAdmin.query(
@@ -175,7 +208,8 @@ export async function levantarEntornoClientes(): Promise<EntornoClientes> {
 
   const envOriginal = { ...process.env };
   Object.assign(process.env, ENTORNO_DE_PRUEBA, {
-    DATABASE_URL: connectionString,
+    DATABASE_URL: connectionStringApp,
+    DATABASE_MIGRATION_URL: connectionString,
   });
 
   // El pool es un singleton perezoso: se cierra por si otro test lo abrió
