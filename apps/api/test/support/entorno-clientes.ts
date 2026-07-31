@@ -59,7 +59,17 @@ export interface UsuarioSembrado {
 
 export interface EntornoClientes {
   app: INestApplication;
+  /** Rol privilegiado. **Solo** para sembrar y para verificar con `SELECT`. */
   poolAdmin: Pool;
+  /**
+   * Conexión con el **mismo rol que usa la aplicación** (sin `BYPASSRLS`).
+   *
+   * Sirve para lanzar consultas crudas —sin `WHERE tenant_id`— y comprobar que
+   * quien filtra es **el motor** y no el repositorio (**R58**, T65).
+   */
+  poolApp: Pool;
+  /** Cadena de conexión del rol de aplicación. */
+  urlApp: string;
   contenedor: StartedPostgreSqlContainer;
   /** admin del tenant A, con credenciales. */
   adminA: UsuarioSembrado;
@@ -125,6 +135,7 @@ export async function levantarEntornoClientes(): Promise<EntornoClientes> {
   // efectos con `SELECT` independientes. Ninguna aserción de aislamiento pasa
   // por él.
   const poolAdmin = new Pool({ connectionString });
+  const poolApp = new Pool({ connectionString: connectionStringApp });
 
   await poolAdmin.query(
     `INSERT INTO tenant (id, nombre, nit, codigo)
@@ -220,6 +231,8 @@ export async function levantarEntornoClientes(): Promise<EntornoClientes> {
   return {
     app,
     poolAdmin,
+    poolApp,
+    urlApp: connectionStringApp,
     contenedor,
     adminA,
     empleadoA,
@@ -231,6 +244,7 @@ export async function levantarEntornoClientes(): Promise<EntornoClientes> {
     async cerrar() {
       await app.close();
       await closeDatabasePool();
+      await poolApp.end();
       await poolAdmin.end();
       await contenedor.stop();
       for (const clave of Object.keys(process.env)) {

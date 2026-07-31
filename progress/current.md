@@ -135,3 +135,22 @@ escribe código.
 
 - Feature #23 `ci_pipeline` sigue pendiente (requiere infraestructura manual).
 - Nada se ha pusheado al remoto Forgejo en esta sesión.
+
+---
+
+## Sesión — cierre de #5 `owner_tenant_profiles` (T50–T73)
+
+Las **23 tasks pendientes** quedan hechas. Informe completo:
+`progress/impl_owner_tenant_profiles_cierre.md`.
+
+- B1, B3 y B4 cerrados (B2 ya lo estaba). Migraciones nuevas `0007` (identidad
+  por tenant + código de inmobiliaria) y `0008` (contacto en el perfil).
+- La aplicación corre con un rol **sin `BYPASSRLS`**; los invariantes de §C7 se
+  prueban con ese rol y se han verificado **por mutación** (conceder `BYPASSRLS`
+  pone 19 tests en rojo; comentar los triggers de auditoría, 6).
+- La lista blanca del guard anti-DDL queda **vacía**.
+- `./init.sh` en verde: 372 tests + 56 de `test:db`.
+
+**Estado:** #5 sigue en `in_progress`, a la espera del reviewer. Quedan cuatro
+decisiones abiertas para el humano, listadas al final del informe (la más
+relevante: D-9 deja el alta sin deduplicar identidad dentro del tenant).

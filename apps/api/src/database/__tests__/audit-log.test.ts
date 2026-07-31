@@ -157,6 +157,72 @@ describe('Audit log — append-only (R6, R7)', () => {
     ).rejects.toThrow(/append-only/i);
   });
 
+  // ─── T66 — la misma inmutabilidad, ahora con el rol de la aplicación ─────
+
+  describe('inmutabilidad con el rol de aplicación (R41, R45, R58)', () => {
+    /**
+     * Dos barreras independientes, y las dos hacen falta.
+     *
+     * 1. **El trigger** (`0006_auditoria_append_only.sql`) protege incluso al
+     *    dueño de la tabla y al rol de migración, cosa que ninguna política RLS
+     *    puede hacer. Es lo que prueban los dos tests de arriba, con el pool
+     *    privilegiado.
+     * 2. **El privilegio** — el rol de aplicación ni siquiera tiene `UPDATE` ni
+     *    `DELETE` sobre `audit_log` (R45), así que la sentencia se rechaza
+     *    antes de llegar al trigger.
+     *
+     * Probar solo la segunda dejaría la puerta abierta a quien se conecte con
+     * el rol privilegiado; probar solo la primera dejaría el `DELETE` como algo
+     * que "el trigger ya parará". Por eso se comprueban las dos por separado.
+     */
+    it('el rol de la app no tiene privilegio de UPDATE ni DELETE sobre audit_log', async () => {
+      for (const privilegio of ['UPDATE', 'DELETE']) {
+        const { rows } = await poolApp.query<{ puede: boolean }>(
+          'SELECT has_table_privilege(current_user, $1, $2) AS puede',
+          ['public.audit_log', privilegio],
+        );
+        expect(rows[0]?.puede, `audit_log ${privilegio}`).toBe(false);
+      }
+    });
+
+    it.each(['UPDATE audit_log SET accion = $1', 'DELETE FROM audit_log'])(
+      'la sentencia `%s` la rechaza el motor para el rol de la app',
+      async (plantilla) => {
+        const cliente = await poolApp.connect();
+        try {
+          await cliente.query('BEGIN');
+          await cliente.query('SELECT set_config($1, $2, true)', [
+            'app.current_tenant',
+            TENANT_A,
+          ]);
+
+          const consulta = plantilla.includes('$1')
+            ? cliente.query(plantilla, ['alterada'])
+            : cliente.query(plantilla);
+
+          // Falla por privilegio (`permission denied`) o por el trigger
+          // (`append-only`): las dos barreras son válidas y las dos dejan la
+          // auditoría intacta, que es lo que R41 exige.
+          await expect(consulta).rejects.toThrow(
+            /permission denied|permiso denegado|append-only/i,
+          );
+        } finally {
+          await cliente.query('ROLLBACK').catch(() => undefined);
+          cliente.release();
+        }
+      },
+    );
+
+    it('tras los intentos, la entrada original sigue intacta', async () => {
+      const { rows } = await poolAdmin.query<{ accion: string }>(
+        `SELECT accion FROM audit_log WHERE actor_id = $1 AND accion = 'login'`,
+        [USER_ID],
+      );
+      expect(rows.length).toBeGreaterThanOrEqual(1);
+      expect(rows[0]?.accion).toBe('login');
+    });
+  });
+
   it('un tenant NO puede leer registros de otro tenant (R6)', async () => {
     // Insertar registro en tenant B (como admin, bypassa RLS)
     await poolAdmin.query(

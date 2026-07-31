@@ -247,10 +247,10 @@
 
 ## Bloque 15 — Re-verificación de §C7 con el rol real
 
-- [ ] T65 — Re-ejecutar la suite de aislamiento con la app corriendo bajo el rol de aplicación: los 9 accesos cruzados siguen en 404 **y**, además, una consulta cruda sin `WHERE` lanzada por la conexión de la app devuelve solo filas del tenant activo (prueba de que ahora mide el motor y no el `WHERE` del repositorio). Incluir el caso de escritura cruzada sobre `user` de T52. **Cubre: R38, R48, R58.**
+- [x] T65 — Re-ejecutar la suite de aislamiento con la app corriendo bajo el rol de aplicación: los 9 accesos cruzados siguen en 404 **y**, además, una consulta cruda sin `WHERE` lanzada por la conexión de la app devuelve solo filas del tenant activo (prueba de que ahora mide el motor y no el `WHERE` del repositorio). Incluir el caso de escritura cruzada sobre `user` de T52. **Cubre: R38, R48, R58.**
 
-- [ ] T66 — Reescribir `audit-log.test.ts`: eliminar del `beforeAll` la creación de la función y los triggers; las aserciones de inmutabilidad corren contra el esquema que dejan las migraciones y, además, con el rol de aplicación (que ni siquiera tiene privilegio de UPDATE/DELETE). Verificar que el test **falla** si se comenta el `CREATE TRIGGER` de la migración. **Cubre: R40, R41, R57, R58.**
+- [x] T66 — Reescribir `audit-log.test.ts`: eliminar del `beforeAll` la creación de la función y los triggers; las aserciones de inmutabilidad corren contra el esquema que dejan las migraciones y, además, con el rol de aplicación (que ni siquiera tiene privilegio de UPDATE/DELETE). Verificar que el test **falla** si se comenta el `CREATE TRIGGER` de la migración. **Cubre: R40, R41, R57, R58.**
 
-- [ ] T67 — Actualizar `progress/impl_owner_tenant_profiles.md` con el mapa de trazabilidad `R38..R58 → test concreto`, el estado de #2/#3/#4 (revertidas a `in_progress`, cerradas por T65/T66) y las respuestas del humano a PA-8…PA-11 tal como se aplicaron. **Cubre: trazabilidad (`docs/specs.md`), `design.md` §17.**
+- [x] T67 — Actualizar `progress/impl_owner_tenant_profiles.md` con el mapa de trazabilidad `R38..R58 → test concreto`, el estado de #2/#3/#4 (revertidas a `in_progress`, cerradas por T65/T66) y las respuestas del humano a PA-8…PA-11 tal como se aplicaron. **Cubre: trazabilidad (`docs/specs.md`), `design.md` §17.**
 
-- [ ] T68 — Ejecutar `npm run lint`, `npm run typecheck`, `npm run test`, `npm run test:db` y `npm run build`; después `./init.sh` con exit code 0 —ahora incluyendo `test:db` en el semáforo—. **Verificación final.**
+- [x] T68 — Ejecutar `npm run lint`, `npm run typecheck`, `npm run test`, `npm run test:db` y `npm run build`; después `./init.sh` con exit code 0 —ahora incluyendo `test:db` en el semáforo—. **Verificación final.**
