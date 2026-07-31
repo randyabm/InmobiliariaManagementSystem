@@ -6,6 +6,7 @@ import type {
 } from '@inmobiliaria/types';
 
 import type { ContextoPeticion } from '../../../common/database/cliente-tenant';
+import { predicadoDePertenenciaAlTenant } from './predicado-identidad';
 
 /**
  * Único punto de acceso a datos de `perfil_inquilino`.
@@ -114,12 +115,20 @@ export class InquilinosRepository {
     );
   }
 
-  /** Contacto en `user` (**R20**). */
+  /**
+   * Contacto en `user` (**R20**).
+   *
+   * **R38 — hallazgo B1.** Mismo cierre que en `PropietariosRepository`: el
+   * `UPDATE` lleva la condición de pertenencia al tenant y devuelve las filas
+   * afectadas, para que el servicio traduzca "0" a **404** (T51). `null`
+   * significa que no había contacto que escribir, no que la identidad sea
+   * ajena.
+   */
   async actualizarContacto(
     ctx: ContextoPeticion,
     userId: string,
     cambios: { nombre?: string; email?: string; telefono?: string | null },
-  ): Promise<void> {
+  ): Promise<number | null> {
     const asignaciones: string[] = [];
     const valores: unknown[] = [];
 
@@ -135,15 +144,18 @@ export class InquilinosRepository {
       valores.push(cambios.telefono ?? null);
       asignaciones.push(`telefono = $${valores.length}`);
     }
-    if (asignaciones.length === 0) return;
+    if (asignaciones.length === 0) return null;
 
     asignaciones.push('updated_at = now()');
-    valores.push(userId);
+    valores.push(userId, ctx.tenantId);
 
-    await ctx.cliente.query(
-      `UPDATE "user" SET ${asignaciones.join(', ')} WHERE id = $${valores.length}`,
+    const { rowCount } = await ctx.cliente.query(
+      `UPDATE "user" SET ${asignaciones.join(', ')}
+        WHERE id = $${valores.length - 1}
+          AND ${predicadoDePertenenciaAlTenant(valores.length)}`,
       valores,
     );
+    return rowCount ?? 0;
   }
 
   /** Baja lógica (**R21**): nada de borrado físico. */

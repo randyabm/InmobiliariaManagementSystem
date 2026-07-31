@@ -128,11 +128,16 @@ export class PropietariosService {
         : {}),
     });
 
-    await this.repositorio.actualizarContacto(ctx, perfil.user_id, {
-      ...(dto.nombre !== undefined ? { nombre: dto.nombre } : {}),
-      ...('email' in dto ? { email: normalizarEmail(dto.email) } : {}),
-      ...('telefono' in dto ? { telefono: dto.telefono ?? null } : {}),
-    });
+    const identidadesEscritas = await this.repositorio.actualizarContacto(
+      ctx,
+      perfil.user_id,
+      {
+        ...(dto.nombre !== undefined ? { nombre: dto.nombre } : {}),
+        ...('email' in dto ? { email: normalizarEmail(dto.email) } : {}),
+        ...('telefono' in dto ? { telefono: dto.telefono ?? null } : {}),
+      },
+    );
+    exigirIdentidadDelTenant(identidadesEscritas);
 
     return this.exigirPerfil(id, ctx);
   }
@@ -168,6 +173,26 @@ export class PropietariosService {
     if (existentes.length > 0) {
       throw new PerfilYaExisteError();
     }
+  }
+}
+
+/**
+ * Traduce el resultado de `actualizarContacto` a la respuesta HTTP (**T51**,
+ * **R38**, **R31**).
+ *
+ * - `null` → no había contacto que escribir (el PATCH solo tocaba el perfil).
+ * - `0` → la sentencia no encontró ninguna identidad **de este tenant** con
+ *   ese `id`. Se responde **404**, igual que ante cualquier recurso ajeno:
+ *   confirmar que la identidad existe en otra inmobiliaria sería la fuga que
+ *   `docs/conventions.md` y R31 prohíben.
+ *
+ * **No** existe `IdentidadCompartidaNoEditableError`: R39 quedó eliminado por
+ * **D-8** (las identidades nunca se comparten entre inmobiliarias), así que un
+ * 409 sería código muerto que nada puede disparar.
+ */
+export function exigirIdentidadDelTenant(filasAfectadas: number | null): void {
+  if (filasAfectadas === 0) {
+    throw new ResourceNotFoundError();
   }
 }
 

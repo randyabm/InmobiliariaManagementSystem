@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { PerfilPropietario, TipoDocumento } from '@inmobiliaria/types';
 
 import type { ContextoPeticion } from '../../../common/database/cliente-tenant';
+import { predicadoDePertenenciaAlTenant } from './predicado-identidad';
 
 /**
  * Único punto de acceso a datos de `perfil_propietario`
@@ -137,12 +138,28 @@ export class PropietariosRepository {
     );
   }
 
-  /** Actualiza los datos de contacto, que viven en `user` (**R13**). */
+  /**
+   * Actualiza los datos de contacto, que viven en `user` (**R13**).
+   *
+   * **R38 — hallazgo B1 de la revisión.** La sentencia incorpora la condición
+   * de que esa identidad **pertenece al tenant de la petición**. Antes era
+   * `WHERE id = $N` a secas: bastaba con un `user_id` mal resuelto —o con un
+   * perfil cuyo `user_id` apuntase a la identidad de otra inmobiliaria— para
+   * reescribir la fila de un tercero, sin que ninguna capa lo impidiera.
+   *
+   * Devuelve el número de filas afectadas para que el servicio traduzca "0" a
+   * **404** (T51). Devuelve `null` cuando no había ningún campo de contacto
+   * que escribir: eso no es un fallo de pertenencia, es un PATCH que solo toca
+   * el perfil.
+   *
+   * @see predicadoDePertenenciaAlTenant — por qué es ese predicado y no
+   *      `tenant_id = $N`.
+   */
   async actualizarContacto(
     ctx: ContextoPeticion,
     userId: string,
     cambios: { nombre?: string; email?: string | null; telefono?: string | null },
-  ): Promise<void> {
+  ): Promise<number | null> {
     const asignaciones: string[] = [];
     const valores: unknown[] = [];
 
@@ -158,15 +175,18 @@ export class PropietariosRepository {
       valores.push(cambios.telefono ?? null);
       asignaciones.push(`telefono = $${valores.length}`);
     }
-    if (asignaciones.length === 0) return;
+    if (asignaciones.length === 0) return null;
 
     asignaciones.push('updated_at = now()');
-    valores.push(userId);
+    valores.push(userId, ctx.tenantId);
 
-    await ctx.cliente.query(
-      `UPDATE "user" SET ${asignaciones.join(', ')} WHERE id = $${valores.length}`,
+    const { rowCount } = await ctx.cliente.query(
+      `UPDATE "user" SET ${asignaciones.join(', ')}
+        WHERE id = $${valores.length - 1}
+          AND ${predicadoDePertenenciaAlTenant(valores.length)}`,
       valores,
     );
+    return rowCount ?? 0;
   }
 
   /**

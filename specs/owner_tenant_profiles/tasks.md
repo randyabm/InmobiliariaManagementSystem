@@ -180,11 +180,11 @@
 > el `PATCH` dejará de escribir contacto en `user` (D-9, paso 4). Lo que queda es
 > el defecto de fondo: una escritura sin condición de tenant.
 
-- [ ] T50 — Modificar `propietarios.repository.ts` e `inquilinos.repository.ts`: el `UPDATE "user"` incorpora la condición de pertenencia al tenant —`EXISTS (… ur.tenant_id = $tenant)` **y** `NOT EXISTS (… ur.tenant_id <> $tenant)`, predicado válido antes y después de la migración de D-8— y devuelve el número de filas afectadas. **Cubre: R38.**
+- [x] T50 — Modificar `propietarios.repository.ts` e `inquilinos.repository.ts`: el `UPDATE "user"` incorpora la condición de pertenencia al tenant —`EXISTS (… ur.tenant_id = $tenant)` **y** `NOT EXISTS (… ur.tenant_id <> $tenant)`, predicado válido antes y después de la migración de D-8— y devuelve el número de filas afectadas. **Cubre: R38.**
 
-- [ ] T51 — En `propietarios.service.ts` e `inquilinos.service.ts`, traducir "0 filas afectadas" a `ResourceNotFoundError` (**404**, no se confirma la existencia de una identidad ajena). **No** se crea `IdentidadCompartidaNoEditableError`: R39 quedó eliminado por D-8. **Cubre: R38, R31.**
+- [x] T51 — En `propietarios.service.ts` e `inquilinos.service.ts`, traducir "0 filas afectadas" a `ResourceNotFoundError` (**404**, no se confirma la existencia de una identidad ajena). **No** se crea `IdentidadCompartidaNoEditableError`: R39 quedó eliminado por D-8. **Cubre: R38, R31.**
 
-- [ ] T52 — Test HTTP determinista de escritura cruzada sobre `user`: partiendo de dos identidades homónimas —una por tenant, según D-8—, un `PATCH` del tenant A que apunte al `user` del tenant B responde **404** y un `SELECT` independiente confirma que ninguna columna de esa fila cambió; el `PATCH` sobre la identidad propia sí actualiza. **Cubre: R38.**
+- [x] T52 — Test HTTP determinista de escritura cruzada sobre `user`: partiendo de dos identidades homónimas —una por tenant, según D-8—, un `PATCH` del tenant A que apunte al `user` del tenant B responde **404** y un `SELECT` independiente confirma que ninguna columna de esa fila cambió; el `PATCH` sobre la identidad propia sí actualiza. **Cubre: R38.**
 
 ## Bloque 11 — B2: auditoría realmente inmutable
 

@@ -10,7 +10,10 @@ import type {
 import { PerfilYaExisteError } from './errors';
 import { IdentidadService, normalizarEmail } from './identidad.service';
 import { InquilinosRepository } from './inquilinos.repository';
-import { esViolacionDeUnicidad } from './propietarios.service';
+import {
+  esViolacionDeUnicidad,
+  exigirIdentidadDelTenant,
+} from './propietarios.service';
 
 /**
  * Hoja de vida del inquilino (RF-C4, RF-C1, RF-C6).
@@ -92,11 +95,18 @@ export class InquilinosService {
         : {}),
     });
 
-    await this.repositorio.actualizarContacto(ctx, perfil.user_id, {
-      ...(dto.nombre !== undefined ? { nombre: dto.nombre } : {}),
-      ...(dto.email !== undefined ? { email: dto.email } : {}),
-      ...('telefono' in dto ? { telefono: dto.telefono ?? null } : {}),
-    });
+    // T51/R38: "0 filas afectadas" significa que esa identidad no es de este
+    // tenant → 404, sin confirmar que exista en otra inmobiliaria (R31).
+    const identidadesEscritas = await this.repositorio.actualizarContacto(
+      ctx,
+      perfil.user_id,
+      {
+        ...(dto.nombre !== undefined ? { nombre: dto.nombre } : {}),
+        ...(dto.email !== undefined ? { email: dto.email } : {}),
+        ...('telefono' in dto ? { telefono: dto.telefono ?? null } : {}),
+      },
+    );
+    exigirIdentidadDelTenant(identidadesEscritas);
 
     return this.exigirPerfil(id, ctx);
   }
