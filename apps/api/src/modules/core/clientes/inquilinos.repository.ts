@@ -19,7 +19,8 @@ import { predicadoDePertenenciaAlTenant } from './predicado-identidad';
 export class InquilinosRepository {
   private static readonly SELECT = `
     SELECT p.id, p.tenant_id, p.user_id,
-           u.nombre, u.email, u.telefono,
+           u.nombre,
+           p.email_contacto,
            p.tipo_documento, p.documento, p.celular,
            p.medio_preferido_contacto, p.activo,
            p.created_at, p.updated_at
@@ -32,20 +33,23 @@ export class InquilinosRepository {
       userId: string;
       tipoDocumento: TipoDocumento;
       documento: string;
+      emailContacto: string;
       celular: string;
       medioPreferidoContacto: MedioPreferidoContacto;
     },
   ): Promise<PerfilInquilino> {
     const { rows } = await ctx.cliente.query<{ id: string }>(
       `INSERT INTO perfil_inquilino
-         (tenant_id, user_id, tipo_documento, documento, celular, medio_preferido_contacto)
-       VALUES ($1, $2, $3, $4, $5, $6)
+         (tenant_id, user_id, tipo_documento, documento,
+          email_contacto, celular, medio_preferido_contacto)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING id`,
       [
         ctx.tenantId,
         datos.userId,
         datos.tipoDocumento,
         datos.documento,
+        datos.emailContacto,
         datos.celular,
         datos.medioPreferidoContacto,
       ],
@@ -89,6 +93,7 @@ export class InquilinosRepository {
     ctx: ContextoPeticion,
     id: string,
     cambios: {
+      emailContacto?: string;
       celular?: string;
       medioPreferidoContacto?: MedioPreferidoContacto;
     },
@@ -96,6 +101,12 @@ export class InquilinosRepository {
     const asignaciones: string[] = [];
     const valores: unknown[] = [];
 
+    // D-9 (R69): el correo del inquilino se escribe en el perfil, y su
+    // obligatoriedad la impone ahora el NOT NULL de la columna.
+    if (cambios.emailContacto !== undefined) {
+      valores.push(cambios.emailContacto);
+      asignaciones.push(`email_contacto = $${valores.length}`);
+    }
     if (cambios.celular !== undefined) {
       valores.push(cambios.celular);
       asignaciones.push(`celular = $${valores.length}`);
@@ -116,7 +127,11 @@ export class InquilinosRepository {
   }
 
   /**
-   * Contacto en `user` (**R20**).
+   * Lo que queda de la persona en `user`: hoy solo el `nombre` (**R20**).
+   *
+   * **D-9 (R69, R71):** el correo de contacto vive en
+   * `perfil_inquilino.email_contacto` y el teléfono de contacto es `celular`,
+   * que ya estaba en el perfil. `user.email` queda para la credencial.
    *
    * **R38 — hallazgo B1.** Mismo cierre que en `PropietariosRepository`: el
    * `UPDATE` lleva la condición de pertenencia al tenant y devuelve las filas
@@ -127,7 +142,7 @@ export class InquilinosRepository {
   async actualizarContacto(
     ctx: ContextoPeticion,
     userId: string,
-    cambios: { nombre?: string; email?: string; telefono?: string | null },
+    cambios: { nombre?: string },
   ): Promise<number | null> {
     const asignaciones: string[] = [];
     const valores: unknown[] = [];
@@ -135,14 +150,6 @@ export class InquilinosRepository {
     if (cambios.nombre !== undefined) {
       valores.push(cambios.nombre);
       asignaciones.push(`nombre = $${valores.length}`);
-    }
-    if (cambios.email !== undefined) {
-      valores.push(cambios.email);
-      asignaciones.push(`email = $${valores.length}`);
-    }
-    if ('telefono' in cambios) {
-      valores.push(cambios.telefono ?? null);
-      asignaciones.push(`telefono = $${valores.length}`);
     }
     if (asignaciones.length === 0) return null;
 
@@ -174,8 +181,7 @@ interface FilaPerfilInquilino {
   tenant_id: string;
   user_id: string;
   nombre: string;
-  email: string | null;
-  telefono: string | null;
+  email_contacto: string;
   tipo_documento: TipoDocumento;
   documento: string;
   celular: string;
@@ -192,8 +198,7 @@ function aPerfil(fila: unknown): PerfilInquilino {
     tenant_id: f.tenant_id,
     user_id: f.user_id,
     nombre: f.nombre,
-    email: f.email,
-    telefono: f.telefono,
+    email_contacto: f.email_contacto,
     tipo_documento: f.tipo_documento,
     documento: f.documento,
     celular: f.celular,

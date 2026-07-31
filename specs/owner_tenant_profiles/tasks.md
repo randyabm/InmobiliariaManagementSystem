@@ -225,13 +225,13 @@
 > mezclar dos cambios sobre `user.email` (el login deja de depender de esa
 > columna en T57; aquí deja de contener el correo de contacto).
 
-- [ ] T69 — Crear la migración `0008_contacto_en_perfil.sql`: añade `perfil_propietario.email_contacto` y `perfil_propietario.telefono_contacto` (ambas NULL) y `perfil_inquilino.email_contacto`; **copia** `user.email` y `user.telefono` de cada cliente a las columnas nuevas de su perfil; y solo entonces impone `NOT NULL` sobre `perfil_inquilino.email_contacto`. **Cubre: R68, R69, R70.**
+- [x] T69 — Crear la migración `0008_contacto_en_perfil.sql`: añade `perfil_propietario.email_contacto` y `perfil_propietario.telefono_contacto` (ambas NULL) y `perfil_inquilino.email_contacto`; **copia** `user.email` y `user.telefono` de cada cliente a las columnas nuevas de su perfil; y solo entonces impone `NOT NULL` sobre `perfil_inquilino.email_contacto`. **Cubre: R68, R69, R70.**
 
-- [ ] T70 — Actualizar esquemas Drizzle, DTOs, repositorios, servicios y tipos compartidos: el contacto se lee y escribe en el perfil; al crear un cliente, `user.email` queda **NULL** y el correo recibido va a `email_contacto`. El `PATCH` deja de escribir `email` y `telefono` en `user`. **Cubre: R68, R69, R71.**
+- [x] T70 — Actualizar esquemas Drizzle, DTOs, repositorios, servicios y tipos compartidos: el contacto se lee y escribe en el perfil; al crear un cliente, `user.email` queda **NULL** y el correo recibido va a `email_contacto`. El `PATCH` deja de escribir `email` y `telefono` en `user`. **Cubre: R68, R69, R71.**
 
-- [ ] T71 — Tests del traslado: crear propietario con correo lo guarda en `perfil_propietario.email_contacto` y deja `user.email` NULL (verificado con `SELECT`); `GET /propietarios/:id` devuelve `email_contacto` y `telefono_contacto`; crear inquilino sin correo sigue dando **400** (R19, ahora sobre la columna del perfil); y un propietario sin correo se crea con `email_contacto` NULL. **Cubre: R68, R69, R71.**
+- [x] T71 — Tests del traslado: crear propietario con correo lo guarda en `perfil_propietario.email_contacto` y deja `user.email` NULL (verificado con `SELECT`); `GET /propietarios/:id` devuelve `email_contacto` y `telefono_contacto`; crear inquilino sin correo sigue dando **400** (R19, ahora sobre la columna del perfil); y un propietario sin correo se crea con `email_contacto` NULL. **Cubre: R68, R69, R71.**
 
-- [ ] T72 — Test de disponibilidad del dato de notificación: una consulta que lea **solo** el perfil devuelve destinatario (`email_contacto` o `celular`) y `medio_preferido_contacto`, sin `JOIN` a `user`. Dejar anotado en `progress/impl_owner_tenant_profiles.md` que la feature #10 (RF-N1) toma de ahí el destinatario. **Cubre: R72.**
+- [x] T72 — Test de disponibilidad del dato de notificación: una consulta que lea **solo** el perfil devuelve destinatario (`email_contacto` o `celular`) y `medio_preferido_contacto`, sin `JOIN` a `user`. Dejar anotado en `progress/impl_owner_tenant_profiles.md` que la feature #10 (RF-N1) toma de ahí el destinatario. **Cubre: R72.**
 
 ## Bloque 14 — B3: rol de aplicación (el conmutador)
 

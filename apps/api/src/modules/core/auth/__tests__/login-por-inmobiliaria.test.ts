@@ -274,14 +274,20 @@ describe('Login por inmobiliaria (#5 R51, R62–R65, R74, D-8, D-12)', () => {
       // Sustituye al antiguo caso de R25, donde se REUTILIZABA la fila ajena.
       expect(enA.body.user_id).not.toBe(enB.body.user_id);
 
+      // D-9 (R71): el correo NO está en `user` —ahí queda NULL— sino en el
+      // `email_contacto` de cada perfil, uno por inmobiliaria.
       const { rows } = await entorno.poolAdmin.query<{
-        id: string;
         tenant_id: string;
-      }>(`SELECT id, tenant_id::text FROM "user" WHERE email = $1 ORDER BY tenant_id`, [
-        correo,
-      ]);
+        email_user: string | null;
+      }>(
+        `SELECT p.tenant_id::text, u.email AS email_user
+           FROM perfil_propietario p JOIN "user" u ON u.id = p.user_id
+          WHERE p.email_contacto = $1 ORDER BY p.tenant_id`,
+        [correo],
+      );
       expect(rows).toHaveLength(2);
       expect(rows.map((r) => r.tenant_id)).toEqual([TENANT_A, TENANT_B]);
+      expect(rows.every((r) => r.email_user === null)).toBe(true);
 
       // Y la respuesta del tenant A no trae NADA del perfil del tenant B.
       const serializado = JSON.stringify(enA.body);
@@ -293,7 +299,9 @@ describe('Login por inmobiliaria (#5 R51, R62–R65, R74, D-8, D-12)', () => {
     });
 
     it('ninguna de las dos identidades nuevas puede iniciar sesión (R6, R71)', async () => {
-      // Un cliente registrado por la inmobiliaria no tiene `password_hash`.
+      // Un cliente registrado por la inmobiliaria no tiene `password_hash` y,
+      // desde D-9, tampoco `user.email`: su correo es de contacto, no una
+      // credencial. Ninguna de las dos cosas le abre la puerta.
       for (const codigo of [CODIGO_TENANT_A, CODIGO_TENANT_B]) {
         const respuesta = await login({
           codigo,

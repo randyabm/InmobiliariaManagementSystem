@@ -51,13 +51,12 @@ export class PropietariosService {
     // D-4: sin upsert. Se comprueba y se rechaza con 409 explícito (R24).
     await this.rechazarSiDocumentoRepetido(ctx, dto.tipo_documento, dto.documento);
 
+    // D-9 (R71): la identidad se crea SIN correo. `user.email` es credencial de
+    // acceso y este cliente todavía no tiene portal; su correo de contacto va
+    // al perfil, unas líneas más abajo.
     const { userId } = await this.identidad.crearIdentidad(
       ctx.cliente,
-      {
-        nombre: dto.nombre,
-        email: normalizarEmail(dto.email),
-        telefono: dto.telefono ?? null,
-      },
+      { nombre: dto.nombre },
       ctx.tenantId,
       'propietario',
     );
@@ -67,6 +66,8 @@ export class PropietariosService {
         userId,
         tipoDocumento: dto.tipo_documento,
         documento: dto.documento,
+        emailContacto: normalizarEmail(dto.email),
+        telefonoContacto: dto.telefono ?? null,
         direccionNotificacion: dto.direccion_notificacion ?? null,
         ciudad: dto.ciudad ?? null,
         sujetoRetencion: dto.sujeto_retencion ?? false,
@@ -119,6 +120,9 @@ export class PropietariosService {
     const perfil = await this.exigirPerfil(id, ctx);
 
     await this.repositorio.actualizar(ctx, id, {
+      // D-9 (R68): el contacto se escribe en el perfil, no en `user`.
+      ...('email' in dto ? { emailContacto: normalizarEmail(dto.email) } : {}),
+      ...('telefono' in dto ? { telefonoContacto: dto.telefono ?? null } : {}),
       ...('direccion_notificacion' in dto
         ? { direccionNotificacion: dto.direccion_notificacion ?? null }
         : {}),
@@ -131,11 +135,7 @@ export class PropietariosService {
     const identidadesEscritas = await this.repositorio.actualizarContacto(
       ctx,
       perfil.user_id,
-      {
-        ...(dto.nombre !== undefined ? { nombre: dto.nombre } : {}),
-        ...('email' in dto ? { email: normalizarEmail(dto.email) } : {}),
-        ...('telefono' in dto ? { telefono: dto.telefono ?? null } : {}),
-      },
+      { ...(dto.nombre !== undefined ? { nombre: dto.nombre } : {}) },
     );
     exigirIdentidadDelTenant(identidadesEscritas);
 

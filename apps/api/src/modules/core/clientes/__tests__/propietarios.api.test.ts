@@ -85,7 +85,8 @@ describe('Propietarios — CRUD y creación en línea (#5)', () => {
       });
 
       expect(respuesta.status).toBe(201);
-      expect(respuesta.body.email).toBeNull();
+      // D-9 (R68): el contacto se devuelve desde el perfil, y aquí no lo hay.
+      expect(respuesta.body.email_contacto).toBeNull();
       expect(respuesta.body.sujeto_retencion).toBe(false);
 
       const { rows } = await entorno.poolAdmin.query<{
@@ -164,7 +165,7 @@ describe('Propietarios — CRUD y creación en línea (#5)', () => {
 
       expect(respuesta.status).toBe(200);
       expect(respuesta.body.nombre).toBe('Diana Hoja');
-      expect(respuesta.body.email).toBe('diana@example.com');
+      expect(respuesta.body.email_contacto).toBe('diana@example.com');
       expect(respuesta.body.sujeto_retencion).toBe(true);
       expect(respuesta.body.cuentas_bancarias).toHaveLength(1);
       expect(respuesta.body.cuenta_predeterminada_id).toBe(

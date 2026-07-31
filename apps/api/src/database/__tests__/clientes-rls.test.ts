@@ -95,9 +95,11 @@ describe('Clientes — esquema y aislamiento (#5 R4, R5, R7, R31, R34)', () => {
       [PERFIL_PROP_A, TENANT_A, USER_A, PERFIL_PROP_B, TENANT_B, USER_B],
     );
     await poolAdmin.query(
-      `INSERT INTO perfil_inquilino (id, tenant_id, user_id, tipo_documento, documento, celular, medio_preferido_contacto)
-       VALUES (gen_random_uuid(), $1, $2, 'CC', '3030303030', '3001112233', 'WHATSAPP'),
-              (gen_random_uuid(), $3, $4, 'CC', '4040404040', '3004445566', 'CORREO')`,
+      // `email_contacto` es NOT NULL desde D-9 (R69): RF-C4 exige el correo del
+      // inquilino y ahora lo impone el motor, no solo el DTO.
+      `INSERT INTO perfil_inquilino (id, tenant_id, user_id, tipo_documento, documento, email_contacto, celular, medio_preferido_contacto)
+       VALUES (gen_random_uuid(), $1, $2, 'CC', '3030303030', 'inq-a@example.com', '3001112233', 'WHATSAPP'),
+              (gen_random_uuid(), $3, $4, 'CC', '4040404040', 'inq-b@example.com', '3004445566', 'CORREO')`,
       [TENANT_A, USER_A, TENANT_B, USER_B],
     );
     await poolAdmin.query(

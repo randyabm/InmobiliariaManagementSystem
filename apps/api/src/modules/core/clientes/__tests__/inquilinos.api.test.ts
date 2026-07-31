@@ -52,7 +52,8 @@ describe('Inquilinos — CRUD (#5)', () => {
     expect(respuesta.body.tenant_id).toBe(TENANT_A);
     expect(respuesta.body.celular).toBe('3001234567');
     expect(respuesta.body.medio_preferido_contacto).toBe('WHATSAPP');
-    expect(respuesta.body.email).toBe('marta@example.com');
+    // D-9 (R69): el correo del inquilino se devuelve desde el perfil.
+    expect(respuesta.body.email_contacto).toBe('marta@example.com');
     expect(respuesta.body.activo).toBe(true);
 
     const { rows } = await entorno.poolAdmin.query<{ tenant_id: string }>(
@@ -253,29 +254,71 @@ describe('Inquilinos — CRUD (#5)', () => {
     expect(rows).toHaveLength(1);
   });
 
-  it('un user puede ser propietario e inquilino en el mismo tenant (§7.4)', async () => {
-    const email = 'ambos-roles@example.com';
-
-    await request(entorno.app.getHttpServer())
+  /**
+   * §7.4 tras **D-9**: el modelo sigue admitiendo que una identidad tenga los
+   * dos roles en la misma inmobiliaria (RF-C2), pero el **flujo de alta ya no
+   * la deduplica**, y no por descuido.
+   *
+   * Antes, la deduplicación dentro del tenant se hacía por `user.email`. D-9
+   * (**R71**) manda que `user.email` quede **NULL** en un cliente registrado
+   * por la inmobiliaria —es credencial de acceso, no contacto—, así que no
+   * queda ninguna clave por la que reconocer a la misma persona en el momento
+   * del alta. `design.md` §7.3 ya lo anticipaba: *"la deduplicación de
+   * identidad solo es posible cuando hay email"*.
+   *
+   * Consecuencia: la misma persona registrada como propietaria **y** como
+   * inquilina de la misma inmobiliaria tiene hoy **dos filas de `user`** y un
+   * perfil colgando de cada una. Queda anotado como decisión abierta en
+   * `progress/impl_owner_tenant_profiles_cierre.md`: unificarlas exigiría una
+   * deduplicación por `documento` dentro del tenant, que **ningún requirement
+   * pide** y que no se ha inventado aquí.
+   */
+  it('el modelo admite los dos roles en una identidad, aunque el alta ya no deduplique (§7.4, D-9)', async () => {
+    const propietario = await request(entorno.app.getHttpServer())
       .post('/propietarios')
       .set('Authorization', `Bearer ${entorno.adminA.token}`)
       .set('x-tenant-id', TENANT_A)
-      .send({ nombre: 'Doble Rol', tipo_documento: 'CC', documento: 'D-1', email })
+      .send({
+        nombre: 'Doble Rol',
+        tipo_documento: 'CC',
+        documento: 'D-1',
+        email: 'ambos-roles@example.com',
+      })
       .expect(201);
 
     const inquilino = await comoAdminA('post', '/inquilinos').send({
       ...inquilinoValido,
       nombre: 'Doble Rol',
       documento: 'D-1',
-      email,
+      email: 'ambos-roles@example.com',
     });
     expect(inquilino.status).toBe(201);
 
-    const { rows } = await entorno.poolAdmin.query<{ rol: string }>(
-      `SELECT ur.rol FROM user_role ur JOIN "user" u ON u.id = ur.user_id
-        WHERE u.email = $1 ORDER BY ur.rol`,
-      [email],
+    // Hoy: dos identidades, ambas del tenant A, ambas con `email` NULL (R71).
+    expect(inquilino.body.user_id).not.toBe(propietario.body.user_id);
+    const { rows: identidades } = await entorno.poolAdmin.query<{
+      email: string | null;
+      tenant_id: string;
+    }>(`SELECT email, tenant_id::text FROM "user" WHERE id = ANY($1::uuid[])`, [
+      [propietario.body.user_id, inquilino.body.user_id],
+    ]);
+    expect(identidades).toHaveLength(2);
+    expect(identidades.every((i) => i.email === null)).toBe(true);
+    expect(identidades.every((i) => i.tenant_id === TENANT_A)).toBe(true);
+
+    // Y el ESQUEMA sigue admitiendo los dos roles sobre una sola identidad,
+    // que es lo que §7.4 afirma: `user_role` tiene UNIQUE(user_id, tenant_id,
+    // rol), no UNIQUE(user_id, tenant_id).
+    const { rowCount } = await entorno.poolAdmin.query(
+      `INSERT INTO user_role (user_id, tenant_id, rol) VALUES ($1, $2, 'inquilino')`,
+      [propietario.body.user_id, TENANT_A],
     );
-    expect(rows.map((r) => r.rol)).toEqual(['inquilino', 'propietario']);
+    expect(rowCount).toBe(1);
+
+    const { rows: roles } = await entorno.poolAdmin.query<{ rol: string }>(
+      `SELECT rol FROM user_role WHERE user_id = $1 ORDER BY rol`,
+      [propietario.body.user_id],
+    );
+    expect(roles.map((r) => r.rol)).toEqual(['inquilino', 'propietario']);
   });
 });

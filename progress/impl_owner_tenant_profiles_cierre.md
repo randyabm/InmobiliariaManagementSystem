@@ -133,3 +133,45 @@ entre tenants"*. **Resuelto a favor del diseño:** se retira toda reutilización
 acotada con `AND tenant_id = $2`. No es una decisión de producto nueva: es la
 lectura que el propio spec fija en dos sitios. Queda para que el reviewer la
 confirme o la rebata.
+
+### Paso 4 — D-9: el contacto se muda al perfil (T69, T70, T71, T72) ✅
+
+- **T69** — migración `0008_contacto_en_perfil.sql` (entrada 8):
+  `perfil_propietario.email_contacto` y `.telefono_contacto` (NULL, D-5 sigue),
+  `perfil_inquilino.email_contacto`; **copia** `user.email`/`user.telefono` al
+  perfil y **solo entonces** impone el `NOT NULL` (R70), con aborto accionable
+  si algún inquilino se quedara sin correo. `user.telefono` no se elimina: lo
+  siguen usando los usuarios internos de la #3.
+- **T70** — esquemas Drizzle, tipos compartidos, DTOs, repositorios y servicios.
+  `DatosDeContacto` queda reducido a `nombre`. Al crear un cliente `user.email`
+  es **NULL** y el correo va a `email_contacto` (R71). El PATCH deja de escribir
+  contacto en `user`; `actualizarContacto` solo escribe ya `nombre`.
+- **T71/T72** — `clientes/__tests__/contacto-en-perfil.api.test.ts` (12 casos),
+  incluida la resolución de destinatario y canal **sin `JOIN` a `user`** (R72).
+
+**Prueba por mutación.** Volviendo a pasar el correo a `crearIdentidad` —es
+decir, reescribiéndolo en `user.email`— se ponen **2 tests rojos** (creación y
+PATCH). El invariante de R71 se mide, no se declara.
+
+**Anotado para la feature #10 (RF-N1):** el destinatario y el canal de una
+notificación se toman de `perfil_inquilino.email_contacto` / `.celular` +
+`medio_preferido_contacto`, y de `perfil_propietario.email_contacto` /
+`.telefono_contacto`. **Nunca de `user`**, que es credencial y puede estar a
+NULL —de hecho lo está en todo cliente registrado por la inmobiliaria—.
+
+Suite tras el paso 4: `test` 33 archivos / **345 tests**; `test:db` 2 / **56**.
+
+#### ⚠️ Decisión abierta que D-9 provoca (§7.4 / RF-C2 dentro de un tenant)
+
+Hasta ahora, dos altas de la misma persona en la misma inmobiliaria compartían
+identidad porque se deduplicaba por `user.email`. **R71 manda que `user.email`
+quede NULL en los clientes**, así que en el momento del alta ya no queda ninguna
+clave por la que reconocerla: quien se registre como propietario **y** como
+inquilino de la misma inmobiliaria tendrá hoy **dos filas de `user`**.
+
+- `design.md` §7.3 ya lo anticipaba —*"la deduplicación de identidad solo es
+  posible cuando hay email"*—, así que es consecuencia derivada, no invento.
+- §7.4 sigue siendo cierto en el **modelo** (probado: `user_role` admite ambos
+  roles sobre una identidad), pero deja de producirlo el **flujo de alta**.
+- Unificarlas exigiría deduplicar por `documento` dentro del tenant. **Ningún
+  requirement lo pide** y no se ha implementado. Queda para el humano.

@@ -40,13 +40,10 @@ export class InquilinosService {
   ): Promise<PerfilInquilino> {
     await this.rechazarSiDocumentoRepetido(ctx, dto.tipo_documento, dto.documento);
 
+    // D-9 (R71): la identidad se crea SIN correo; el de contacto va al perfil.
     const { userId } = await this.identidad.crearIdentidad(
       ctx.cliente,
-      {
-        nombre: dto.nombre,
-        email: normalizarEmail(dto.email),
-        telefono: dto.telefono ?? null,
-      },
+      { nombre: dto.nombre },
       ctx.tenantId,
       'inquilino',
     );
@@ -56,6 +53,7 @@ export class InquilinosService {
         userId,
         tipoDocumento: dto.tipo_documento,
         documento: dto.documento,
+        emailContacto: normalizarEmail(dto.email)!,
         celular: dto.celular,
         medioPreferidoContacto: dto.medio_preferido_contacto,
       });
@@ -89,6 +87,10 @@ export class InquilinosService {
     const perfil = await this.exigirPerfil(id, ctx);
 
     await this.repositorio.actualizar(ctx, id, {
+      // D-9 (R69): el correo del inquilino vive en el perfil.
+      ...(dto.email !== undefined
+        ? { emailContacto: normalizarEmail(dto.email)! }
+        : {}),
       ...(dto.celular !== undefined ? { celular: dto.celular } : {}),
       ...(dto.medio_preferido_contacto !== undefined
         ? { medioPreferidoContacto: dto.medio_preferido_contacto }
@@ -100,11 +102,7 @@ export class InquilinosService {
     const identidadesEscritas = await this.repositorio.actualizarContacto(
       ctx,
       perfil.user_id,
-      {
-        ...(dto.nombre !== undefined ? { nombre: dto.nombre } : {}),
-        ...(dto.email !== undefined ? { email: dto.email } : {}),
-        ...('telefono' in dto ? { telefono: dto.telefono ?? null } : {}),
-      },
+      { ...(dto.nombre !== undefined ? { nombre: dto.nombre } : {}) },
     );
     exigirIdentidadDelTenant(identidadesEscritas);
 

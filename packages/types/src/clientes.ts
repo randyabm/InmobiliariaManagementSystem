@@ -28,12 +28,18 @@ export type MedioPreferidoContacto = (typeof MEDIOS_PREFERIDOS_CONTACTO)[number]
 export const TIPOS_CUENTA = ['AHORROS', 'CORRIENTE'] as const;
 export type TipoCuenta = (typeof TIPOS_CUENTA)[number];
 
-/** Datos de contacto: viven en `user`, no se duplican en el perfil. */
+/**
+ * Identificación de la persona.
+ *
+ * **Enmendado por D-9 (R68, R69, R71):** aquí queda solo el `nombre`, que es de
+ * la persona. El **contacto** —correo y teléfono— se movió al perfil, porque es
+ * un dato de la relación comercial con una inmobiliaria concreta y dos
+ * inmobiliarias pueden tener datos distintos de la misma persona. `user.email`
+ * pasa a ser exclusivamente credencial de acceso, y en un cliente recién
+ * registrado queda NULL.
+ */
 export interface DatosDeContacto {
   readonly nombre: string;
-  /** Opcional solo para el propietario (D-5). El inquilino lo exige (RF-C4). */
-  readonly email: string | null;
-  readonly telefono: string | null;
 }
 
 export interface PerfilPropietario extends DatosDeContacto {
@@ -42,6 +48,9 @@ export interface PerfilPropietario extends DatosDeContacto {
   readonly user_id: string;
   readonly tipo_documento: TipoDocumento;
   readonly documento: string;
+  /** Contacto de ESTA relación comercial (D-9, R68). Opcional por D-5. */
+  readonly email_contacto: string | null;
+  readonly telefono_contacto: string | null;
   readonly direccion_notificacion: string | null;
   readonly ciudad: string | null;
   /**
@@ -62,6 +71,8 @@ export interface PerfilInquilino extends DatosDeContacto {
   readonly user_id: string;
   readonly tipo_documento: TipoDocumento;
   readonly documento: string;
+  /** Obligatorio (RF-C4, R69): desde D-9 es una columna NOT NULL del perfil. */
+  readonly email_contacto: string;
   readonly celular: string;
   readonly medio_preferido_contacto: MedioPreferidoContacto;
   readonly activo: boolean;

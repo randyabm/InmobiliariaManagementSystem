@@ -17,8 +17,17 @@ import { user } from './user';
  *
  * A diferencia del propietario, el email **sí** es obligatorio para el
  * inquilino (RF-C4 lo exige de forma explícita); la opcionalidad de D-5 aplica
- * solo al propietario. El email vive en `user`, así que la obligatoriedad se
- * valida en el DTO, no con una columna aquí.
+ * solo al propietario.
+ *
+ * **Contacto en el perfil (D-9, R69).** Desde D-9 ese correo es
+ * `email_contacto`, una columna `NOT NULL` de esta tabla, y no `user.email`:
+ * la obligatoriedad de RF-C4 la impone ahora **el motor** y no solo el DTO.
+ * No se añade `telefono_contacto`: `celular` ya estaba y hace de teléfono de
+ * contacto (R69).
+ *
+ * Con `email_contacto`, `celular` y `medio_preferido_contacto` en la misma
+ * fila, el motor de notificaciones (RF-N1, feature #10) resuelve destinatario y
+ * canal **sin leer `user`** (**R72**).
  *
  * Codeudores, coarrendatarios y referencias son alcance de la feature #25
  * (D-6): esta feature no crea sus tablas.
@@ -35,6 +44,7 @@ export const perfilInquilino = pgTable(
       .references(() => user.id),
     tipoDocumento: text('tipo_documento').notNull(),
     documento: text('documento').notNull(),
+    emailContacto: text('email_contacto').notNull(),
     celular: text('celular').notNull(),
     medioPreferidoContacto: text('medio_preferido_contacto').notNull(),
     activo: boolean('activo').notNull().default(true),

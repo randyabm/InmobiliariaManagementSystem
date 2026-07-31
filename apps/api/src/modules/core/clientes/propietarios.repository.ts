@@ -27,7 +27,8 @@ import { predicadoDePertenenciaAlTenant } from './predicado-identidad';
 export class PropietariosRepository {
   private static readonly SELECT = `
     SELECT p.id, p.tenant_id, p.user_id,
-           u.nombre, u.email, u.telefono,
+           u.nombre,
+           p.email_contacto, p.telefono_contacto,
            p.tipo_documento, p.documento,
            p.direccion_notificacion, p.ciudad,
            p.sujeto_retencion, p.activo,
@@ -41,6 +42,8 @@ export class PropietariosRepository {
       userId: string;
       tipoDocumento: TipoDocumento;
       documento: string;
+      emailContacto?: string | null;
+      telefonoContacto?: string | null;
       direccionNotificacion?: string | null;
       ciudad?: string | null;
       sujetoRetencion: boolean;
@@ -49,14 +52,17 @@ export class PropietariosRepository {
     const { rows } = await ctx.cliente.query<{ id: string }>(
       `INSERT INTO perfil_propietario
          (tenant_id, user_id, tipo_documento, documento,
+          email_contacto, telefono_contacto,
           direccion_notificacion, ciudad, sujeto_retencion)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        RETURNING id`,
       [
         ctx.tenantId,
         datos.userId,
         datos.tipoDocumento,
         datos.documento,
+        datos.emailContacto ?? null,
+        datos.telefonoContacto ?? null,
         datos.direccionNotificacion ?? null,
         datos.ciudad ?? null,
         datos.sujetoRetencion,
@@ -106,6 +112,8 @@ export class PropietariosRepository {
     ctx: ContextoPeticion,
     id: string,
     cambios: {
+      emailContacto?: string | null;
+      telefonoContacto?: string | null;
       direccionNotificacion?: string | null;
       ciudad?: string | null;
       sujetoRetencion?: boolean;
@@ -114,6 +122,15 @@ export class PropietariosRepository {
     const asignaciones: string[] = [];
     const valores: unknown[] = [];
 
+    // D-9 (R68): el contacto se escribe AQUÍ, en el perfil, no en `user`.
+    if ('emailContacto' in cambios) {
+      valores.push(cambios.emailContacto ?? null);
+      asignaciones.push(`email_contacto = $${valores.length}`);
+    }
+    if ('telefonoContacto' in cambios) {
+      valores.push(cambios.telefonoContacto ?? null);
+      asignaciones.push(`telefono_contacto = $${valores.length}`);
+    }
     if ('direccionNotificacion' in cambios) {
       valores.push(cambios.direccionNotificacion ?? null);
       asignaciones.push(`direccion_notificacion = $${valores.length}`);
@@ -139,7 +156,12 @@ export class PropietariosRepository {
   }
 
   /**
-   * Actualiza los datos de contacto, que viven en `user` (**R13**).
+   * Actualiza lo que queda de la persona en `user`: hoy solo el `nombre`.
+   *
+   * **D-9 (R68, R71):** el correo y el teléfono de contacto **ya no se escriben
+   * aquí**; van a `email_contacto` y `telefono_contacto` del perfil, vía
+   * `actualizar`. `user.email` queda reservado para la credencial de acceso y
+   * en un cliente registrado por la inmobiliaria vale NULL.
    *
    * **R38 — hallazgo B1 de la revisión.** La sentencia incorpora la condición
    * de que esa identidad **pertenece al tenant de la petición**. Antes era
@@ -158,7 +180,7 @@ export class PropietariosRepository {
   async actualizarContacto(
     ctx: ContextoPeticion,
     userId: string,
-    cambios: { nombre?: string; email?: string | null; telefono?: string | null },
+    cambios: { nombre?: string },
   ): Promise<number | null> {
     const asignaciones: string[] = [];
     const valores: unknown[] = [];
@@ -166,14 +188,6 @@ export class PropietariosRepository {
     if (cambios.nombre !== undefined) {
       valores.push(cambios.nombre);
       asignaciones.push(`nombre = $${valores.length}`);
-    }
-    if ('email' in cambios) {
-      valores.push(cambios.email ?? null);
-      asignaciones.push(`email = $${valores.length}`);
-    }
-    if ('telefono' in cambios) {
-      valores.push(cambios.telefono ?? null);
-      asignaciones.push(`telefono = $${valores.length}`);
     }
     if (asignaciones.length === 0) return null;
 
@@ -209,8 +223,8 @@ interface FilaPerfilPropietario {
   tenant_id: string;
   user_id: string;
   nombre: string;
-  email: string | null;
-  telefono: string | null;
+  email_contacto: string | null;
+  telefono_contacto: string | null;
   tipo_documento: TipoDocumento;
   documento: string;
   direccion_notificacion: string | null;
@@ -228,8 +242,8 @@ function aPerfil(fila: unknown): PerfilPropietario {
     tenant_id: f.tenant_id,
     user_id: f.user_id,
     nombre: f.nombre,
-    email: f.email,
-    telefono: f.telefono,
+    email_contacto: f.email_contacto,
+    telefono_contacto: f.telefono_contacto,
     tipo_documento: f.tipo_documento,
     documento: f.documento,
     direccion_notificacion: f.direccion_notificacion,
