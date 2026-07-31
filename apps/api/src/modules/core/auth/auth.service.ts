@@ -1,16 +1,26 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
+import type { PoolClient } from 'pg';
+
 import { getDatabasePool } from '../../../database/database.client';
+import {
+  esCodigoDeInmobiliariaValido,
+  normalizarCodigoDeInmobiliaria,
+} from './codigo-inmobiliaria';
+import { CodigoDeInmobiliariaInvalidoError } from './errors/codigo-de-inmobiliaria-invalido.error';
 
 interface LoginDto {
+  /** Código de la inmobiliaria en la que se entra (**R63**, D-12). */
+  codigo?: string | null;
   email?: string | null;
   password?: string | null;
 }
 
 interface JwtTokenPayload {
   sub: string;
-  email: string;
+  email: string | null;
+  tenant_id: string;
   roles: Array<{ tenant_id: string; rol: string }>;
 }
 
@@ -28,83 +38,240 @@ export function normalizarEmailDeLogin(email: unknown): string | null {
   return limpio === '' ? null : limpio;
 }
 
+/**
+ * Autenticación (feature #3, reescrita por **D-8** y **D-12**).
+ *
+ * ## Qué cambió y por qué
+ *
+ * Con D-8 las identidades no se comparten entre inmobiliarias, así que la
+ * `UNIQUE(email)` global desapareció: **el correo ya no identifica a nadie por
+ * sí solo**. `POST /auth/login` con `{email, password}` sería ambiguo —dos
+ * personas distintas pueden tener el mismo correo en dos inmobiliarias—, y por
+ * eso ahora exige además el `codigo` de la inmobiliaria (**R63**, **R65**).
+ *
+ * ## El login deja de ser la excepción
+ *
+ * Antes consultaba `user` con el pool crudo, **fuera de toda transacción con
+ * contexto de tenant**, que es lo que la revisión señaló en B4.3. Eso era
+ * tolerable solo mientras la aplicación fuese superusuario; en cuanto deja de
+ * serlo, o devuelve 401 a todo el mundo o lee sin filtro. Ahora el flujo es
+ * (**R66**, `design.md` §20.2):
+ *
+ * ```
+ * 1. normalizar(codigo)                     trim + minúsculas (R74)
+ * 2. tenant_por_codigo(codigo) → tenant_id  SECURITY DEFINER, exacto (R52)
+ * 3. BEGIN; SET LOCAL app.current_tenant
+ * 4. SELECT … FROM "user" WHERE email = $1  ya filtrado por RLS
+ * ```
+ *
+ * El paso 2 es la **única** lectura que evita el RLS en todo el sistema, y no
+ * toca `user`: devuelve un `uuid` a partir de un código que la propia
+ * inmobiliaria reparte a sus usuarios.
+ *
+ * ## Un solo 401
+ *
+ * Código inexistente, correo de otra inmobiliaria, identidad sin
+ * `password_hash` y contraseña equivocada responden **exactamente lo mismo**
+ * (**R64**). El 400 se reserva para lo que es error de forma del `codigo`, que
+ * no revela nada de quién es cliente del SaaS.
+ */
 @Injectable()
 export class AuthService {
   constructor(private readonly jwtService: JwtService) {}
 
-  async login(dto: LoginDto): Promise<{ access_token: string; user: { id: string; email: string; nombre: string } }> {
+  async login(dto: LoginDto): Promise<{
+    access_token: string;
+    user: { id: string; email: string | null; nombre: string };
+  }> {
+    // R63: el código es obligatorio y su forma se valida ANTES de tocar la
+    // base. 400, y es la única respuesta distinta que da este endpoint.
+    const codigo = normalizarCodigoDeInmobiliaria(dto?.codigo);
+    if (codigo === null || !esCodigoDeInmobiliariaValido(codigo)) {
+      throw new CodigoDeInmobiliariaInvalidoError();
+    }
+
     // R8: email nulo, ausente o vacío -> 401 SIN consultar la base de datos.
     const email = normalizarEmailDeLogin(dto?.email);
     if (email === null) {
       throw new UnauthorizedException('Credenciales inválidas');
     }
 
-    const pool = getDatabasePool(process.env.DATABASE_URL!);
+    const cliente = await getDatabasePool(process.env.DATABASE_URL!).connect();
+    try {
+      const tenantId = await this.resolverTenant(cliente, codigo);
+      // R64: un código que no existe responde igual que unas credenciales
+      // malas. Cualquier otra cosa convertiría el formulario de acceso en un
+      // directorio de los clientes del SaaS.
+      if (tenantId === null) {
+        throw new UnauthorizedException('Credenciales inválidas');
+      }
 
-    // `email = $1` con $1 no nulo nunca casa una fila con `email IS NULL`
-    // (en SQL, `NULL = 'algo'` es NULL, no true). R8.
-    const rows = await pool.query(
-      'SELECT id, email, nombre, password_hash FROM "user" WHERE email = $1 AND email IS NOT NULL',
-      [email],
-    );
-    const found = rows.rows[0] as
-      | { id: string; email: string; nombre: string; password_hash: string | null }
-      | undefined;
-
-    if (!found) {
-      throw new UnauthorizedException('Credenciales inválidas');
+      return await this.autenticarEnTenant(cliente, tenantId, email, dto?.password);
+    } finally {
+      cliente.release();
     }
-
-    // R6: una identidad sin credenciales (cliente registrado por la
-    // inmobiliaria que aún no activó portal) NO puede iniciar sesión. Se
-    // rechaza ANTES de invocar bcrypt: `bcrypt.compare(x, null)` no es una
-    // comparación válida y su resultado no debe decidir una autenticación.
-    if (found.password_hash === null || found.password_hash === '') {
-      throw new UnauthorizedException('Credenciales inválidas');
-    }
-
-    const password = typeof dto?.password === 'string' ? dto.password : '';
-    const passwordValid = await bcrypt.compare(password, found.password_hash);
-    if (!passwordValid) {
-      throw new UnauthorizedException('Credenciales inválidas');
-    }
-
-    const roleRows = await pool.query(
-      'SELECT tenant_id, rol FROM user_role WHERE user_id = $1 AND activo = true',
-      [found.id],
-    );
-    const roles = roleRows.rows as Array<{ tenant_id: string; rol: string }>;
-
-    const payload: JwtTokenPayload = {
-      sub: found.id,
-      email: found.email,
-      roles,
-    };
-
-    const access_token = this.jwtService.sign(payload);
-
-    return {
-      access_token,
-      user: { id: found.id, email: found.email, nombre: found.nombre },
-    };
   }
 
-  async getProfile(userId: string): Promise<{ id: string; email: string; nombre: string; roles: Array<{ tenant_id: string; rol: string }> }> {
-    const pool = getDatabasePool(process.env.DATABASE_URL!);
+  /**
+   * `GET /auth/me`.
+   *
+   * Corre bajo contexto de tenant por el mismo motivo que el login: cuando la
+   * aplicación deje de ser superusuario (T61), una consulta a `user` sin
+   * `app.current_tenant` fijado devuelve **cero filas**. El tenant sale del
+   * token, que desde **R67** lleva uno solo.
+   */
+  async getProfile(
+    userId: string,
+    tenantId: string,
+  ): Promise<{
+    id: string;
+    email: string | null;
+    nombre: string;
+    roles: Array<{ tenant_id: string; rol: string }>;
+  }> {
+    const cliente = await getDatabasePool(process.env.DATABASE_URL!).connect();
+    try {
+      await cliente.query('BEGIN');
+      await this.fijarTenant(cliente, tenantId);
 
-    const rows = await pool.query('SELECT id, email, nombre FROM "user" WHERE id = $1', [userId]);
-    const found = rows.rows[0] as { id: string; email: string; nombre: string } | undefined;
+      const { rows } = await cliente.query<{
+        id: string;
+        email: string | null;
+        nombre: string;
+      }>('SELECT id, email, nombre FROM "user" WHERE id = $1', [userId]);
+      const encontrado = rows[0];
 
-    if (!found) {
-      throw new UnauthorizedException('Usuario no encontrado');
+      if (!encontrado) {
+        throw new UnauthorizedException('Usuario no encontrado');
+      }
+
+      const roles = await this.rolesActivos(cliente, userId);
+      await cliente.query('COMMIT');
+      return { ...encontrado, roles };
+    } catch (error) {
+      await cliente.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      cliente.release();
     }
+  }
 
-    const roleRows = await pool.query(
+  /**
+   * `codigo` → `tenant_id` (**R52**, **R66**).
+   *
+   * Devuelve `null` si no existe, para que quien llama lo trate como unas
+   * credenciales inválidas cualesquiera.
+   */
+  private async resolverTenant(
+    cliente: PoolClient,
+    codigo: string,
+  ): Promise<string | null> {
+    const { rows } = await cliente.query<{ tenant_id: string | null }>(
+      'SELECT tenant_por_codigo($1) AS tenant_id',
+      [codigo],
+    );
+    return rows[0]?.tenant_id ?? null;
+  }
+
+  /** Pasos 3 y 4: todo lo que toca `user` ocurre dentro del contexto. */
+  private async autenticarEnTenant(
+    cliente: PoolClient,
+    tenantId: string,
+    email: string,
+    password: unknown,
+  ): Promise<{
+    access_token: string;
+    user: { id: string; email: string | null; nombre: string };
+  }> {
+    try {
+      await cliente.query('BEGIN');
+      await this.fijarTenant(cliente, tenantId);
+
+      // `email = $1` con $1 no nulo nunca casa una fila con `email IS NULL`
+      // (en SQL, `NULL = 'algo'` es NULL, no true). R8.
+      //
+      // **Doble barrera, igual que en los repositorios de clientes** y por el
+      // mismo motivo (`propietarios.repository.ts`): el RLS es la garantía
+      // real, pero es inerte para un rol superusuario, y el aislamiento no
+      // puede depender de un detalle de configuración del despliegue. Aquí eso
+      // no es teórico: **hasta T61 la aplicación se conecta como superusuario**,
+      // así que sin este `tenant_id = $2` el 401 de R64 no se cumpliría en
+      // ejecución y el correo del tenant vecino autenticaría.
+      const { rows } = await cliente.query<{
+        id: string;
+        email: string;
+        nombre: string;
+        password_hash: string | null;
+      }>(
+        `SELECT id, email, nombre, password_hash FROM "user"
+          WHERE email = $1 AND email IS NOT NULL AND tenant_id = $2`,
+        [email, tenantId],
+      );
+      const encontrado = rows[0];
+
+      if (!encontrado) {
+        throw new UnauthorizedException('Credenciales inválidas');
+      }
+
+      // R6: una identidad sin credenciales (cliente registrado por la
+      // inmobiliaria que aún no activó portal) NO puede iniciar sesión. Se
+      // rechaza ANTES de invocar bcrypt: `bcrypt.compare(x, null)` no es una
+      // comparación válida y su resultado no debe decidir una autenticación.
+      if (encontrado.password_hash === null || encontrado.password_hash === '') {
+        throw new UnauthorizedException('Credenciales inválidas');
+      }
+
+      const clave = typeof password === 'string' ? password : '';
+      if (!(await bcrypt.compare(clave, encontrado.password_hash))) {
+        throw new UnauthorizedException('Credenciales inválidas');
+      }
+
+      const roles = await this.rolesActivos(cliente, encontrado.id);
+      await cliente.query('COMMIT');
+
+      // R67: el token lleva los roles del ÚNICO tenant del usuario. `RolesGuard`
+      // sigue rechazando con 403 cualquier `x-tenant-id` que no coincida (R33).
+      const payload: JwtTokenPayload = {
+        sub: encontrado.id,
+        email: encontrado.email,
+        tenant_id: tenantId,
+        roles,
+      };
+
+      return {
+        access_token: this.jwtService.sign(payload),
+        user: {
+          id: encontrado.id,
+          email: encontrado.email,
+          nombre: encontrado.nombre,
+        },
+      };
+    } catch (error) {
+      await cliente.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    }
+  }
+
+  /**
+   * `set_config` parametrizado, nunca interpolación de cadenas: el tenant
+   * procede de un dato de entrada y no puede llegar concatenado a un SQL
+   * (`docs/conventions.md`). Es local a la transacción.
+   */
+  private async fijarTenant(cliente: PoolClient, tenantId: string): Promise<void> {
+    await cliente.query('SELECT set_config($1, $2, true)', [
+      'app.current_tenant',
+      tenantId,
+    ]);
+  }
+
+  private async rolesActivos(
+    cliente: PoolClient,
+    userId: string,
+  ): Promise<Array<{ tenant_id: string; rol: string }>> {
+    const { rows } = await cliente.query<{ tenant_id: string; rol: string }>(
       'SELECT tenant_id, rol FROM user_role WHERE user_id = $1 AND activo = true',
       [userId],
     );
-    const roles = roleRows.rows as Array<{ tenant_id: string; rol: string }>;
-
-    return { ...found, roles };
+    return rows;
   }
 }

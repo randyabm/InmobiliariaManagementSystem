@@ -4,6 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   CLAVE_DE_PRUEBA,
   type EntornoClientes,
+  CODIGO_TENANT_A,
   levantarEntornoClientes,
   TENANT_A,
 } from '../../../../../test/support/entorno-clientes';
@@ -34,7 +35,7 @@ describe('Login tras D-5 (#5 R6, R8)', () => {
   it('un usuario con credenciales sigue obteniendo access_token (R8a)', async () => {
     const respuesta = await request(servidor())
       .post('/auth/login')
-      .send({ email: 'admin-a@example.com', password: CLAVE_DE_PRUEBA });
+      .send({ codigo: CODIGO_TENANT_A, email: 'admin-a@example.com', password: CLAVE_DE_PRUEBA });
 
     expect(respuesta.status).toBe(201);
     expect(typeof respuesta.body.access_token).toBe('string');
@@ -45,7 +46,7 @@ describe('Login tras D-5 (#5 R6, R8)', () => {
   it('la contraseña equivocada sigue devolviendo 401', async () => {
     const respuesta = await request(servidor())
       .post('/auth/login')
-      .send({ email: 'admin-a@example.com', password: 'no-es-la-clave' });
+      .send({ codigo: CODIGO_TENANT_A, email: 'admin-a@example.com', password: 'no-es-la-clave' });
 
     expect(respuesta.status).toBe(401);
   });
@@ -74,7 +75,7 @@ describe('Login tras D-5 (#5 R6, R8)', () => {
 
         const respuesta = await request(servidor())
           .post('/auth/login')
-          .send({ email: 'sin-clave@example.com', password });
+          .send({ codigo: CODIGO_TENANT_A, email: 'sin-clave@example.com', password });
 
         expect(respuesta.status).toBe(401);
         expect(respuesta.body).not.toHaveProperty('access_token');
@@ -84,10 +85,10 @@ describe('Login tras D-5 (#5 R6, R8)', () => {
     it('el 401 no distingue "sin credenciales" de "credenciales inválidas"', async () => {
       const sinClave = await request(servidor())
         .post('/auth/login')
-        .send({ email: 'sin-clave@example.com', password: 'x' });
+        .send({ codigo: CODIGO_TENANT_A, email: 'sin-clave@example.com', password: 'x' });
       const inexistente = await request(servidor())
         .post('/auth/login')
-        .send({ email: 'no-existe@example.com', password: 'x' });
+        .send({ codigo: CODIGO_TENANT_A, email: 'no-existe@example.com', password: 'x' });
 
       expect(sinClave.status).toBe(401);
       expect(inexistente.status).toBe(401);
@@ -99,11 +100,13 @@ describe('Login tras D-5 (#5 R6, R8)', () => {
 
   describe('email nulo, ausente o vacío (R8)', () => {
     const casos: Array<[string, Record<string, unknown>]> = [
-      ['email nulo', { email: null, password: CLAVE_DE_PRUEBA }],
-      ['email ausente', { password: CLAVE_DE_PRUEBA }],
-      ['email vacío', { email: '', password: CLAVE_DE_PRUEBA }],
-      ['email en blanco', { email: '   ', password: CLAVE_DE_PRUEBA }],
-      ['cuerpo vacío', {}],
+      // Todos llevan un `codigo` válido: lo que se prueba es el email (R8), y
+      // sin código la respuesta sería 400 por R63, que es otra cosa.
+      ['email nulo', { codigo: CODIGO_TENANT_A, email: null, password: CLAVE_DE_PRUEBA }],
+      ['email ausente', { codigo: CODIGO_TENANT_A, password: CLAVE_DE_PRUEBA }],
+      ['email vacío', { codigo: CODIGO_TENANT_A, email: '', password: CLAVE_DE_PRUEBA }],
+      ['email en blanco', { codigo: CODIGO_TENANT_A, email: '   ', password: CLAVE_DE_PRUEBA }],
+      ['solo el código', { codigo: CODIGO_TENANT_A }],
     ];
 
     it.each(casos)('%s devuelve 401', async (_nombre, cuerpo) => {

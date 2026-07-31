@@ -90,3 +90,46 @@ Tests nuevos: `auth/__tests__/codigo-inmobiliaria.test.ts` (unitarios de R73–R
    pero **hoy no es observable**. No se ha inflado ningún test para fingir que sí.
 
 Suite tras el paso 2: `test` 31 archivos / **311 tests**; `test:db` 2 / **56**.
+
+### Paso 3 — D-8, aplicación: login por inmobiliaria (T57, T58, T59) ✅
+
+- **T57** — `POST /auth/login` exige `codigo` (400 por forma, vía
+  `CodigoDeInmobiliariaInvalidoError`), lo normaliza (R74), resuelve el tenant
+  con `tenant_por_codigo` y consulta `user` **dentro de una transacción con
+  `app.current_tenant` fijado** (R66). Se acabó la excepción de B4.3: el login
+  ya no consulta con el pool crudo fuera de todo contexto.
+  `GET /auth/me` recibe el mismo tratamiento —no estaba en ninguna task, pero
+  sin él T61 lo habría dejado devolviendo 401 a todo el mundo—.
+- **T58** — retirada de `vincularPorEmail`; `crearOVincularIdentidad` pasa a
+  llamarse `crearIdentidad`. El JWT lleva `tenant_id` y los roles de su único
+  tenant (R67).
+- **T59** — `auth/__tests__/login-por-inmobiliaria.test.ts`: mismo correo en dos
+  inmobiliarias (R65), 401 indistinguible (R64), 400 por forma (R63),
+  normalización (R74) y R62.
+
+**Prueba por mutación.** Sustituir `AND tenant_id = $2` de la consulta del login
+por `($2 IS NOT NULL)` pone **9 tests rojos**, entre ellos "ninguna de las dos
+autentica con el código de la otra" y "el 401 es indistinguible".
+
+Suite tras el paso 3: `test` 32 archivos / **333 tests**; `test:db` 2 / **56**.
+
+#### ⚠️ Contradicción del spec encontrada y resuelta (R62 / T58 frente a §7.4)
+
+El titular de **R62** y el enunciado de **T58** dicen que la identidad es
+"**siempre** nueva". Al pie de la letra eso rompe dos cosas:
+
+1. **RF-C2 y `design.md` §7.4** — una persona puede ser propietaria **e**
+   inquilina de la misma inmobiliaria con una sola identidad y dos `user_role`.
+   Hay un test de #5 que lo cubre desde T36.
+2. **La `UNIQUE (tenant_id, email)` de R59** — crear una segunda identidad con
+   el mismo correo en el mismo tenant es una violación de unicidad (se observó:
+   500 en `inquilinos.api.test.ts`).
+
+El cuerpo del propio R62 acota la prohibición —*"NO DEBE consultar ni reutilizar
+ninguna identidad existente **de otro tenant**"*— y `design.md` §20.4 la acota
+igual: *"RF-C2 sigue siendo cierto dentro de un tenant […] pero deja de serlo
+entre tenants"*. **Resuelto a favor del diseño:** se retira toda reutilización
+**entre** inmobiliarias y se conserva la reutilización **dentro** de una,
+acotada con `AND tenant_id = $2`. No es una decisión de producto nueva: es la
+lectura que el propio spec fija en dos sitios. Queda para que el reviewer la
+confirme o la rebata.

@@ -40,7 +40,7 @@ export class InquilinosService {
   ): Promise<PerfilInquilino> {
     await this.rechazarSiDocumentoRepetido(ctx, dto.tipo_documento, dto.documento);
 
-    const { userId } = await this.identidad.crearOVincularIdentidad(
+    const { userId } = await this.identidad.crearIdentidad(
       ctx.cliente,
       {
         nombre: dto.nombre,

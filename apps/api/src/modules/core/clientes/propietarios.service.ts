@@ -51,7 +51,7 @@ export class PropietariosService {
     // D-4: sin upsert. Se comprueba y se rechaza con 409 explícito (R24).
     await this.rechazarSiDocumentoRepetido(ctx, dto.tipo_documento, dto.documento);
 
-    const { userId } = await this.identidad.crearOVincularIdentidad(
+    const { userId } = await this.identidad.crearIdentidad(
       ctx.cliente,
       {
         nombre: dto.nombre,

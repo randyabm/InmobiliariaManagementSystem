@@ -11,76 +11,96 @@ export interface DatosDeIdentidad {
 
 export interface IdentidadResuelta {
   userId: string;
-  /** `true` si se reutilizó un `user` que ya existía (RF-C2, RF-AU6). */
-  reutilizada: boolean;
 }
 
 /**
- * Crea o vincula la identidad (`user`) y su rol en el tenant (`user_role`).
+ * Crea la identidad (`user`) y su rol en el tenant (`user_role`).
  *
  * Recibe el `PoolClient` **explícitamente** para que la identidad, el rol y el
  * perfil ocurran en **la misma transacción** que abrió el
  * `TenantContextInterceptor` (**R22**): un fallo parcial no puede dejar un
  * `user` huérfano sin perfil.
  *
- * Reglas de vinculación:
+ * ## Nunca se reutiliza una identidad de OTRA inmobiliaria (R62, D-8)
  *
- * - **Con email** → se reutiliza el `user` que ya tenga ese email, aunque
- *   pertenezca a otra inmobiliaria. Es la identidad única multi-tenant de
- *   RF-C2/RF-AU6. La respuesta no expone nada de los perfiles de ese `user`
- *   en otros tenants (**R25**): aquí solo se devuelve el `user_id`.
- * - **Sin email** → identidad **nueva**, siempre. NO se busca por
- *   `documento` (**R26**): hacerlo fuera del tenant revelaría que la persona
- *   ya es cliente de otra inmobiliaria, justo lo que prohíbe el PRD §11.3.
- *   Consecuencia asumida (design.md §7.3): la misma persona sin correo
- *   registrada en dos inmobiliarias produce dos filas de `user`.
+ * `vincularPorEmail` reutilizaba el `user` que ya tuviera ese correo **aunque
+ * perteneciera a otra inmobiliaria** (**R25**). D-8 eliminó R25: esa
+ * vinculación ocurría sin consentimiento de nadie y permitía que el tenant A se
+ * hiciera con la identidad del administrador del tenant B, que es el paso 1 de
+ * la cadena de ataque descrita en la revisión (B1). Con `user.tenant_id` y la
+ * FK compuesta de R60 ya no es ni representable, y aquí no queda ni rastro de
+ * la búsqueda global.
  *
- * El `user` se crea sin `password_hash`: es un cliente registrado por la
- * inmobiliaria (RF-C1), no alguien que se dio de alta en un portal. Mientras
- * el hash sea NULL el login responde 401 sin evaluar contraseña (**R6**).
+ * Tampoco se busca por **`documento`** (**R26**, vigente): hacerlo fuera del
+ * tenant revelaría que la persona ya es cliente de otra inmobiliaria, justo lo
+ * que prohíbe el PRD §11.3.
+ *
+ * ## Dentro del MISMO tenant sí se reutiliza, y es a propósito
+ *
+ * Una persona puede ser propietaria **e** inquilina de la misma inmobiliaria
+ * (RF-C2, `design.md` §7.4): son dos perfiles y dos `user_role`, pero **una
+ * sola identidad**. `design.md` §20.4 lo dice sin ambigüedad al acotar el
+ * alcance de D-8: *"RF-C2 sigue siendo cierto dentro de un tenant […] pero deja
+ * de serlo entre tenants"*. Y la `UNIQUE (tenant_id, email)` de R59 lo exige de
+ * todos modos: crear una segunda identidad con el mismo correo en el mismo
+ * tenant sería una violación de unicidad.
+ *
+ * > **Contradicción del spec, resuelta a favor del diseño.** El titular de
+ * > **R62** y el enunciado de **T58** dicen "la identidad es **siempre**
+ * > nueva". Leído al pie de la letra rompería RF-C2 y §7.4. El cuerpo del
+ * > propio R62 acota la prohibición —*"NO DEBE consultar ni reutilizar ninguna
+ * > identidad existente **de otro tenant**"*— y §20.4 la acota igual, así que
+ * > "siempre nueva" es taquigrafía de "nunca heredada de otra inmobiliaria".
+ * > Queda anotado en `progress/impl_owner_tenant_profiles_cierre.md`.
+ *
+ * Consecuencia asumida (`design.md` §7.3 y §20.4, **D-13**): la misma persona
+ * registrada en dos inmobiliarias tendrá dos filas de `user`, dos contraseñas y
+ * dos portales.
+ *
+ * El `user` se crea sin `password_hash` y —desde **D-9**— con `email` **NULL**:
+ * es un cliente registrado por la inmobiliaria (RF-C1), no alguien que se dio
+ * de alta en un portal. Su correo de contacto vive en el perfil (**R71**).
+ * Mientras el hash sea NULL el login responde 401 sin evaluar contraseña
+ * (**R6**).
  */
 @Injectable()
 export class IdentidadService {
-  async crearOVincularIdentidad(
+  async crearIdentidad(
     cliente: PoolClient,
     datos: DatosDeIdentidad,
     tenantId: string,
     rol: RolDeCliente,
   ): Promise<IdentidadResuelta> {
     const email = normalizarEmail(datos.email);
-    const identidad = email
-      ? await this.vincularPorEmail(cliente, email, datos, tenantId)
-      : await this.crearIdentidadNueva(cliente, null, datos, tenantId);
+    const identidad =
+      (email === null
+        ? null
+        : await this.buscarEnEsteTenant(cliente, email, tenantId)) ??
+      (await this.crearIdentidadNueva(cliente, email, datos, tenantId));
 
     await this.asegurarRol(cliente, identidad.userId, tenantId, rol);
     return identidad;
   }
 
   /**
-   * ⚠️ **Acotada al tenant por D-8 (T54).** Buscaba por `email` en toda la
-   * tabla y reutilizaba la identidad de otra inmobiliaria (R25). Con
-   * `user.tenant_id` y la FK compuesta de R60 eso dejó de ser siquiera
-   * representable: un `user_role` del tenant A sobre una identidad del tenant B
-   * viola la FK. Lo que queda es reutilización **dentro** del mismo tenant.
+   * Identidad existente **de esta misma inmobiliaria** con ese correo.
    *
-   * La retira por completo **T58** (R62: la identidad es siempre nueva).
+   * El `AND tenant_id = $2` es lo único que separa esto de la vinculación de
+   * R25 que D-8 eliminó, y por eso no es opcional ni redundante con el RLS:
+   * hasta T61 la aplicación se conecta como superusuario y el RLS es inerte,
+   * así que sin esta condición la consulta volvería a alcanzar identidades de
+   * otras inmobiliarias. Es la misma doble barrera que usan los repositorios.
    */
-  private async vincularPorEmail(
+  private async buscarEnEsteTenant(
     cliente: PoolClient,
     email: string,
-    datos: DatosDeIdentidad,
     tenantId: string,
-  ): Promise<IdentidadResuelta> {
+  ): Promise<IdentidadResuelta | null> {
     const { rows } = await cliente.query<{ id: string }>(
       'SELECT id FROM "user" WHERE email = $1 AND tenant_id = $2',
       [email, tenantId],
     );
-
-    const existente = rows[0];
-    if (existente) {
-      return { userId: existente.id, reutilizada: true };
-    }
-    return this.crearIdentidadNueva(cliente, email, datos, tenantId);
+    return rows[0] ? { userId: rows[0].id } : null;
   }
 
   private async crearIdentidadNueva(
@@ -100,7 +120,7 @@ export class IdentidadService {
     if (!creada) {
       throw new Error('No se pudo crear la identidad del cliente.');
     }
-    return { userId: creada.id, reutilizada: false };
+    return { userId: creada.id };
   }
 
   /**
