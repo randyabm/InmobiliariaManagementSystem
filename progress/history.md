@@ -324,3 +324,104 @@ triggers se crean via SQL directo. Los triggers usan `BEFORE UPDATE/DELETE`
 con `RAISE EXCEPTION` para prevenir cualquier modificación.
 
 - **Próximo paso:** feature #5 `owner_tenant_profiles` — spec por `spec_author`.
+
+---
+
+## Sesión 2026-07-26 → 2026-08-01 — features #5, #2, #3, #4 y #26
+
+### Resumen
+
+Se cerró la feature #5 `owner_tenant_profiles` (partida en #5 + #25) y la #26
+`identidad_multirol_cliente`. En el camino se **reabrieron** #2, #3 y #4, que
+estaban marcadas `done` sobre invariantes de seguridad que **no se cumplían en
+ejecución**, y se volvieron a cerrar solo cuando quedaron demostrados con el
+rol de base de datos real.
+
+`init.sh`: 142 tests al empezar → **452 + 71** (`test` y `test:db`).
+
+### Corrección de una decisión técnica registrada en la feature #4
+
+El acta de cierre de #4 (más arriba en este archivo) dice:
+
+> "Los triggers append-only se crean en el `beforeAll` de los tests porque
+> Drizzle's migration runner no maneja correctamente las funciones PL/pgSQL
+> con delimitadores `$$`."
+
+**Esa justificación era falsa y produjo el peor defecto de esta sesión.**
+Ninguna migración creaba los triggers: los creaba el propio test antes de
+probarlos, así que la inmutabilidad de la auditoría era verde por construcción
+y **en producción no existía**. La migración `0006_auditoria_append_only.sql`
+los crea sin ningún problema, lo que demuestra que la limitación aducida no
+era real. Verificado por mutación: neutralizando `0006`, `audit-log.test.ts`
+pasa de 7 verdes a 3 rojos.
+
+### Los cuatro hallazgos del primer review de #5
+
+1. **B1** — `PATCH` de propietario e inquilino hacía `UPDATE "user" WHERE id`
+   sin filtro de inmobiliaria: escritura cruzada entre tenants.
+2. **B2** — el trigger de auditoría inmutable no lo creaba ninguna migración.
+3. **B3** — la aplicación se conectaba a PostgreSQL como **superusuario**, que
+   se salta el RLS; `FORCE` alcanza al dueño de la tabla, no al superusuario.
+   El aislamiento en ejecución lo sostenían solo los `WHERE tenant_id`.
+4. **B4** — la política `user_tenant_isolation` era `FOR ALL` sin `WITH CHECK`.
+
+Causa de fondo común: **`init.sh` no ejecutaba `npm run test:db`**, así que la
+suite que verifica las políticas RLS vivía fuera del semáforo. Cuatro de sus
+tests llevaban rotos desde #2/#3 (consultaban `pg_policies.polname`, columna
+inexistente) sin que nadie lo viera.
+
+### Defecto latente encontrado al implementar #26 (pertenece a la #3)
+
+`AuthModule` congelaba `process.env.JWT_SECRET ?? 'dev-secret'` en el cuerpo
+del módulo, mientras la estrategia lo leía en el constructor: **la API firmaba
+con un secreto y verificaba con otro, rechazando sus propios tokens**. Nadie lo
+detectó porque ningún test reutilizaba el token de `POST /auth/login`. Además,
+el valor por defecto producía tokens falsificables sin avisar. Corregido con
+`registerAsync` y sin valor por defecto; `rol-activo.api.test.ts` ya reutiliza
+el token emitido, y revertir el arreglo pone 4 tests en rojo.
+
+### Lección que atraviesa toda la sesión
+
+Los tres defectos graves (B2, B3 y el del JWT) comparten el mismo patrón: **un
+test que fabrica el objeto que dice verificar, o que nunca ejercita el camino
+real**. Por eso se adoptaron dos medidas permanentes:
+
+- `tests/ddl-en-tests.test.ts` — guard que detecta tests que crean el objeto
+  que verifican.
+- **Verificación por mutación obligatoria**: romper a propósito lo que el test
+  dice proteger y comprobar que se pone rojo. Un test verde no es evidencia si
+  nadie lo ha visto fallar.
+
+### Decisiones de producto del humano (D-1…D-13 de #5, PA-1…PA-5 de #26)
+
+- Identidades **nunca compartidas entre inmobiliarias**: cada una tiene su
+  propia fila de `user`; correo único por inmobiliaria; el login pide un código
+  corto legible (formato de etiqueta DNS, reutilizable como subdominio en fase
+  3-4). Dos cuentas para quien trate con dos inmobiliarias, aceptado también
+  para el portal del inquilino.
+- Dentro de una inmobiliaria, la identidad **sí** se deduplica por documento y
+  puede ser propietario e inquilino a la vez, eligiendo con qué rol actúa.
+- Nombre divergente al deduplicar → **409**, sin escribir nada. Comparación
+  estricta: no se pliegan tildes.
+- El contacto vive en el perfil; `user.email` queda solo como credencial.
+- Rol de aplicación **sin `BYPASSRLS`**, con `DATABASE_URL` y
+  `DATABASE_MIGRATION_URL` separadas.
+- Tarifa de retención → configuración por inmobiliaria y año (feature #25).
+- Certificados fiscales y lista de propiedades del propietario → diferidos.
+
+### Features creadas en esta sesión
+
+- **#25** `retencion_codeudor_referencias` (`spec_ready`) — mitad de la #5.
+- **#26** `identidad_multirol_cliente` — deduplicación y rol activo.
+- **#27** `sesion_y_revocacion` (`pending`) — hoy el rol se valida solo al
+  emitir el token, así que revocarlo no surte efecto hasta que caduque.
+
+### Pendientes al cerrar
+
+- **PA-14 / PA-4**: quién da de alta una inmobiliaria y asigna su `codigo`.
+  El PRD menciona el rol Super Admin pero no define ningún `RF-*` de onboarding.
+- El portal del cliente (RF-AU2/AU4) **no existe como feature** en el tablero,
+  y por eso R18 de #26 solo pudo demostrarse por vías indirectas: no hay
+  ninguna ruta de cliente, todas piden `admin` o `empleado`.
+- Feature #23 `ci_pipeline` sigue pendiente: Forgejo no está levantado.
+- Nada pusheado: el trabajo vive solo en el disco local.

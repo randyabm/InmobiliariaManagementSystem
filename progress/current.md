@@ -4,184 +4,59 @@
 > `history.md`. Mientras trabajas, **mantenlo actualizado en tiempo real**,
 > no al final.
 
-- **Feature en curso:** #5 `owner_tenant_profiles` — status **`in_progress`**
-- **Inicio:** 2026-07-26 (spec) / 2026-07-27 (implementación)
-- **Agente:** leader → spec_author (spec v3, partido) → **implementer**
-- **Estado:** spec aprobado por el humano. Implementación en curso.
-- **Línea base antes de tocar código:** `./init.sh` verde, **142 tests**.
+- **Feature en curso:** #26 `identidad_multirol_cliente` — status
+  **`in_progress`**
+- **Agente:** leader → spec_author → implementer → **reviewer (APROBADO)**
+- **Estado:** ⏸ **esperando que el humano autorice marcarla `done`.**
 
-## Plan de implementación (T1–T47, en orden)
+## Estado de la verificación
 
-| Bloque | Tasks | Contenido | Estado |
-|---|---|---|---|
-| 1 | T1–T10 | Esquema Drizzle, migración `0005`, RLS, índices, tests | ✅ |
-| 2 | T11–T14 | Contexto de tenant: helper, interceptor registrado, `RolesGuard` | ✅ |
-| 3 | T15–T21 | `identidad.service`, login tras D-5, enmienda a `auth_rbac` | ✅ |
-| 4 | T22–T27 | CRUD de propietario + hoja de vida | ✅ |
-| 5 | T28–T32 | Cuentas bancarias y `resolverCuentaDeGiro` | ✅ |
-| 6 | T33–T36 | CRUD de inquilino | ✅ |
-| 7 | T37–T42 | Invariantes de seguridad (deterministas, Postgres real) | ✅ |
-| 8 | T43–T47 | Integración, trazabilidad, verificación | ✅ |
+`./init.sh` exit 0 — `npm run test` **452** (42 archivos) y `npm run test:db`
+**71** (3 archivos). Verificado por el leader, no solo reportado.
 
-**47/47 tasks completadas.** `./init.sh` verde (exit 0). Tests **142 → 257**;
-`npm run test:db` 20 (con 4 rojos preexistentes) → **24 verdes**.
+31/31 tasks. Veredicto en `progress/review_identidad_multirol_cliente.md`:
+**APROBADO, sin bloqueantes**. El reviewer reprodujo por su cuenta cuatro
+mutaciones del implementer con números idénticos —(b) 1/452, (b+d) 2/19,
+(d) 37/452, (f) 9/452— y añadió una propia, (g) revertir el arreglo del JWT,
+que da 4/452.
 
-**Informe completo: `progress/impl_owner_tenant_profiles.md`** — incluye el
-mapa de trazabilidad R1–R37 → test y las contradicciones detectadas.
+## Lo que trajo esta feature
 
-### Pendiente de decisión del humano (detectado al implementar)
+- La identidad se deduplica por **documento dentro de la inmobiliaria**: quien
+  sea propietario e inquilino de la misma agencia es ahora una sola identidad
+  con dos roles, no dos filas de `user`.
+- El token declara **con qué rol se actúa**, y el rol activo restringe, nunca
+  amplía (R29: un `rol_activo` incoherente con el token se rechaza con 403).
+- Nombre divergente al deduplicar → **409** sin escribir nada, con cuerpo
+  accionable y sin exponer el documento.
+- Deuda del review de #5 cerrada: `init.sh` ahora **falla** (no advierte) si
+  `DATABASE_URL` y `DATABASE_MIGRATION_URL` coinciden.
 
-1. La aplicación se conecta a PostgreSQL como **superusuario**, que se salta el
-   RLS por completo. Hace falta un rol de aplicación sin `BYPASSRLS`. (§5.2)
-2. La política RLS de `user` de la feature #3 impide crear identidades y
-   vincular por email entre tenants en cuanto el rol deje de ser superusuario.
-   Choca con R22/R25 de #5. (§5.3)
-3. `init.sh` no ejecuta `npm run test:db`: 4 tests de políticas RLS llevaban
-   rotos desde #2/#3 sin que nadie lo viera. Corregidos. (§5.1)
+## Defecto latente corregido, perteneciente a la feature #3
 
-**La feature NO se ha marcado `done`**: espera al reviewer.
+`AuthModule` congelaba `JWT_SECRET` al importar el módulo, con `?? 'dev-secret'`
+de reserva: la API **firmaba con un secreto y verificaba con otro**, rechazando
+sus propios tokens. Invisible porque ningún test reutilizaba el token de
+`POST /auth/login`. Corregido y cubierto; queda constancia en `history.md`.
 
-## Sesión 2026-07-27 (b) — implementer, alcance acotado: T48, T49, T53
+## Pendiente de decisión del humano
 
-El reviewer rechazó #5 con 4 hallazgos. El humano encargó **solo** la puerta
-de verificación (T48, T49) y la migración de triggers append-only (T53).
-**T50–T52 y T54–T68 quedan sin tocar a propósito**: dependen de PA-8…PA-11,
-decisiones de producto que el humano todavía no ha tomado.
+1. **Autorizar cerrar la #26** (`done`). El leader no marca features como
+   `done` por su cuenta.
+2. **El push sigue sin hacerse.** Forgejo no responde en `127.0.0.1:3000` (es
+   la infraestructura de la feature #23, aún sin montar). Existe un segundo
+   remoto, `origin` → GitHub, que el humano **no ha autorizado** como destino.
+   Todo el trabajo vive en un solo disco.
+3. **PA-14** sigue abierta: quién da de alta una inmobiliaria y asigna su
+   `codigo`. El PRD menciona el Super Admin pero no define ningún `RF-*` de
+   onboarding.
 
-- Línea base antes de tocar nada: `npm run test` **257** verdes (27 archivos),
-  `npm run test:db` **24** verdes (1 archivo), `./init.sh` exit 0.
-- Plan: (1) T53 migración `0006_auditoria_append_only.sql` + journal + ajuste
-  del conteo de migraciones; (2) T49 guard `tests/ddl-en-tests.test.ts`;
-  (3) T48 `run_script test:db` en `init.sh`; (4) verificación.
-- Informe: `progress/impl_owner_tenant_profiles_puerta.md`.
+## Cola
 
-**Resultado: T48, T49 y T53 hechas y marcadas `[x]`.** Hallazgo **B2 cerrado**
-(el trigger append-only lo crea ahora `0006`, no el test). B1, B3 y B4 siguen
-abiertos: dependen de PA-8…PA-11.
-
-- `npm run test` **269** verdes (28 archivos) · `npm run test:db` **26** verdes.
-- Verificado a mano que, neutralizando `0006`, `audit-log.test.ts` se pone en
-  **3 rojos** y `test:db` falla. El test ya no es verde por construcción.
-- **`./init.sh` sigue en ROJO por una sola causa, ajena a estas tasks:**
-  `[FAIL] Hay 4 features en in_progress (máximo 1)`. Viene de la reversión de
-  #2/#3/#4 a `in_progress` que hizo el humano (`design.md` §17) y ya estaba así
-  en `HEAD`; no he tocado `feature_list.json`. Todo lo demás del semáforo pasa,
-  `test:db` incluido. **Decisión pendiente del humano/leader.**
-- Ninguna feature marcada `done`: espera al reviewer.
-
-## Hecho en la sesión de spec (2026-07-26)
-
-1. **Higiene de git.** El trabajo de las features #24, #2, #3 y #4 estaba
-   implementado y verificado pero **sin commitear**; vivía solo en el working
-   tree. Commiteado en `2e54df7`. El working tree queda limpio.
-2. **Spec de la feature #5** redactado, revisado con el humano y partido en
-   dos (`47c43f3`, `162714b`, `9e0355d`).
-
-## Decisiones del humano sobre el spec de #5 (D-1…D-7)
-
-| Id | Decisión |
-|----|----------|
-| D-1 | Lista de propiedades del propietario → **diferida a #6** (la entidad `Propiedad` depende de #5, no al revés). RF-C5 queda parcialmente cubierto. |
-| D-2 | Tarifa de retención → **configuración del tenant por año**, no columna del propietario (la fija la ley y cambia anualmente). |
-| D-3 | Certificados fiscales → **diferidos al módulo contable**: el PRD no los define y sus cifras las produce el módulo de giros, que no existe. |
-| D-4 | Crear en línea → GET por documento + POST con **409**, sin upsert (PRD §12.1). |
-| D-5 | Email del propietario **opcional** → `user.email` nullable, con migración, revisión del login de #3 y enmienda a su spec. |
-| D-6 | Codeudor y referencias → **entran** como captura de datos; el amarre a la firma es de #14/#17. |
-| D-7 | `documento_identidad` en el perfil, **único por tenant**. Desviación consciente del PRD §8.7, aprobada por el humano, por el aislamiento del §11.3. |
-
-## Corte de la feature #5
-
-55 tasks en una sola corrida daban un diff inrevisable, así que se partió:
-
-- **#5 `owner_tenant_profiles`** — 37 requirements / 47 tasks, 3 tablas,
-  13 rutas. Núcleo: resolución de tenant, `user.email` nullable, CRUD de
-  propietario e inquilino, cuenta bancaria y precedencia, creación en línea.
-- **#25 `retencion_codeudor_referencias`** (nueva) — 25 requirements /
-  27 tasks, 3 tablas, 10 rutas. Dependencia dura de #5.
-
-Los 4 criterios de aceptación originales quedaron mapeados sin pérdidas.
-
-## Deuda detectada por el spec, que #5 debe cerrar
-
-El `TenantContextInterceptor` de la feature #2 **existe pero no estaba
-registrado en la app**, y el tenant se deducía de `roles[0].tenant_id`. Con
-una identidad con roles en varias inmobiliarias (RF-AU6) eso puede escribir
-en el tenant equivocado. Las features #2 y #3 están marcadas `done` con ese
-agujero abierto. Se arregla dentro de #5 (R33, R34, T11–T14) por decisión del
-humano.
-
-## Contradicciones registradas (no resueltas, anotadas a propósito)
-
-1. Con el email opcional, una persona sin correo registrada en dos tenants
-   produce **dos filas de `user`**: no hay clave de deduplicación global y
-   buscar por documento entre tenants viola §11.3. Salida futura: fusión de
-   identidades auditada. (`specs/owner_tenant_profiles/design.md` §7.3)
-2. El spec cerrado de #3 exige `email NOT NULL UNIQUE`: queda **enmendado**
-   por T17 de #5.
-3. El payload del JWT incluye `email`. Hoy no rompe nada (#5 no emite tokens
-   de clientes), pero la feature del portal (RF-AU2/AU4) tendrá que decidir
-   el identificador de un cliente sin correo.
-4. La tarifa de retención hereda el pendiente técnico del PRD §13.5 sobre la
-   fuente del IPC (carga manual vs. integración): se sigue la recomendación
-   que el propio PRD ya hace, carga manual por el admin.
-
-## Próximo paso
-
-El humano lee `specs/owner_tenant_profiles/` y dice **"aprobado"** → la #5
-pasa a `in_progress` y se lanza el `implementer`. Sin esa aprobación no se
-escribe código.
-
-## Pendiente de fondo
-
-- Feature #23 `ci_pipeline` sigue pendiente (requiere infraestructura manual).
-- Nada se ha pusheado al remoto Forgejo en esta sesión.
-
----
-
-## Sesión — cierre de #5 `owner_tenant_profiles` (T50–T73)
-
-Las **23 tasks pendientes** quedan hechas. Informe completo:
-`progress/impl_owner_tenant_profiles_cierre.md`.
-
-- B1, B3 y B4 cerrados (B2 ya lo estaba). Migraciones nuevas `0007` (identidad
-  por tenant + código de inmobiliaria) y `0008` (contacto en el perfil).
-- La aplicación corre con un rol **sin `BYPASSRLS`**; los invariantes de §C7 se
-  prueban con ese rol y se han verificado **por mutación** (conceder `BYPASSRLS`
-  pone 19 tests en rojo; comentar los triggers de auditoría, 6).
-- La lista blanca del guard anti-DDL queda **vacía**.
-- `./init.sh` en verde: 372 tests + 56 de `test:db`.
-
-**Estado:** #5 sigue en `in_progress`, a la espera del reviewer. Quedan cuatro
-decisiones abiertas para el humano, listadas al final del informe (la más
-relevante: D-9 deja el alta sin deduplicar identidad dentro del tenant).
-
----
-
-## Sesión — implementación de #26 `identidad_multirol_cliente` (T1–T31)
-
-Las **31 tasks** quedan hechas. Informe completo:
-`progress/impl_identidad_multirol_cliente.md`.
-
-- La identidad de un cliente se deduplica por **documento dentro de la
-  inmobiliaria** (migración `0009`, índice único parcial). Quien es propietario
-  **e** inquilino de la misma agencia es ahora **una** persona con **una**
-  credencial y dos roles. Cierra la deuda **D5**.
-- Nombre divergente al deduplicar → **409** `NOMBRE_NO_COINCIDE_CON_IDENTIDAD`
-  con cuerpo accionable y **sin escribir nada** (verificado con `SELECT`).
-- El token puede declarar `rol_activo` (`POST /auth/rol-activo`), que
-  **restringe y nunca amplía**. **No** se implementa revocación: es la #27.
-- **D-8 intacta**: la reutilización entre inmobiliarias sigue prohibida, con
-  test dedicado y mutación que lo demuestra.
-- Deudas **D4** (`init.sh` falla si las dos URLs coinciden) y **D6** (el spec de
-  la #5 ya no dice "identidad siempre nueva") saldadas.
-- Seis mutaciones verificadas, todas en rojo (tabla con números reales en el
-  informe). La lista blanca del guard anti-DDL **no se amplió**.
-- Defecto latente corregido de paso: `AuthModule` congelaba `JWT_SECRET` al
-  importar el archivo y la API rechazaba sus propios tokens.
-- `./init.sh` en verde: **452** tests + **71** de `test:db`.
-
-**Estado:** #26 sigue en `in_progress`, a la espera del reviewer. Cuatro
-decisiones abiertas al final del informe; la más relevante para el humano:
-**PA-5** (¿se pliegan las tildes al comparar nombres?) y que el **portal del
-cliente (RF-AU2/AU4) no existe como feature**, así que R18 no se puede demostrar
-sobre rutas de cliente todavía.
+- **#25** `retencion_codeudor_referencias` — `spec_ready`, 27 tasks, sin
+  decisiones pendientes.
+- **#27** `sesion_y_revocacion` — `pending`, sin spec todavía.
+- **#6** `property_profile` — `pending`, siguiente del orden original.
+- El **portal del cliente** (RF-AU2/AU4) no existe como feature y ya bloquea
+  cobertura: R18 de #26 solo pudo demostrarse por vías indirectas porque no
+  hay ninguna ruta de cliente en el sistema.
