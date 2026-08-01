@@ -179,6 +179,31 @@ describe('Propiedades — propietarios, ocupación, documentos y fotos (#6)', ()
       expect(ficha.body.propietarios).toHaveLength(0);
     });
 
+    it('una fila de la puente que apunte al principal (estado corrupto) no puede removerse (R10)', async () => {
+      // La API no puede crear este estado (`anadir` lo bloquea con 409),
+      // pero el invariante R10 debe resistir un estado corrupto en la base:
+      // se siembra la fila directamente y la baja debe ser 409, no 200.
+      const { rows } = await entorno.poolAdmin.query<{ id: string }>(
+        `INSERT INTO propiedad_propietario (tenant_id, propiedad_id, perfil_propietario_id)
+         VALUES ($1, $2, $3) RETURNING id`,
+        [TENANT_A, idPropiedad, principalId],
+      );
+      const idCorrupta = rows[0]!.id;
+
+      const respuesta = await comoAdminA(
+        'delete',
+        `/propiedades/${idPropiedad}/propietarios/${idCorrupta}`,
+      );
+      expect(respuesta.status).toBe(409);
+      expect(respuesta.body.error).toBe('PROPIETARIO_PRINCIPAL_NO_REMOVIBLE');
+
+      const { rows: sigue } = await entorno.poolAdmin.query<{ activo: boolean }>(
+        'SELECT activo FROM propiedad_propietario WHERE id = $1',
+        [idCorrupta],
+      );
+      expect(sigue[0]?.activo).toBe(true);
+    });
+
     it('remover una asociación inexistente es 404 (R14)', async () => {
       const respuesta = await comoAdminA(
         'delete',
