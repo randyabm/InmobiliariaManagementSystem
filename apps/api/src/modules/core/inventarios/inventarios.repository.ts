@@ -23,6 +23,7 @@ import type { PoolClient } from 'pg';
 export class InventariosRepository {
   private static readonly SELECT_INVENTARIO = `
     SELECT id, tenant_id::text AS tenant_id, propiedad_id::text AS propiedad_id,
+           perfil_inquilino_id::text AS perfil_inquilino_id,
            tipo_evento, estado, creado_por::text AS creado_por,
            revision_completada_en, activo, created_at, updated_at
       FROM inventario`;
@@ -64,6 +65,7 @@ export class InventariosRepository {
     INSERT INTO inventario (tenant_id, propiedad_id, tipo_evento, creado_por)
     VALUES ($1, $2, $3, $4)
     RETURNING id, tenant_id::text AS tenant_id, propiedad_id::text AS propiedad_id,
+              perfil_inquilino_id::text AS perfil_inquilino_id,
               tipo_evento, estado, creado_por::text AS creado_por,
               revision_completada_en, activo, created_at, updated_at`;
 
@@ -408,20 +410,29 @@ export class InventariosRepository {
       claveStorage: string;
       hashSha256: string;
       autor: 'EMPLEADO' | 'INQUILINO';
+      revisionId?: string;
     },
   ): Promise<InventarioItemFoto> {
     const { rows } = await ctx.cliente.query(
       `${InventariosRepository.SELECT_FOTO_INSERT_RETURNING}`,
-      [ctx.tenantId, datos.itemId, datos.claveStorage, datos.hashSha256, datos.autor],
+      [
+        ctx.tenantId,
+        datos.itemId,
+        datos.claveStorage,
+        datos.hashSha256,
+        datos.autor,
+        datos.revisionId ?? null,
+      ],
     );
     return aFoto(rows[0]!);
   }
 
   private static readonly SELECT_FOTO_INSERT_RETURNING = `
-    INSERT INTO inventario_item_foto (tenant_id, item_id, clave_storage, hash_sha256, autor)
-    VALUES ($1, $2, $3, $4, $5)
+    INSERT INTO inventario_item_foto
+      (tenant_id, item_id, clave_storage, hash_sha256, autor, revision_id)
+    VALUES ($1, $2, $3, $4, $5, $6)
     RETURNING id, item_id, clave_storage, hash_sha256, autor, activo,
-              fecha_captura AS created_at`;
+              revision_id, fecha_captura AS created_at`;
 
   async buscarFoto(ctx: ContextoPeticion, id: string): Promise<InventarioItemFoto | null> {
     const { rows } = await ctx.cliente.query(
@@ -477,6 +488,7 @@ interface FilaInventario {
   id: string;
   tenant_id: string;
   propiedad_id: string;
+  perfil_inquilino_id: string | null;
   tipo_evento: TipoEventoInventario;
   estado: EstadoInventario;
   creado_por: string | null;
@@ -492,6 +504,7 @@ function aInventario(fila: unknown): Inventario {
     id: f.id,
     tenant_id: f.tenant_id,
     propiedad_id: f.propiedad_id,
+    perfil_inquilino_id: f.perfil_inquilino_id,
     tipo_evento: f.tipo_evento,
     estado: f.estado,
     creado_por: f.creado_por,
@@ -580,7 +593,6 @@ interface FilaFoto {
   activo: boolean;
   created_at: Date;
 }
-
 function aFoto(fila: unknown): InventarioItemFoto {
   const f = fila as FilaFoto;
   return {

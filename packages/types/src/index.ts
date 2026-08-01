@@ -35,6 +35,16 @@ export type {
   WorkflowTransicionLog,
 } from './workflows';
 
+// Feature #13 inventory_tenant_review.
+export { PROPOSITOS_OTP, RESPUESTAS_REVISION } from './inventario-revision';
+export type {
+  CodigoOtp,
+  InvitacionInventario,
+  PropositoOtp,
+  RespuestaRevision,
+  RevisionItemInventario,
+} from './inventario-revision';
+
 // Feature #12 inventory_creation.
 export {
   AUTORES_FOTO,

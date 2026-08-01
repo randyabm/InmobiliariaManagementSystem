@@ -63,6 +63,7 @@ import { RetencionService } from './retencion.service';
     ReferenciasService,
   ],
   exports: [
+    IdentidadService,
     CuentasBancariasService,
     PropietariosService,
     InquilinosService,

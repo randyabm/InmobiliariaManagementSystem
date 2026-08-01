@@ -103,6 +103,18 @@ const RUTAS_PERMITIDAS = [
   'POST /inventarios/:id/items/:itemId/fotos',
   'DELETE /inventarios/:id/fotos/:idFoto',
   'DELETE /inventarios/:id',
+  // ─── Feature #13 inventory_tenant_review: 7 rutas (R15, design.md §6) ──
+  // `POST /inventarios/:id/invitaciones` es admin/empleado; el bootstrap y
+  // el registro son públicos (sin sesión, R3); las dos rutas de `inquilino/`
+  // son las primeras de CLIENTE con `@Roles('inquilino')` + scoping por
+  // perfil (R9); `auth/otp/*` exige sesión (#27).
+  'POST /inventarios/:id/invitaciones',
+  'GET /invitaciones/:token',
+  'POST /invitaciones/:token/registro',
+  'GET /inquilino/inventarios/:id',
+  'POST /inquilino/inventarios/:id/items/:idItem/revision',
+  'POST /auth/otp/solicitar',
+  'POST /auth/otp/verificar',
   // ─── Feature #7 workflow_engine: 9 rutas (R17, design.md §8) ───────────
   // Gestión de definiciones: solo `admin` (RF-W2). Instancias y ejecución:
   // `@Roles('admin','empleado')`.

@@ -492,10 +492,11 @@ describe('Aplicación real de las migraciones (R10)', () => {
       expect(rows[0]?.proacl ?? '').not.toMatch(/(^|,)=X\//);
     });
 
-    it('no hay ninguna OTRA función SECURITY DEFINER sobre `user` (R52, R18, R3)', async () => {
-      // R52 decía "única ruta", R18 (feature #27) añadió la del refresh y R3
-      // (feature #10) la del procesador de notificaciones. Si mañana alguien
-      // abre una cuarta puerta que evite el RLS, este test la ve.
+    it('no hay ninguna OTRA función SECURITY DEFINER sobre `user` (R52, R18, R3, R53)', async () => {
+      // R52 decía "única ruta", R18 (feature #27) añadió la del refresh, R3
+      // (feature #10) la del procesador de notificaciones y R53 (feature #13)
+      // la de la invitación. Si mañana alguien abre una quinta puerta que
+      // evite el RLS, este test la ve.
       const { rows } = await pool.query<{ proname: string }>(
         `SELECT p.proname
            FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
@@ -504,6 +505,7 @@ describe('Aplicación real de las migraciones (R10)', () => {
       );
 
       expect(rows.map((r) => r.proname)).toEqual([
+        'invitacion_por_token',
         'notificaciones_tenants_a_procesar',
         'sesion_por_refresh_token',
         'tenant_por_codigo',
@@ -1343,6 +1345,94 @@ describe('Aplicación real de las migraciones (R10)', () => {
             AND column_name = 'estado'`,
       );
       expect(defaultCol[0]?.column_default).toContain("'BORRADOR'");
+    });
+  });
+
+  // ─── Feature #13 inventory_tenant_review (T4: R1, R4, R6, R13) ─────────
+
+  describe('esquema de #13 (R1, R4, R6, R13)', () => {
+    const TABLAS_13 = [
+      'invitacion_inventario',
+      'codigo_otp',
+      'inventario_item_revision',
+    ] as const;
+
+    it.each(TABLAS_13)(
+      'la tabla %s existe con RLS habilitado Y FORZADO (R1/R4/R6)',
+      async (tabla) => {
+        const { rows } = await pool.query<{
+          relrowsecurity: boolean;
+          relforcerowsecurity: boolean;
+        }>(
+          `SELECT c.relrowsecurity, c.relforcerowsecurity
+             FROM pg_class c
+             JOIN pg_namespace n ON n.oid = c.relnamespace
+            WHERE n.nspname = 'public' AND c.relname = $1`,
+          [tabla],
+        );
+
+        expect(rows, `la tabla ${tabla} no existe`).toHaveLength(1);
+        expect(rows[0]?.relrowsecurity).toBe(true);
+        expect(rows[0]?.relforcerowsecurity).toBe(true);
+      },
+    );
+
+    it.each(TABLAS_13)(
+      'la política de aislamiento de %s filtra por app.current_tenant (R1/R4/R6)',
+      async (tabla) => {
+        const { rows } = await pool.query<{ polname: string; qual: string | null }>(
+          `SELECT policyname AS polname, qual
+             FROM pg_policies WHERE schemaname = 'public' AND tablename = $1`,
+          [tabla],
+        );
+
+        expect(rows.map((r) => r.polname)).toContain(`${tabla}_tenant_isolation`);
+        const politica = rows.find((r) => r.polname === `${tabla}_tenant_isolation`);
+        expect(politica?.qual).toContain('app.current_tenant');
+      },
+    );
+
+    it('codigo_otp tiene el CHECK de propósito REGISTRO/LOGIN/FIRMA (R4, R8)', async () => {
+      const { rows } = await pool.query<{ conname: string }>(
+        `SELECT conname FROM pg_constraint
+          WHERE conrelid = 'codigo_otp'::regclass AND contype = 'c'`,
+      );
+      expect(rows.map((r) => r.conname)).toContain('codigo_otp_proposito_check');
+    });
+
+    it('invitacion_por_token es SECURITY DEFINER, sin PUBLIC y resuelve por coincidencia exacta (R13, PA-13-4)', async () => {
+      const { rows: fn } = await pool.query<{ prosecdef: boolean; proacl: string | null }>(
+        `SELECT p.prosecdef, p.proacl::text AS proacl
+           FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+          WHERE n.nspname = 'public' AND p.proname = 'invitacion_por_token'`,
+      );
+      expect(fn).toHaveLength(1);
+      expect(fn[0]?.prosecdef).toBe(true);
+      expect(fn[0]?.proacl ?? '').not.toMatch(/(^|,)=X\//);
+
+      // Coincidencia exacta del hash: nada con hashes parciales.
+      const hashValido = 'a'.repeat(64);
+      const { rows: exacta } = await pool.query(
+        `SELECT * FROM invitacion_por_token($1)`,
+        [hashValido],
+      );
+      expect(exacta).toHaveLength(0); // no existe la fila, pero la función responde
+
+      for (const parcial of ['a'.repeat(63), 'b'.repeat(64), '%', '']) {
+        const { rows: nada } = await pool.query(`SELECT * FROM invitacion_por_token($1)`, [
+          parcial,
+        ]);
+        expect(nada, `invitacion_por_token('${parcial}')`).toHaveLength(0);
+      }
+    });
+
+    it('inventario_item_revision tiene UNIQUE por (item_id, perfil_inquilino_id) (R6, PA-13-2)', async () => {
+      const { rows } = await pool.query<{ indexname: string }>(
+        `SELECT indexname FROM pg_indexes
+          WHERE tablename = 'inventario_item_revision'
+            AND indexdef LIKE '%item_id%perfil_inquilino_id%'`,
+      );
+      expect(rows).toHaveLength(1);
     });
   });
 });

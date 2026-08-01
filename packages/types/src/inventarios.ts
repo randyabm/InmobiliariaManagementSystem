@@ -32,6 +32,7 @@ export interface Inventario {
   readonly id: string;
   readonly tenant_id: string;
   readonly propiedad_id: string;
+  readonly perfil_inquilino_id: string | null;
   readonly tipo_evento: TipoEventoInventario;
   readonly estado: EstadoInventario;
   readonly creado_por: string | null;

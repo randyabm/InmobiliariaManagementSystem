@@ -120,6 +120,13 @@
       "when": 1754870400000,
       "tag": "0016_inventory_creation",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1754956800000,
+      "tag": "0017_inventory_tenant_review",
+      "breakpoints": true
     }
   ]
 }

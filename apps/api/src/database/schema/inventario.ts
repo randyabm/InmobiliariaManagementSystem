@@ -1,6 +1,7 @@
 import { check, index, pgTable, text, timestamp, uuid, boolean } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 import { propiedad } from './propiedad';
+import { perfilInquilino } from './perfil-inquilino';
 import { tenant } from './tenant';
 import { user } from './user';
 
@@ -22,6 +23,7 @@ export const inventario = pgTable(
     propiedadId: uuid('propiedad_id')
       .notNull()
       .references(() => propiedad.id),
+    perfilInquilinoId: uuid('perfil_inquilino_id').references(() => perfilInquilino.id),
     tipoEvento: text('tipo_evento').notNull(),
     estado: text('estado').notNull().default('BORRADOR'),
     creadoPor: uuid('creado_por').references(() => user.id),

@@ -11,6 +11,8 @@ import { WorkflowsModule } from './workflows/workflows.module';
 import { NotificacionesModule } from './notificaciones/notificaciones.module';
 import { PlantillasModule } from './plantillas/plantillas.module';
 import { InventariosModule } from './inventarios/inventarios.module';
+import { InvitacionesModule } from './invitaciones/invitaciones.module';
+import { OtpModule } from './otp/otp.module';
 
 /**
  * Módulo transversal: tenant, auth, usuarios, roles y auditoría viven aquí
@@ -34,6 +36,8 @@ import { InventariosModule } from './inventarios/inventarios.module';
     NotificacionesModule,
     PlantillasModule,
     InventariosModule,
+    InvitacionesModule,
+    OtpModule,
   ],
   controllers: [HealthController],
   providers: [HealthService],
@@ -47,6 +51,8 @@ import { InventariosModule } from './inventarios/inventarios.module';
     NotificacionesModule,
     PlantillasModule,
     InventariosModule,
+    InvitacionesModule,
+    OtpModule,
   ],
 })
 export class CoreModule {}
