@@ -875,3 +875,25 @@ Review APPROVED (`f4d8efb`) con 3 mutaciones rojas y 1 fix del reviewer.
   mínima (el motor es el entregable); D-3 tope defensivo de pasadas.
 
 Línea base: `./init.sh` exit 0, `test` **800**, `test:db` **140**.
+
+### 2026-08-01 — #14 `inventory_signature_pdf` cerrada (`done`)
+
+Review APPROVED (`d408c8e`): 5 mutaciones (3 rojas, 2 inertes por defensa
+en profundidad). El humano autorizó cerrarla y **delegó el resto de la fase
+1** (implementar todo sin pedir review ni aprobación).
+
+- Migración `0018`: `inventario_firma` (RLS ENABLE+FORCE, UNIQUE por
+  parte, triggers append-only verificados incluso para el dueño);
+  `propiedad_documento` ganó `entidad_tipo/entidad_id` (PA-14-2).
+- `GeneradorPdf` (pdf-lib MVP, hash estable sin fechas automáticas) y
+  `ServicioFirma` (interfaz, D4/PA-14-4) como enchufables.
+- Flujo: `confirmar-acuerdo` (ENVIADO/EN_REVISION + revisión completa) →
+  ACORDADO → firma empleado → firma inquilino con OTP FIRMA reciente
+  (RF-AU3, consume #13) → FIRMADO → CERRADO. 409 al re-firmar y al
+  regenerar el documento.
+- PDF en el repositorio documental con hash verificado en la descarga
+  (R7/R11); vínculo formal al contrato anotado para #17.
+- Deuda: D-1 vínculo al contrato en #17; D-2 frontera #22; D-3 ventana de
+  OTP >10 min sin test; D-4 regeneración con fotos cambiantes.
+
+Línea base: `./init.sh` exit 0, `test` **821**, `test:db` **143**.

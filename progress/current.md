@@ -4,10 +4,11 @@
 > `history.md`. Mientras trabajas, **mantenlo actualizado en tiempo real**,
 > no al final.
 
-- **Feature en curso:** **#14 `inventory_signature_pdf`** (implementada,
-  22/22 tasks, esperando **review**). #12, #13 y #15 `done`.
-- **Agente:** implementer terminó #14 → reviewer (mutaciones) → humano
-  autoriza `done`.
+- **Feature en curso:** resto de la fase 1 por orden del humano (sin pedir
+  review ni aprobación): **#16-#20** (contratos y póliza, 1c), **#21-#22**
+  (comparación y versionado de inventarios), **#23** (CI). #12-#15 `done`.
+- **Agente:** leader → spec_author → implementer → reviewer, todo
+  autónomo; el humano autorizó el cierre sin puertas.
 - **Estado:** meta de la sesión: **completar la fase 1** (1b + 1c + #23).
 
 ## UI del proyecto
@@ -17,19 +18,16 @@ scaffold (#1); `apps/pwa` no existe; el tablero no tiene features de
 frontend. Las features de la fase 1 son backend (API). La PWA de campo
 (#15) será el primer cliente real de inventarios.
 
-## Cerradas (18)
+## En cola (resto de la fase 1, autónomo)
 
-#1–#5, #24, #25–#27, #6–#13, #15.
+- **#16-#20** — contratos y póliza (1c): templates, generación+firma,
+  digitalización, renovaciones/alertas, póliza.
+- **#21-#22** — comparación y versionado de inventarios (1b pendiente).
+- **#23** — CI pipeline (Forgejo sin montar; documentar la decisión).
 
-## En review
+## Cerradas (19)
 
-- **#14 `inventory_signature_pdf`** — implementación completa:
-  - Suite: `npm run test` **821** + `npm run test:db` **143**.
-  - Lint, typecheck y build verdes; `./init.sh` exit 0 (22 OK).
-  - Trazabilidad R1–R12 → test en `progress/impl_inventory_signature_pdf.md`.
-  - PA-14-1..4 ejecutadas; PDF pdf-lib con hash estable, evidencia
-    append-only, OTP FIRMA de #13 consumido; vínculo al contrato anotado
-    para #17.
+#1–#5, #24, #25–#27, #6–#15.
 
 ## Pendientes de decisión del humano
 

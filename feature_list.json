@@ -386,7 +386,7 @@
       "name": "inventory_signature_pdf",
       "phase": "1b",
       "sdd": true,
-      "status": "in_progress",
+      "status": "done",
       "title": "Firma electrónica y PDF del inventario",
       "prd_refs": [
         "RF-I8",
