@@ -668,3 +668,52 @@ RF-P4/P5), que transicionará propiedades sobre el motor #7 recién cerrado.
 La cola sigue con **#9 `property_intake`** (ingreso de propiedad con
 creación en línea, RF-PI1..PI3), que reutilizará el camino de #6/#8 para el
 alta y la instancia del ciclo de vida.
+
+## 2026-08-01 — Feature #9 `property_intake` (cerrada)
+
+- **Agente:** leader → spec_author → implementer → reviewer
+- **Feature:** #9 `property_intake` — `in_progress` → **`done`**
+- **Veredicto del reviewer:** **APPROVED, sin bloqueantes**
+  (`progress/review_property_intake.md`).
+- **Verificación:** `./init.sh` exit 0 — `test` **674** (70 archivos), `test:db`
+  **108** (3 archivos). Lint, typecheck y build verdes. 22/22 tasks.
+  **Sin migración** (R13).
+- **Mutaciones:** 4 reproducidas por el reviewer: 3 con rojos (1/13 nombre
+  sin comparar, 3/8 crear siempre, 1/9 sin auditoría del servicio) y 1
+  defensiva explicada con 0 rojos (el 409 de la cadena bloqueada lo produce
+  el motor, no la envoltura).
+- **Lo que trajo (cierra la secuencia de ingreso del PRD §12.1):**
+  - `POST /propiedades/ingreso` orquestador atómico con unión discriminada:
+    `VACANTE` (propietario en línea → ficha → `disponible`) y `ARRENDADA`
+    (propietario + inquilino en línea → ocupación con historial → cadena
+    por claves hasta `arrendada`).
+  - Crear si no existe con memoria (PA-9-3): reutiliza perfiles por
+    documento dentro del tenant con el criterio `nombresCoinciden` de #26;
+    nombre divergente → 409 sin escribir nada; ids ajenos → 404.
+  - Atomicidad real (PA-9-4): todo en la transacción de la petición; con
+    `arrendar` desactivada en la copia del tenant, el ingreso revierte CERO
+    filas (perfil, propiedad, instancia, log del motor).
+  - Auditoría explícita del servicio (R8): cada perfil creado, la ficha y
+    cada transición registran su entrada en `audit_log` (las llamadas
+    internas no pasan por el `AuditInterceptor`; el controller NO lleva
+    `@Audit` para no duplicar).
+  - Fronteras respetadas (R14): RF-PI3 → #16 (templates), contrato físico →
+    #18 (digitalización), póliza → #20. Sin tablas de contratos (T18).
+- **Desviaciones anotadas (legítimas):** `ResolverPerfilService` como
+  servicio inyectable; cadena por claves con `TransicionNoDisponibleError`
+  reutilizado; sin `@Audit` en el controller del ingreso.
+- **Deuda del reviewer (no bloqueante):** D-1 guarda defensiva de la cadena
+  (inalcanzable hoy, solo hay baja lógica); D-2 `buscarPorDocumento` toma el
+  primer perfil (revisar criterio con el backfill de #26/PA-2 al llegar a
+  producción); D-3 #16/#18 extenderán el flujo del escenario B.
+- **Pendientes heredados:** PA-14 (onboarding sin RF-*), push sin
+  autorizar, Forgejo (#23) sin montar, deudas de reviews #25/#26/#27/#6/#7/#8/#9.
+
+### Fase 1a: completa
+
+Con #9 quedan cerradas TODAS las features de la fase 1a del tablero
+(13): #1 scaffold, #2 RLS, #3 auth/RBAC, #4 auditoría, #5 perfiles, #24
+hardening, #25 retención, #26 identidad multi-rol, #27 sesiones, #6 hoja
+de vida del inmueble, #7 motor de workflows, #8 ciclo de vida + dashboard
+y #9 ingreso. La cola sigue con la fase 1b (#10 notifications, #11-#15
+inventarios, #23 CI) y 1c (contratos).
