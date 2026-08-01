@@ -36,6 +36,6 @@ import { PlantillasContratoService } from './plantillas-contrato.service';
     RenovacionesService,
     PolizasService,
   ],
-  exports: [PlantillasContratoService, PlantillasContratoRepository, ContratosService],
+  exports: [PlantillasContratoService, PlantillasContratoRepository, ContratosService, RenovacionesService],
 })
 export class ContratosModule {}

@@ -990,3 +990,35 @@ humana pendiente):
   iteración (PA-33-3).
 
 `./init.sh` exit 0 (25 OK) — valida el tablero (33 features) y los specs.
+
+### 2026-08-01 — Fase 2/3/4 iniciada: #29..#33 implementadas (aprobación del humano)
+
+El humano aprobó los specs del roadmap («ok aprobado») y delegó la
+implementación autónoma.
+
+- **#29 inventory_paper_format** (Fase 2): formato en papel sin fotos con
+  ID de vínculo, reconstrucción digital (notas → ítems, fotos sueltas
+  etiquetadas, escaneo como evidencia), confirmación por el flujo OTP de
+  #13. Sin tablas nuevas.
+- **#30 payment_reconciliation** (Fase 3): migración 0025 (4 tablas),
+  inferencia de estructura tras interfaz con MVP determinista (PA-30-1),
+  parseo de valores 100% código (PA-30-2, salvaguarda §15.3), idempotencia
+  por hash + duplicados, mapeo confirmable y reutilizable (RF-PA6),
+  emparejamiento por referencia única ARR-XXXXX + cuenta/valor/fecha,
+  bandeja manual, estado de cuenta con morosidad. Nunca Conciliado sin
+  humano.
+- **#31 maintenance_incidents** (Fase 3): tickets = instancias del motor
+  de #7 (definición `incidencias` sembrada, PA-31-1); scoping por rol
+  (RF-M7) con `rolEfectivo` (ContextoPeticion ganó `roles`); aprobación de
+  costos del propietario (RF-M5), aceptar/reabrir (RF-M4).
+- **#32 web_embedding** (Fase 3-4): migración 0027 `tenant_dominio`;
+  handshake SSO de un solo uso canjeado por access token (PA-32-2),
+  feature flag por paquete (RF-INT6), config de theming (RF-INT5). CORS
+  por tenant anotado como frontera.
+- **#33 ai_assistant** (Fase 4+): interfaz `AsistenteConversacional`
+  (PA-33-1) con orquestador MVP sin LLM; herramientas acotadas que llaman
+  SERVICIOS con la sesión (PA-33-2, RF-CB10/CB11); límite duro que escala
+  (RF-CB6, mutación roja); auditoría completa (RF-CB12); seguridad
+  probada DETERMINISTA (§16.1).
+
+Línea base: `./init.sh` exit 0, `test` **884**, `test:db` **143**.

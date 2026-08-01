@@ -17,6 +17,7 @@ import { ContratosModule } from './contratos/contratos.module';
 import { PagosModule } from './pagos/pagos.module';
 import { TicketsModule } from './tickets/tickets.module';
 import { PortalModule } from './portal/portal.module';
+import { AsistenteModule } from './asistente/asistente.module';
 
 /**
  * Módulo transversal: tenant, auth, usuarios, roles y auditoría viven aquí
@@ -46,6 +47,7 @@ import { PortalModule } from './portal/portal.module';
     PagosModule,
     TicketsModule,
     PortalModule,
+    AsistenteModule,
   ],
   controllers: [HealthController],
   providers: [HealthService],

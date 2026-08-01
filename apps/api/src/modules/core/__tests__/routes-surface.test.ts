@@ -195,6 +195,8 @@ const RUTAS_PERMITIDAS = [
   // ─── Feature #32 web_embedding: 2 rutas (R6, design.md §2) ─────────────
   'POST /portal/sso',
   'GET /portal/config',
+  // ─── Feature #33 ai_assistant: 1 ruta (R7, design.md §2) ───────────────
+  'POST /asistente/conversar',
   // ─── Feature #7 workflow_engine: 9 rutas (R17, design.md §8) ───────────
   // Gestión de definiciones: solo `admin` (RF-W2). Instancias y ejecución:
   // `@Roles('admin','empleado')`.

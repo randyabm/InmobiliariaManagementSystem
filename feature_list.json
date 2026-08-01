@@ -605,7 +605,7 @@
       "name": "payment_reconciliation",
       "phase": "3",
       "sdd": true,
-      "status": "in_progress",
+      "status": "done",
       "title": "Conciliación de pagos (RF-PA1–PA15, §15, D9) — el sistema no procesa pagos",
       "prd_refs": [
         "RF-PA1",
@@ -669,7 +669,7 @@
       "name": "ai_assistant",
       "phase": "4",
       "sdd": true,
-      "status": "in_progress",
+      "status": "done",
       "title": "Asistente conversacional / Chatbot IA (RF-CB1–CB15, §14, D8)",
       "prd_refs": [
         "RF-CB1",
