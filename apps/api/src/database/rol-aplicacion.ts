@@ -31,9 +31,11 @@ import { Pool } from 'pg';
  * - `SELECT, INSERT` en `audit_log` — nunca `UPDATE` ni `DELETE`: la auditoría
  *   es append-only (R41) y aquí eso deja de depender solo del trigger.
  * - `EXECUTE` en `tenant_por_codigo`, la única ruta previa al contexto de
- *   tenant (R52), y en `sesion_por_refresh_token`, la única ruta del refresh
- *   previa al tenant (R18, feature #27). Ambas se revocan de PUBLIC en su
- *   migración y se conceden aquí, explícitamente.
+ *   tenant (R52), en `sesion_por_refresh_token`, la única ruta del refresh
+ *   previa al tenant (R18, feature #27), y en `notificaciones_pendientes`,
+ *   la única ruta del procesador de notificaciones (R3, feature #10).
+ *   Todas se revocan de PUBLIC en su migración y se conceden aquí,
+ *   explícitamente.
  * - **`DELETE` en ninguna tabla.** No hace falta: todas las bajas son lógicas
  *   (R14, R21) y las entidades con valor legal son inmutables. Negarlo en el
  *   motor convierte esa convención en una barrera real.
@@ -110,11 +112,14 @@ export async function asegurarRolDeAplicacion(
     //    con el aislamiento, y costaría horas de diagnóstico.
     await pool.query(`GRANT USAGE ON ALL SEQUENCES IN SCHEMA public TO ${rol}`);
 
-    // 5) Las únicas funciones que evitan el RLS (R52 y R18). Se conceden
+    // 5) Las únicas funciones que evitan el RLS (R52, R18 y R3). Se conceden
     //    explícitamente porque la migración se las revocó a PUBLIC.
     await pool.query(`GRANT EXECUTE ON FUNCTION tenant_por_codigo(text) TO ${rol}`);
     await pool.query(
       `GRANT EXECUTE ON FUNCTION sesion_por_refresh_token(text) TO ${rol}`,
+    );
+    await pool.query(
+      `GRANT EXECUTE ON FUNCTION notificaciones_pendientes() TO ${rol}`,
     );
   } finally {
     await pool.end();

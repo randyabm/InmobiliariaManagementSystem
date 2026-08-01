@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { WorkflowService } from '../workflow.service';
 import { CicloAutomaticoError, TransicionNoDisponibleError } from '../errors';
 import type { WorkflowInstancia } from '@inmobiliaria/types';
+import { NotificacionesOutboxService } from '../../notificaciones/notificaciones-outbox.service';
 
 /**
  * **T11 — R6, R7, R8, R9.** El núcleo del motor con un doble de repositorio
@@ -57,6 +58,12 @@ const INSTANCIA: WorkflowInstancia = {
   updated_at: '',
 };
 
+function notificacionesMock() {
+  return {
+    escribirDesdeTransicion: vi.fn().mockResolvedValue(undefined),
+  } as unknown as NotificacionesOutboxService;
+}
+
 function repositorioMock(sobres: Record<string, unknown> = {}) {
   return {
     buscarDefinicion: vi.fn().mockResolvedValue(DEFINICION),
@@ -76,7 +83,7 @@ function repositorioMock(sobres: Record<string, unknown> = {}) {
 describe('WorkflowService (T11: R6, R7, R8, R9)', () => {
   it('crearInstancia usa el estado inicial de la definición (R6)', async () => {
     const repo = repositorioMock();
-    const servicio = new WorkflowService(repo as never);
+    const servicio = new WorkflowService(repo as never, notificacionesMock());
 
     const instancia = await servicio.crearInstancia(
       DEFINICION.id,
@@ -95,7 +102,7 @@ describe('WorkflowService (T11: R6, R7, R8, R9)', () => {
     const repo = repositorioMock({
       buscarInstanciaPorEntidad: vi.fn().mockResolvedValue(INSTANCIA),
     });
-    const servicio = new WorkflowService(repo as never);
+    const servicio = new WorkflowService(repo as never, notificacionesMock());
 
     await expect(
       servicio.crearInstancia(DEFINICION.id, { entidadTipo: 'propiedad', entidadId: INSTANCIA.entidad_id, contexto: {} }, CTX),
@@ -105,6 +112,7 @@ describe('WorkflowService (T11: R6, R7, R8, R9)', () => {
   it('rol insuficiente → 403; condición falsa o estado equivocado → 409 (R7)', async () => {
     const sinRol = new WorkflowService(
       repositorioMock({ rolesActivosDelActor: vi.fn().mockResolvedValue(['empleado']) }) as never,
+      notificacionesMock(),
     );
     await expect(
       sinRol.ejecutarTransicion(INSTANCIA.id, DEFINICION.transiciones[0]!.id, {}, 'user-1', CTX),
@@ -116,6 +124,7 @@ describe('WorkflowService (T11: R6, R7, R8, R9)', () => {
           { ...DEFINICION.transiciones[0]!, condicion: [{ campo: 'ok', operador: 'igual', valor: true }] },
         ]),
       }) as never,
+      notificacionesMock(),
     );
     await expect(
       condicionFalsa.ejecutarTransicion(INSTANCIA.id, DEFINICION.transiciones[0]!.id, {}, 'user-1', CTX),
@@ -128,7 +137,7 @@ describe('WorkflowService (T11: R6, R7, R8, R9)', () => {
         { ...DEFINICION.transiciones[0]!, condicion: [{ campo: 'ok', operador: 'igual', valor: true }] },
       ]),
     });
-    const servicio = new WorkflowService(repo as never);
+    const servicio = new WorkflowService(repo as never, notificacionesMock());
 
     // Sin el contexto extra, la condición sería falsa; con él, pasa.
     await expect(
@@ -146,7 +155,7 @@ describe('WorkflowService (T11: R6, R7, R8, R9)', () => {
       { id: 't-auto-1', definicion_id: 'x', origen_estado_id: ESTADO_MEDIO, destino_estado_id: ESTADO_FINAL, clave: 'auto1', tipo_ejecucion: 'AUTOMATICA', roles_requeridos: [], condicion: [], notificacion: {}, orden: 2, activo: true, created_at: '' },
     ];
     const repo = repositorioMock({ transicionesDe: vi.fn().mockResolvedValue(transiciones) });
-    const servicio = new WorkflowService(repo as never);
+    const servicio = new WorkflowService(repo as never, notificacionesMock());
 
     await servicio.ejecutarTransicion(INSTANCIA.id, 't-humana', {}, 'user-1', CTX);
 
@@ -170,7 +179,7 @@ describe('WorkflowService (T11: R6, R7, R8, R9)', () => {
       ciclica,
     ];
     const repo = repositorioMock({ transicionesDe: vi.fn().mockResolvedValue(transiciones) });
-    const servicio = new WorkflowService(repo as never);
+    const servicio = new WorkflowService(repo as never, notificacionesMock());
 
     await expect(
       servicio.ejecutarTransicion(INSTANCIA.id, 't-humana', {}, 'user-1', CTX),

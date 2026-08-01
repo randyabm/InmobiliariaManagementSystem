@@ -8,6 +8,7 @@ import { AlmacenamientoModule } from './almacenamiento/almacenamiento.module';
 import { ClientesModule } from './clientes/clientes.module';
 import { PropiedadesModule } from './propiedades/propiedades.module';
 import { WorkflowsModule } from './workflows/workflows.module';
+import { NotificacionesModule } from './notificaciones/notificaciones.module';
 
 /**
  * Módulo transversal: tenant, auth, usuarios, roles y auditoría viven aquí
@@ -28,6 +29,7 @@ import { WorkflowsModule } from './workflows/workflows.module';
     ClientesModule,
     PropiedadesModule,
     WorkflowsModule,
+    NotificacionesModule,
   ],
   controllers: [HealthController],
   providers: [HealthService],
@@ -38,6 +40,7 @@ import { WorkflowsModule } from './workflows/workflows.module';
     ClientesModule,
     PropiedadesModule,
     WorkflowsModule,
+    NotificacionesModule,
   ],
 })
 export class CoreModule {}

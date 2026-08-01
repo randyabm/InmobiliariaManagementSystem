@@ -492,11 +492,10 @@ describe('Aplicación real de las migraciones (R10)', () => {
       expect(rows[0]?.proacl ?? '').not.toMatch(/(^|,)=X\//);
     });
 
-    it('no hay ninguna OTRA función SECURITY DEFINER sobre `user` (R52, R18)', async () => {
-      // R52 decía "única ruta" y R18 (feature #27) añade exactamente una más:
-      // sesion_por_refresh_token, la única vía del refresh previa al tenant.
-      // Si mañana alguien abre una tercera puerta que evite el RLS, este
-      // test la ve.
+    it('no hay ninguna OTRA función SECURITY DEFINER sobre `user` (R52, R18, R3)', async () => {
+      // R52 decía "única ruta", R18 (feature #27) añadió la del refresh y R3
+      // (feature #10) la del procesador de notificaciones. Si mañana alguien
+      // abre una cuarta puerta que evite el RLS, este test la ve.
       const { rows } = await pool.query<{ proname: string }>(
         `SELECT p.proname
            FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
@@ -505,6 +504,7 @@ describe('Aplicación real de las migraciones (R10)', () => {
       );
 
       expect(rows.map((r) => r.proname)).toEqual([
+        'notificaciones_pendientes',
         'sesion_por_refresh_token',
         'tenant_por_codigo',
       ]);

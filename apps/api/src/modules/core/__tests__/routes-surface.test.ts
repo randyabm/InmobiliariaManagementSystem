@@ -61,6 +61,12 @@ const RUTAS_PERMITIDAS = [
   'POST /propiedades/:id/ciclo-vida/transiciones/:claveTransicion',
   // ─── Feature #9 property_intake: 1 ruta (R13, design.md §5) ────────────
   'POST /propiedades/ingreso',
+  // ─── Feature #10 notifications: 5 rutas (R17, design.md §5) ─────────────
+  'POST /notificaciones',
+  'GET /notificaciones',
+  'POST /notificaciones/programadas',
+  'GET /notificaciones/programadas',
+  'DELETE /notificaciones/programadas/:id',
   'PATCH /propiedades/:id',
   'DELETE /propiedades/:id',
   'POST /propiedades/:idPropiedad/propietarios',

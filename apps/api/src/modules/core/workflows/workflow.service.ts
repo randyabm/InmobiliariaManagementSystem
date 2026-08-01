@@ -8,6 +8,7 @@ import type {
 
 import type { ContextoPeticion } from '../../../common/database/cliente-tenant';
 import { ResourceNotFoundError } from '../../../common/errors';
+import { NotificacionesOutboxService } from '../notificaciones/notificaciones-outbox.service';
 import { cumpleCondicion } from './evaluador-condiciones';
 import {
   CicloAutomaticoError,
@@ -28,7 +29,10 @@ import { WorkflowRepository } from './workflow.repository';
 export class WorkflowService {
   private static readonly LIMITE_CASCADA = 10;
 
-  constructor(private readonly repositorio: WorkflowRepository) {}
+  constructor(
+    private readonly repositorio: WorkflowRepository,
+    private readonly notificaciones: NotificacionesOutboxService,
+  ) {}
 
   /** R6 — crear la instancia en el estado inicial. */
   async crearInstancia(
@@ -215,6 +219,11 @@ export class WorkflowService {
       automatica,
       contextoTras: contexto,
     });
+
+    // R2, R18 (feature #10): el gancho de notificaciones es transaccional.
+    // Si la transición revierte, la fila del outbox revierte con ella; el
+    // hook vacío no escribe nada y la semántica del motor no cambia.
+    await this.notificaciones.escribirDesdeTransicion(instancia, transicion, ctx);
   }
 
   private humanaDisponible(

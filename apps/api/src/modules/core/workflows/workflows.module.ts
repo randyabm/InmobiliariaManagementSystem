@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 
 import { AuditModule } from '../audit/audit.module';
+import { NotificacionesModule } from '../notificaciones/notificaciones.module';
 import { DefinicionesService } from './definiciones.service';
 import { WorkflowRepository } from './workflow.repository';
 import { WorkflowService } from './workflow.service';
@@ -16,7 +17,7 @@ import { WorkflowsController } from './workflows.controller';
  * entidades (el #8 lo usará para el ciclo de vida de la propiedad).
  */
 @Module({
-  imports: [AuditModule],
+  imports: [AuditModule, NotificacionesModule],
   controllers: [WorkflowsController],
   providers: [WorkflowRepository, WorkflowService, DefinicionesService],
   exports: [WorkflowService],

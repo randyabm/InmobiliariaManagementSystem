@@ -36,10 +36,22 @@ export interface CondicionClausula {
 /** La condición de una transición es un array de cláusulas (vacío = siempre). */
 export type Condicion = readonly CondicionClausula[];
 
-/** El hook declarativo de notificaciones (frontera #10): dato, no ejecución. */
+/**
+ * El hook declarativo de notificaciones (frontera #10): dato, no ejecución.
+ *
+ * Ampliado por la feature #10 con `destinatario` (R7, PA-10-3): el tipo se
+ * resuelve desde la entidad de la instancia al procesar, o es un
+ * email/celular directo. `canal` opcional: si falta, se usa el
+ * `medio_preferido_contacto` del perfil (RF-C4).
+ */
 export interface NotificacionHook {
-  readonly canal?: string;
+  readonly canal?: 'CORREO' | 'SMS' | 'WHATSAPP' | 'LLAMADA';
   readonly plantilla?: string;
+  readonly destinatario?: {
+    readonly tipo?: 'inquilino_actual' | 'propietario_principal';
+    readonly email?: string;
+    readonly celular?: string;
+  };
 }
 
 export interface WorkflowDefinicion {
