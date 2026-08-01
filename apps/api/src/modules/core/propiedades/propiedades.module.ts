@@ -12,6 +12,9 @@ import { DocumentosController } from './documentos.controller';
 import { DocumentosService } from './documentos.service';
 import { FotosController } from './fotos.controller';
 import { FotosService } from './fotos.service';
+import { IngresoController } from './ingreso.controller';
+import { IngresoService } from './ingreso.service';
+import { ResolverPerfilService } from './resolver-perfil.service';
 import { OcupacionController } from './ocupacion.controller';
 import { OcupacionService } from './ocupacion.service';
 import { PropiedadesController } from './propiedades.controller';
@@ -38,6 +41,7 @@ import { PropietariosDePropiedadService } from './propietarios-de-propiedad.serv
   controllers: [
     DashboardController,
     PropiedadesController,
+    IngresoController,
     PropietariosDePropiedadController,
     OcupacionController,
     DocumentosController,
@@ -54,6 +58,8 @@ import { PropietariosDePropiedadService } from './propietarios-de-propiedad.serv
     FotosService,
     CicloVidaService,
     DashboardService,
+    ResolverPerfilService,
+    IngresoService,
   ],
   exports: [PropiedadesService],
 })
