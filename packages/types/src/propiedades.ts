@@ -107,9 +107,13 @@ export interface PropiedadDocumento {
  * propietarios activos (principal + adicionales), la cuenta de giro resuelta
  * (R8: override → predeterminada del principal → null) y los datos básicos
  * del inquilino actual.
+ *
+ * `estado_ciclo_vida` (feature #8, R3): el estado se lee de la instancia
+ * del motor de workflows, nunca de una columna de `propiedad` (PA-8-1).
  */
 export interface PropiedadConExtras extends Propiedad {
   readonly propietarios: readonly PropiedadPropietario[];
   readonly cuenta_giro: import('./clientes').CuentaBancaria | null;
   readonly inquilino_actual_nombre: string | null;
+  readonly estado_ciclo_vida: import('./ciclo-vida').EstadoCicloVida | null;
 }

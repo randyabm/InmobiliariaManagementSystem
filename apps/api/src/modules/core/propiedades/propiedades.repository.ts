@@ -232,6 +232,37 @@ export class PropiedadesRepository {
     );
     return rows[0]?.nombre ?? null;
   }
+
+  /**
+   * R3 (feature #8) — el estado del ciclo de vida leído del motor
+   * (PA-8-1: `propiedad` no lleva columna de estado). `null` si la
+   * propiedad aún no tiene instancia.
+   */
+  async estadoCicloVida(
+    ctx: ContextoPeticion,
+    propiedadId: string,
+  ): Promise<{ clave: string; etiqueta: string; desde: string } | null> {
+    const { rows } = await ctx.cliente.query<{
+      clave: string;
+      etiqueta: string;
+      desde: Date;
+    }>(
+      `SELECT e.clave, e.etiqueta, i.updated_at AS desde
+         FROM workflow_instancia i
+         JOIN workflow_estado e ON e.id = i.estado_actual_id
+        WHERE i.entidad_tipo = 'propiedad'
+          AND i.entidad_id = $1
+          AND i.tenant_id = $2`,
+      [propiedadId, ctx.tenantId],
+    );
+    const fila = rows[0];
+    if (!fila) return null;
+    return {
+      clave: fila.clave,
+      etiqueta: fila.etiqueta,
+      desde: fila.desde.toISOString(),
+    };
+  }
 }
 
 interface FilaPropiedad {
@@ -321,6 +352,7 @@ export function aPropiedadConExtras(
     propietarios: PropiedadPropietario[];
     cuentaGiro: PropiedadConExtras['cuenta_giro'];
     inquilinoActualNombre: string | null;
+    estadoCicloVida: PropiedadConExtras['estado_ciclo_vida'];
   },
 ): PropiedadConExtras {
   return {
@@ -328,5 +360,6 @@ export function aPropiedadConExtras(
     propietarios: extras.propietarios,
     cuenta_giro: extras.cuentaGiro,
     inquilino_actual_nombre: extras.inquilinoActualNombre,
+    estado_ciclo_vida: extras.estadoCicloVida,
   };
 }

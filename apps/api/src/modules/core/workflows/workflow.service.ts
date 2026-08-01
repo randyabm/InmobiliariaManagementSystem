@@ -168,6 +168,14 @@ export class WorkflowService {
     return this.repositorio.historial(ctx, idInstancia);
   }
 
+  /**
+   * PA-8-3 (feature #8) — la definición activa para un tenant: la copia
+   * `TENANT` si existe, si no la plantilla `SISTEMA`.
+   */
+  resolverDefinicionParaTenant(tipo: string, ctx: ContextoPeticion) {
+    return this.repositorio.buscarDefinicionParaTenant(ctx, tipo);
+  }
+
   // ─── Privado ────────────────────────────────────────────────────────────
 
   private async registrar(

@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { CuentaDeGiroInvalidaError } from '../../clientes/errors';
 import { PropietariosService } from '../../clientes/propietarios.service';
+import { WorkflowService } from '../../workflows/workflow.service';
 import { PropiedadesRepository } from '../propiedades.repository';
 import { PropiedadesService } from '../propiedades.service';
 
@@ -55,6 +56,10 @@ describe('PropiedadesService — override de cuenta (T25: R8)', () => {
       { insertar: vi.fn().mockResolvedValue(PROPIEDAD_BASE) } as unknown as PropiedadesRepository,
       { obtener: vi.fn().mockResolvedValue({}) } as unknown as PropietariosService,
       { resolverCuentaDeGiro: resolver } as never,
+      {
+        resolverDefinicionParaTenant: vi.fn().mockResolvedValue({ id: 'def-1' }),
+        crearInstancia: vi.fn().mockResolvedValue({ id: 'inst-1' }),
+      } as unknown as WorkflowService,
     );
 
     await servicio.crear(
@@ -82,6 +87,7 @@ describe('PropiedadesService — override de cuenta (T25: R8)', () => {
       { insertar } as unknown as PropiedadesRepository,
       { obtener: vi.fn().mockResolvedValue({}) } as unknown as PropietariosService,
       { resolverCuentaDeGiro: resolver } as never,
+      {} as unknown as WorkflowService,
     );
 
     await expect(
@@ -114,9 +120,11 @@ describe('PropiedadesService — override de cuenta (T25: R8)', () => {
         }),
         propietariosActivos: vi.fn().mockResolvedValue([]),
         nombreDelInquilinoActual: vi.fn().mockResolvedValue(null),
+        estadoCicloVida: vi.fn().mockResolvedValue(null),
       } as unknown as PropiedadesRepository,
       {} as unknown as PropietariosService,
       { resolverCuentaDeGiro: resolver } as never,
+      {} as unknown as WorkflowService,
     );
 
     const ficha = await servicio.obtener(PROPIEDAD_BASE.id, TENANT_CTX);
@@ -132,9 +140,15 @@ describe('PropiedadesService — override de cuenta (T25: R8)', () => {
         buscarPorId: vi.fn().mockResolvedValue(PROPIEDAD_BASE),
         propietariosActivos: vi.fn().mockResolvedValue([]),
         nombreDelInquilinoActual: vi.fn().mockResolvedValue(null),
+        estadoCicloVida: vi.fn().mockResolvedValue({
+          clave: 'disponible',
+          etiqueta: 'Disponible / Vacante',
+          desde: '2026-01-01T00:00:00.000Z',
+        }),
       } as unknown as PropiedadesRepository,
       {} as unknown as PropietariosService,
       { resolverCuentaDeGiro: resolver } as never,
+      {} as unknown as WorkflowService,
     );
 
     const ficha = await servicio.obtener(PROPIEDAD_BASE.id, TENANT_CTX);

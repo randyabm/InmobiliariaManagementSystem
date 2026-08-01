@@ -35,6 +35,15 @@ export type {
   WorkflowTransicionLog,
 } from './workflows';
 
+// Feature #8 property_lifecycle.
+export type {
+  CicloVidaDePropiedad,
+  DashboardFila,
+  DashboardPropiedades,
+  EstadoCicloVida,
+  InstanciaDeCicloVida,
+} from './ciclo-vida';
+
 // Feature #5 owner_tenant_profiles y feature #25 retencion_codeudor_referencias.
 export {
   MEDIOS_PREFERIDOS_CONTACTO,

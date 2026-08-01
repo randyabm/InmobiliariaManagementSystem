@@ -88,6 +88,27 @@ export class WorkflowRepository {
     return rows[0] ? aDefinicion(rows[0]) : null;
   }
 
+  /**
+   * PA-8-3 (feature #8) — la definición activa para un tenant: la copia
+   * `TENANT` si existe, si no la plantilla `SISTEMA`. Ambas son visibles
+   * por la política RLS (la del sistema con el OR de PA-7-1).
+   */
+  async buscarDefinicionParaTenant(
+    ctx: ContextoPeticion,
+    tipo: string,
+  ): Promise<WorkflowDefinicion | null> {
+    const { rows } = await ctx.cliente.query(
+      `${WorkflowRepository.SELECT_DEFINICION}
+        WHERE tipo = $1
+          AND (tenant_id = $2
+               OR tenant_id = '00000000-0000-0000-0000-000000000000'::uuid)
+        ORDER BY CASE WHEN tenant_id = $2 THEN 0 ELSE 1 END
+        LIMIT 1`,
+      [tipo, ctx.tenantId],
+    );
+    return rows[0] ? aDefinicion(rows[0]) : null;
+  }
+
   async estadosDe(cliente: PoolClient, definicionId: string): Promise<WorkflowEstado[]> {
     const { rows } = await cliente.query(
       `SELECT id, definicion_id, clave, etiqueta, es_inicial, es_final, orden,

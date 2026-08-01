@@ -5,6 +5,7 @@ import type { ContextoPeticion } from '../../../common/database/cliente-tenant';
 import { ResourceNotFoundError } from '../../../common/errors';
 import { CuentasBancariasService } from '../clientes/cuentas-bancarias.service';
 import { PropietariosService } from '../clientes/propietarios.service';
+import { WorkflowService } from '../workflows/workflow.service';
 import type {
   ActualizarPropiedadDto,
   CrearPropiedadDto,
@@ -38,6 +39,7 @@ export class PropiedadesService {
     private readonly repositorio: PropiedadesRepository,
     private readonly propietarios: PropietariosService,
     private readonly cuentas: CuentasBancariasService,
+    private readonly workflow: WorkflowService,
   ) {}
 
   /** R5, R8. */
@@ -45,7 +47,7 @@ export class PropiedadesService {
     await this.exigirPrincipal(dto.propietario_principal_id, ctx);
     await this.validarOverride(dto.propietario_principal_id, dto.cuenta_bancaria_id ?? null, ctx);
 
-    return this.repositorio.insertar(ctx, {
+    const propiedad = await this.repositorio.insertar(ctx, {
       direccion: dto.direccion,
       tipo: dto.tipo,
       area: dto.area,
@@ -64,28 +66,50 @@ export class PropiedadesService {
       propietarioPrincipalId: dto.propietario_principal_id,
       cuentaBancariaId: dto.cuenta_bancaria_id ?? null,
     });
+
+    // R1 (feature #8): la propiedad nace con su máquina. En la MISMA
+    // transacción de la petición: si la instancia falla, la excepción hace
+    // rollback de la ficha también (PA-8-2).
+    const definicion = await this.workflow.resolverDefinicionParaTenant(
+      'ciclo_vida_propiedad',
+      ctx,
+    );
+    if (!definicion) {
+      throw new Error('No hay definición de ciclo de vida disponible.');
+    }
+    await this.workflow.crearInstancia(
+      definicion.id,
+      { entidadTipo: 'propiedad', entidadId: propiedad.id, contexto: {} },
+      ctx,
+    );
+
+    return propiedad;
   }
 
   async listar(ctx: ContextoPeticion): Promise<Propiedad[]> {
     return this.repositorio.listar(ctx);
   }
 
-  /** R6, R8. */
+  /** R6, R8, R3 (#8). */
   async obtener(id: string, ctx: ContextoPeticion): Promise<PropiedadConExtras> {
     const propiedad = await this.exigir(id, ctx);
 
-    const [propietarios, cuentaGiro, inquilinoActualNombre] = await Promise.all([
-      this.repositorio.propietariosActivos(ctx, id),
-      this.cuentaDeGiroNullable(propiedad.propietario_principal_id, propiedad.cuenta_bancaria_id, ctx),
-      propiedad.inquilino_actual_id
-        ? this.repositorio.nombreDelInquilinoActual(ctx, propiedad.inquilino_actual_id)
-        : Promise.resolve(null),
-    ]);
+    const [propietarios, cuentaGiro, inquilinoActualNombre, estadoCicloVida] =
+      await Promise.all([
+        this.repositorio.propietariosActivos(ctx, id),
+        this.cuentaDeGiroNullable(propiedad.propietario_principal_id, propiedad.cuenta_bancaria_id, ctx),
+        propiedad.inquilino_actual_id
+          ? this.repositorio.nombreDelInquilinoActual(ctx, propiedad.inquilino_actual_id)
+          : Promise.resolve(null),
+        // R3 (#8): el estado se lee del motor, nunca de una columna propia.
+        this.repositorio.estadoCicloVida(ctx, id),
+      ]);
 
     return aPropiedadConExtras(propiedad, {
       propietarios,
       cuentaGiro,
       inquilinoActualNombre,
+      estadoCicloVida,
     });
   }
 

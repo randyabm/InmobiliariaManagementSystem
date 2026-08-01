@@ -3,6 +3,7 @@ import { Module } from '@nestjs/common';
 import { AlmacenamientoModule } from '../almacenamiento/almacenamiento.module';
 import { AuditModule } from '../audit/audit.module';
 import { ClientesModule } from '../clientes/clientes.module';
+import { WorkflowsModule } from '../workflows/workflows.module';
 import { DocumentosController } from './documentos.controller';
 import { DocumentosService } from './documentos.service';
 import { FotosController } from './fotos.controller';
@@ -17,14 +18,18 @@ import { PropietariosDePropiedadRepository } from './propietarios-de-propiedad.r
 import { PropietariosDePropiedadService } from './propietarios-de-propiedad.service';
 
 /**
- * Hoja de vida del inmueble (feature #6).
+ * Hoja de vida del inmueble (feature #6) y su ciclo de vida (feature #8).
  *
  * Depende de `core/clientes` (perfiles, cuentas de giro), de
- * `core/almacenamiento` (fotos y documentos) y de `core/audit` (mutaciones
- * críticas). Todas son dependencias legales dentro de `core/`.
+ * `core/almacenamiento` (fotos y documentos) y de `core/workflows` (el
+ * ciclo de vida: la propiedad nace con su instancia y transiciona por el
+ * motor). Todas son dependencias legales dentro de `core/`.
+ *
+ * Los submódulos de #8 (ciclo de vida y dashboard) se registran en sus
+ * tasks del bloque 2.
  */
 @Module({
-  imports: [ClientesModule, AlmacenamientoModule, AuditModule],
+  imports: [ClientesModule, AlmacenamientoModule, AuditModule, WorkflowsModule],
   controllers: [
     PropiedadesController,
     PropietariosDePropiedadController,
