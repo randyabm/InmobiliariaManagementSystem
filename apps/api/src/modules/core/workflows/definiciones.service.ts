@@ -83,6 +83,7 @@ export class DefinicionesService {
       tipoEjecucion: 'HUMANA' | 'AUTOMATICA';
       rolesRequeridos?: string[];
       condicion?: unknown;
+      notificacion?: unknown;
       orden?: number;
     },
     ctx: ContextoPeticion,
@@ -97,6 +98,7 @@ export class DefinicionesService {
       tipoEjecucion: datos.tipoEjecucion,
       rolesRequeridos: datos.rolesRequeridos ?? [],
       condicion: datos.condicion ?? [],
+      notificacion: datos.notificacion ?? {},
       orden: datos.orden ?? 0,
     });
 

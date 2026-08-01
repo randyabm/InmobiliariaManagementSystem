@@ -231,12 +231,17 @@ describe('Invariantes de seguridad de #8 (T17-T20)', () => {
         .set('x-tenant-id', TENANT_A)
         .send({});
 
-      // No existe ninguna tabla de notificaciones ni de cola de envíos.
-      const { rows: tablas } = await entorno.poolAdmin.query<{ table_name: string }>(
-        `SELECT table_name FROM information_schema.tables
-          WHERE table_schema = 'public' AND table_name LIKE '%notific%'`,
+      // El seed no declara hooks (notificacion = '{}'): la transición del
+      // ciclo de vida NO escribe nada en el outbox ni en enviadas — el hook
+      // sigue siendo dato que solo #10 consume (R8). El motor de
+      // notificaciones (#10) ya existe como tablas; lo que se verifica es
+      // que esta transición con hook vacío no genera trabajo.
+      const { rows: outbox } = await entorno.poolAdmin.query<{ total: string }>(
+        `SELECT count(*)::text AS total FROM notificacion_pendiente
+          WHERE created_at >= $1`,
+        [desde],
       );
-      expect(tablas).toEqual([]);
+      expect(Number(outbox[0]?.total)).toBe(0);
 
       // La única escritura nueva es la del log del motor + audit_log.
       const { rows: log } = await entorno.poolAdmin.query<{ total: string }>(

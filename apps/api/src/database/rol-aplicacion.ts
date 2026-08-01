@@ -33,7 +33,7 @@ import { Pool } from 'pg';
  * - `EXECUTE` en `tenant_por_codigo`, la única ruta previa al contexto de
  *   tenant (R52), en `sesion_por_refresh_token`, la única ruta del refresh
  *   previa al tenant (R18, feature #27), y en `notificaciones_pendientes`,
- *   la única ruta del procesador de notificaciones (R3, feature #10).
+ *   la única ruta del procesador de notificaciones (R3, feature #10),
  *   Todas se revocan de PUBLIC en su migración y se conceden aquí,
  *   explícitamente.
  * - **`DELETE` en ninguna tabla.** No hace falta: todas las bajas son lógicas
@@ -119,7 +119,7 @@ export async function asegurarRolDeAplicacion(
       `GRANT EXECUTE ON FUNCTION sesion_por_refresh_token(text) TO ${rol}`,
     );
     await pool.query(
-      `GRANT EXECUTE ON FUNCTION notificaciones_pendientes() TO ${rol}`,
+      `GRANT EXECUTE ON FUNCTION notificaciones_tenants_a_procesar() TO ${rol}`,
     );
   } finally {
     await pool.end();

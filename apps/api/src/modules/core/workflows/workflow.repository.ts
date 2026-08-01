@@ -159,14 +159,15 @@ export class WorkflowRepository {
       tipoEjecucion: 'HUMANA' | 'AUTOMATICA';
       rolesRequeridos: string[];
       condicion: unknown;
+      notificacion: unknown;
       orden: number;
     },
   ): Promise<{ id: string }> {
     const { rows } = await cliente.query<{ id: string }>(
       `INSERT INTO workflow_transicion
          (definicion_id, origen_estado_id, destino_estado_id, clave,
-          tipo_ejecucion, roles_requeridos, condicion, orden)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
+          tipo_ejecucion, roles_requeridos, condicion, notificacion, orden)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
       [
         datos.definicionId,
         datos.origenEstadoId,
@@ -175,6 +176,7 @@ export class WorkflowRepository {
         datos.tipoEjecucion,
         datos.rolesRequeridos,
         JSON.stringify(datos.condicion ?? []),
+        JSON.stringify(datos.notificacion ?? {}),
         datos.orden,
       ],
     );

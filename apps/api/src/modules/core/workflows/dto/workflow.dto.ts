@@ -1,4 +1,4 @@
-import { OPERADORES_CONDICION, TIPOS_EJECUCION } from '@inmobiliaria/types';
+import { CANALES_NOTIFICACION, OPERADORES_CONDICION, TIPOS_EJECUCION } from '@inmobiliaria/types';
 import { z } from 'zod';
 
 const uuid = () => z.string().uuid();
@@ -46,6 +46,24 @@ export const esquemaAnadirTransicion = z
           .strict(),
       )
       .default([]),
+    // Feature #10: el hook declarativo de notificaciones (dato, no
+    // ejecución). `destinatario.tipo` se resuelve desde la entidad de la
+    // instancia al procesar; email/celular son directos.
+    notificacion: z
+      .object({
+        canal: z.enum(CANALES_NOTIFICACION).optional(),
+        plantilla: z.string().trim().min(1).max(120).optional(),
+        destinatario: z
+          .object({
+            tipo: z.enum(['inquilino_actual', 'propietario_principal']).optional(),
+            email: z.string().trim().email().max(320).optional(),
+            celular: z.string().trim().min(1).max(50).optional(),
+          })
+          .strict()
+          .optional(),
+      })
+      .strict()
+      .default({}),
     orden: z.number().int().min(0).default(0),
   })
   .strict();

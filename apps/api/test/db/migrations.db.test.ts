@@ -504,7 +504,7 @@ describe('Aplicación real de las migraciones (R10)', () => {
       );
 
       expect(rows.map((r) => r.proname)).toEqual([
-        'notificaciones_pendientes',
+        'notificaciones_tenants_a_procesar',
         'sesion_por_refresh_token',
         'tenant_por_codigo',
       ]);

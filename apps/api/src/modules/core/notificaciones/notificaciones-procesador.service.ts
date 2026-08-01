@@ -54,10 +54,10 @@ export class NotificacionesProcesadorService {
       const databaseUrl = process.env.DATABASE_URL;
       if (!databaseUrl) return { procesadas, fallidas };
 
-      // 1) Las filas pendientes de TODOS los tenants (bootstrap, R3).
+      // 1) Los tenants con trabajo pendiente (bootstrap global, R3/R12).
       const pool = getDatabasePool(databaseUrl);
-      const bootstrap = await pool.query<{ id: string; tenant_id: string }>(
-        'SELECT id, tenant_id FROM notificaciones_pendientes()',
+      const bootstrap = await pool.query<{ tenant_id: string }>(
+        'SELECT tenant_id FROM notificaciones_tenants_a_procesar()',
       );
 
       for (const fila of bootstrap.rows) {
@@ -70,8 +70,9 @@ export class NotificacionesProcesadorService {
           ]);
           const ctx = { cliente, tenantId: fila.tenant_id } as ContextoPeticion;
 
-          // Relectura DENTRO del RLS (defensa en profundidad).
-          const { rows } = await cliente.query<{
+          // 2) Las filas PENDIENTE del outbox de ESTE tenant (dentro del
+          //    RLS — defensa en profundidad).
+          const { rows: pendientes } = await cliente.query<{
             id: string;
             canal: string | null;
             destinatario: string | null;
@@ -85,49 +86,47 @@ export class NotificacionesProcesadorService {
             `SELECT id, canal, destinatario, contenido,
                     entidad_tipo, entidad_id::text AS entidad_id,
                     transicion_id::text AS transicion_id, estado, intentos
-               FROM notificacion_pendiente WHERE id = $1`,
-            [fila.id],
+               FROM notificacion_pendiente WHERE estado = 'PENDIENTE'
+               ORDER BY created_at`,
           );
-          const pendiente = rows[0];
-          if (!pendiente || pendiente.estado !== 'PENDIENTE') {
-            await cliente.query('COMMIT');
-            continue;
+
+          for (const pendiente of pendientes) {
+            try {
+              const resuelto = await this.resolverDestino(pendiente, ctx);
+              await this.proveedor.enviar({
+                tenantId: fila.tenant_id,
+                destinatario: resuelto.destinatario,
+                contenido: pendiente.contenido ?? {},
+                cliente,
+              });
+              await cliente.query(
+                `UPDATE notificacion_pendiente
+                    SET estado = 'PROCESADA', procesada_en = now()
+                  WHERE id = $1`,
+                [pendiente.id],
+              );
+              procesadas += 1;
+            } catch (error) {
+              // R4: intentos acotados y error sin PII (R15).
+              const nuevoIntentos = pendiente.intentos + 1;
+              await cliente.query(
+                `UPDATE notificacion_pendiente
+                    SET estado = CASE WHEN $2 >= 3 THEN 'FALLIDA' ELSE 'PENDIENTE' END,
+                        intentos = $2,
+                        error = CASE WHEN $2 >= 3 THEN $3 ELSE NULL END
+                  WHERE id = $1`,
+                [pendiente.id, nuevoIntentos, String((error as Error).message ?? 'error')],
+              );
+              fallidas += 1;
+            }
           }
 
-          try {
-            const resuelto = await this.resolverDestino(pendiente, ctx);
-            await this.proveedor.enviar({
-              tenantId: fila.tenant_id,
-              destinatario: resuelto.destinatario,
-              contenido: pendiente.contenido ?? {},
-              cliente,
-            });
-            await cliente.query(
-              `UPDATE notificacion_pendiente
-                  SET estado = 'PROCESADA', procesada_en = now()
-                WHERE id = $1`,
-              [fila.id],
-            );
-            procesadas += 1;
-          } catch (error) {
-            // R4: intentos acotados y error sin PII (R15).
-            const nuevoIntentos = pendiente.intentos + 1;
-            await cliente.query(
-              `UPDATE notificacion_pendiente
-                  SET estado = CASE WHEN $2 >= 3 THEN 'FALLIDA' ELSE 'PENDIENTE' END,
-                      intentos = $2,
-                      error = CASE WHEN $2 >= 3 THEN $3 ELSE NULL END
-                WHERE id = $1`,
-              [fila.id, nuevoIntentos, String((error as Error).message ?? 'error')],
-            );
-            fallidas += 1;
-          }
-
+          // 3) Los recordatorios vencidos de ESTE tenant (R12).
           await this.procesarProgramadasVencidas(cliente);
           await cliente.query('COMMIT');
         } catch (error) {
           await cliente.query('ROLLBACK').catch(() => undefined);
-          this.logger.error(`Error procesando notificación ${fila.id}: ${String(error)}`);
+          this.logger.error(`Error procesando tenant ${fila.tenant_id}: ${String(error)}`);
         } finally {
           cliente.release();
         }

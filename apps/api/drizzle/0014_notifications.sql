@@ -170,32 +170,35 @@ END $$;
 --> statement-breakpoint
 
 -- ───────────────────────────────────────────────────────────────────────────
--- 5) notificaciones_pendientes() — la única vía previa al tenant del
---    procesador (patrón R52/R18)
+-- 5) notificaciones_tenants_a_procesar() — la única vía previa al tenant
+--    del procesador (patrón R52/R18)
 -- ───────────────────────────────────────────────────────────────────────────
 --
 -- El procesador es GLOBAL (sirve a todos los tenants del proceso) y no
 -- puede saber el tenant de una fila antes de leerla: sin contexto, el RLS
--- le ocultaría TODO el outbox. Esta función devuelve SOLO el bootstrap
--- (id, tenant_id) de las filas PENDIENTE, y el procesador reabre cada fila
--- DENTRO de `SET LOCAL` de su tenant antes de tocar nada (defensa en
--- profundidad, patrón de `sesion_por_refresh_token`).
+-- le ocultaría TODO. Esta función devuelve SOLO el bootstrap —los
+-- tenant_id que tienen trabajo: filas PENDIENTE del outbox o recordatorios
+-- vencidos— y el procesador reabre cada fila DENTRO de `SET LOCAL` de su
+-- tenant antes de tocar nada (defensa en profundidad, patrón de
+-- `sesion_por_refresh_token`).
 --
 -- Tercera —y declarada última— vía de lectura fuera del RLS: el inventario
 -- de funciones SECURITY DEFINER de `migrations.db.test.ts` la vigila.
 
-CREATE OR REPLACE FUNCTION notificaciones_pendientes()
-RETURNS TABLE (id uuid, tenant_id uuid) AS $fn$
-  SELECT p."id", p."tenant_id"
-    FROM "notificacion_pendiente" p
-   WHERE p."estado" = 'PENDIENTE'
-   ORDER BY p."created_at";
+CREATE OR REPLACE FUNCTION notificaciones_tenants_a_procesar()
+RETURNS TABLE (tenant_id uuid) AS $fn$
+  SELECT DISTINCT tenant_id FROM (
+    SELECT "tenant_id" FROM "notificacion_pendiente" WHERE "estado" = 'PENDIENTE'
+    UNION ALL
+    SELECT "tenant_id" FROM "notificacion_programada"
+     WHERE "estado" = 'PENDIENTE' AND "programada_para" <= now()
+  ) trabajo;
 $fn$ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp;
 --> statement-breakpoint
 
-COMMENT ON FUNCTION notificaciones_pendientes() IS
-  'R3/#10: unica ruta del procesador de notificaciones previa al tenant (patron R52/R18). Devuelve solo (id, tenant_id) de las filas PENDIENTE del outbox; el procesador revalida cada fila dentro del RLS de su tenant antes de despachar. REVOKE de PUBLIC; no exponer ninguna otra.';
+COMMENT ON FUNCTION notificaciones_tenants_a_procesar() IS
+  'R3/#10: unica ruta del procesador de notificaciones previa al tenant (patron R52/R18). Devuelve los tenant_id con trabajo pendiente (outbox PENDIENTE o recordatorios vencidos); el procesador revalida cada fila dentro del RLS de su tenant antes de despachar. REVOKE de PUBLIC; no exponer ninguna otra.';
 --> statement-breakpoint
 
-REVOKE ALL ON FUNCTION notificaciones_pendientes() FROM PUBLIC;
+REVOKE ALL ON FUNCTION notificaciones_tenants_a_procesar() FROM PUBLIC;
 --> statement-breakpoint

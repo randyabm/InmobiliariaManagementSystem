@@ -104,6 +104,7 @@ export class WorkflowsController {
         tipoEjecucion: dto.tipo_ejecucion,
         rolesRequeridos: dto.roles_requeridos,
         condicion: dto.condicion,
+        notificacion: dto.notificacion,
         orden: dto.orden,
       },
       construirContextoPeticion(request),
