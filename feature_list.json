@@ -181,7 +181,7 @@
       "name": "property_profile",
       "phase": "1a",
       "sdd": true,
-      "status": "in_progress",
+      "status": "done",
       "title": "Hoja de vida del inmueble",
       "prd_refs": ["RF-P1", "RF-P2", "RF-P3"],
       "acceptance": [

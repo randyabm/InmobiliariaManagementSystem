@@ -524,3 +524,53 @@ real**. Por eso se adoptaron dos medidas permanentes:
   firma `ver: 0` fijo; D-3 `auth.refresh_emitido` sin ip/request_id.
 - **Pendientes heredados:** PA-14 (onboarding de inmobiliaria sin RF-*),
   push sin autorizar, Forgejo (#23) sin montar, deudas de reviews #25 y #26.
+
+## 2026-08-01 — Feature #6 `property_profile` (cerrada)
+
+- **Agente:** leader → spec_author → implementer → reviewer
+- **Feature:** #6 `property_profile` — `in_progress` → **`done`**
+- **Veredicto del reviewer:** **APPROVED, sin bloqueantes**
+  (`progress/review_property_profile.md`).
+- **Verificación:** `./init.sh` exit 0 — `test` **576** (56 archivos), `test:db`
+  **100** (3 archivos). Lint, typecheck y build verdes. 28/28 tasks.
+- **Mutaciones:** 4 del implementer reproducidas (3/11, 3/17, 1/18, 1/18) +
+  1 propia de RLS (4/10) + 1 test añadido por el reviewer que hace carga
+  real la guarda del propietario principal (R10).
+- **Lo que trajo (la feature más amplia de la fase 1a):**
+  - 4 tablas (migración `0012`, RLS ENABLE+FORCE): `propiedad` (los cuatro
+    grupos del PRD: identificación, comercial, administración PH,
+    contable), `propiedad_propietario` (puente), `historial_ocupacion`
+    (índice único parcial de ocupación vigente), `propiedad_documento`.
+  - Módulo compartido `core/almacenamiento/` (MinIO): claves
+    `uuid + extensión derivada del mime` (el nombre del cliente nunca es
+    clave), hash SHA-256 verificado leyendo el objeto (R21), URLs firmadas,
+    bucket asegurado al arrancar. Lo reutilizarán #12 y #18.
+  - 14 rutas: CRUD de la ficha, propietarios adicionales (el principal no
+    puede duplicarse ni removerse, 409), inquilino actual + historial de
+    ocupación (escritura atómica en la transacción de la petición),
+    repositorio documental (subir/listar/archivar sin borrar el objeto) y
+    fotos (clave ajena → 400).
+  - **Cierra la dependencia #5 (design.md §6):** `propiedad.cuenta_bancaria_id`
+    con la regla única de #5 (`resolverCuentaDeGiro`): override gana, ajeno
+    → 400 sin persistir, ficha con `cuenta_giro` nullable.
+  - Fronteras PA-6-3 respetadas: sin `estado` (será #8) y sin creación en
+    línea (será #9); el principal inexistente/ajeno es 404 indistinguible.
+- **Desviaciones anotadas (legítimas):** parámetro de ruta normalizado a
+  `:idPropiedad`; `AuditInterceptor` ampliado con `idPropietario`/
+  `idDocumento`; la sonda de ruta inexistente de `routes-surface.test.ts`
+  se movió a `/no-existe/secretas` (la anterior colisionaba con
+  `GET /propiedades/:id`).
+- **Deuda del reviewer (no bloqueante):** D-1 revisar la sonda de rutas
+  cuando #8 añada rutas; D-2 exigir `MINIO_ACCESS_KEY`/`MINIO_SECRET_KEY`
+  sin default antes de producción; D-3 #8 reutilizará la ficha para el
+  dashboard.
+- **Pendientes heredados:** PA-14 (onboarding sin RF-*), push sin
+  autorizar, Forgejo (#23) sin montar, deudas de reviews #25/#26/#27/#6.
+
+### Fase 1a de fundaciones: completa
+
+Con #6 quedan cerradas las features 1a del tablero: #1 scaffold, #2 RLS,
+#3 auth/RBAC, #4 auditoría, #5 perfiles, #24 hardening, #25 retención,
+#26 identidad multi-rol, #27 sesiones y #6 hoja de vida del inmueble. La
+cola sigue con #8 `property_lifecycle` (ciclo de vida + dashboard), #7
+`workflow_engine`, #9 `property_intake` y el resto de la fase 1a/1b.
