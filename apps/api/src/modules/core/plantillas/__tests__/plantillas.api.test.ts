@@ -86,11 +86,24 @@ describe('Plantillas de inmuebles (#11)', () => {
   // ─── T11 — clonar y frontera del sistema (R5, R6) ───────────────────────
 
   describe('T11 — clonar (R5, R6)', () => {
-    it('clonar la plantilla del sistema crea la copia TENANT con sus zonas e ítems', async () => {
+    it('clonar la plantilla del sistema crea la copia TENANT con zonas e ítems ACTIVOS', async () => {
       const lista = await comoAdminA('get', '/plantillas');
       const apartamento = lista.body.find(
         (p: { tipo: string; origen: string }) =>
           p.tipo === 'APARTAMENTO' && p.origen === 'SISTEMA',
+      );
+
+      // Se inactiva una zona del SISTEMA directamente (estado que la API no
+      // puede producir, pero que la semilla de datos futura podría): el
+      // clon NO debe copiarla (R5).
+      const { rows: sala } = await entorno.poolAdmin.query<{ id: string }>(
+        `SELECT id FROM plantilla_zona
+          WHERE plantilla_id = $1 AND nombre = 'Sala'`,
+        [apartamento.id],
+      );
+      await entorno.poolAdmin.query(
+        'UPDATE plantilla_zona SET activo = false WHERE id = $1',
+        [sala[0]?.id],
       );
 
       const clonada = await comoAdminA('post', `/plantillas/${apartamento.id}/clonar`);
@@ -98,9 +111,27 @@ describe('Plantillas de inmuebles (#11)', () => {
       expect(clonada.body.origen).toBe('TENANT');
 
       const detalle = await comoAdminA('get', `/plantillas/${clonada.body.id}`);
-      expect(detalle.body.zonas).toHaveLength(5);
-      const sala = detalle.body.zonas.find((z: { nombre: string }) => z.nombre === 'Sala');
-      expect(sala.items).toHaveLength(5);
+      expect(detalle.body.zonas).toHaveLength(4);
+      expect(
+        detalle.body.zonas.some((z: { nombre: string }) => z.nombre === 'Sala'),
+      ).toBe(false);
+
+      // La zona inactiva NO se copió ni siquiera como fila (R5): el conteo
+      // crudo de la copia es 4, no 5 — si la fila muerta se propagara con
+      // activo = false, la API la ocultaría igual pero la base llevaría
+      // basura que #12 podría clonar por error.
+      const { rows: conteo } = await entorno.poolAdmin.query<{ total: string }>(
+        `SELECT count(*)::text AS total FROM plantilla_zona
+          WHERE plantilla_id = $1`,
+        [clonada.body.id],
+      );
+      expect(Number(conteo[0]?.total)).toBe(4);
+
+      // Se restaura la zona del sistema para no contaminar otros tests.
+      await entorno.poolAdmin.query(
+        'UPDATE plantilla_zona SET activo = true WHERE id = $1',
+        [sala[0]?.id],
+      );
     });
 
     it('clonar de nuevo el mismo tipo → 409 sin escribir', async () => {
@@ -149,7 +180,8 @@ describe('Plantillas de inmuebles (#11)', () => {
       );
       idCopia = copia.id;
       const detalle = await comoAdminA('get', `/plantillas/${idCopia}`);
-      idSala = detalle.body.zonas.find((z: { nombre: string }) => z.nombre === 'Sala').id;
+      // El clon excluyó la zona inactiva (R5): se usa la primera zona.
+      idSala = detalle.body.zonas[0].id;
     });
 
     it('crea una zona y la actualiza (repetible/obligatoria/orden) con SELECT (R7)', async () => {
