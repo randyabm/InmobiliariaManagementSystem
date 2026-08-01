@@ -768,3 +768,43 @@ inventarios, #23 CI) y 1c (contratos).
 La cola sigue con la fase 1b de inventarios: **#11 `inventory_templates`**
 (plantillas de zonas e ítems), luego #12 creación, #13 revisión del
 inquilino, #14 firma+PDF y #15 PWA offline.
+
+## 2026-08-01 — Feature #11 `inventory_templates` (cerrada)
+
+- **Agente:** leader → spec_author → implementer → reviewer
+- **Feature:** #11 `inventory_templates` — `in_progress` → **`done`**
+- **Veredicto del reviewer:** **APPROVED, sin bloqueantes**
+  (`progress/review_inventory_templates.md`).
+- **Verificación:** `./init.sh` exit 0 — `test` **732** (80 archivos), `test:db`
+  **122** (3 archivos). Lint, typecheck y build verdes. 22/22 tasks.
+- **Mutaciones:** 3 reproducidas (1/10 filtro del clon — tras un test del
+  reviewer que siembra una zona inactiva y verifica el conteo crudo —,
+  2/15 409 del sistema, 5+ rojos sin el OR de la política del catálogo).
+- **Lo que trajo (el molde del inventario, §8.8):**
+  - Jerarquía plantilla → zona → ítem (migración `0015`): 6 `field_type`
+    (estado, si_no, si_no_estado, conteo, seleccion con `opciones_json`,
+    texto), banderas `obligatorio`/`foto_obligatoria`, zonas
+    `repetible`/`obligatoria`, CHECK del motor para opciones↔seleccion.
+  - Catálogo base (PA-11-2): APARTAMENTO con el ejemplo completo del PRD
+    §8.8.5; las otras 5 sin zonas (no se inventa producto; deuda D-1).
+  - Patrón de plantillas del sistema reutilizado de #7 (PA-11-1): tenant
+    reservado + RLS OR/WITH CHECK, sin vías nuevas fuera del RLS.
+  - Gestión solo `admin` (PA-11-4): clonar con solo zonas/ítems ACTIVOS,
+    CRUD de zonas/ítems con baja lógica, `PLANTILLA_SISTEMA_NO_EDITABLE`,
+    `opciones_json` validado en 3 capas (zod + servicio + CHECK).
+  - 9 rutas, 3 tablas. La materialización queda anclada a #12 (R15).
+- **Deuda del reviewer (no bloqueante):** D-1 catálogo incompleto hasta
+  definir las zonas de las 5 plantillas; D-2 test de ítem inactivo en zona
+  activa cuando #12 materialice; D-3 `version` sin incremento (historial de
+  versiones sería feature aparte).
+- **Respuesta del humano sobre UI:** NO hay UI real; `apps/web` es solo el
+  shell de healthcheck del scaffold (#1) y `apps/pwa` no existe. Las
+  features de la fase 1 son backend (API); la PWA de campo (#15) será el
+  primer cliente real.
+
+### Siguiente
+
+Batch autorizado por el humano: **#12 `inventory_creation`**, **#13
+`inventory_tenant_review`** y **#15 `pwa_offline`** en un solo lote (spec +
+implementación + review). El #14 (`inventory_signature_pdf`) queda para
+después del lote.
