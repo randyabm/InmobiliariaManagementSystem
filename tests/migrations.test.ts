@@ -84,6 +84,8 @@ const archivosSql = readdirSync(rutaRepo(CARPETA))
  * `payment_mapping_profile` se crearon en la feature #30
  * `payment_reconciliation` (R7), con RLS habilitado y forzado en la misma
  * migración.
+ * La tabla `tenant_dominio` se creó en la feature #32 `web_embedding`
+ * (R6), con RLS habilitado y forzado en la misma migración.
  */
 const TABLAS_PERMITIDAS: readonly string[] = [
   'tenant',
@@ -132,6 +134,7 @@ const TABLAS_PERMITIDAS: readonly string[] = [
   'payment_import_fila',
   'payment_record',
   'payment_mapping_profile',
+  'tenant_dominio',
 ];
 
 describe('Migración inicial (R10)', () => {
