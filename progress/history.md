@@ -808,3 +808,44 @@ Batch autorizado por el humano: **#12 `inventory_creation`**, **#13
 `inventory_tenant_review`** y **#15 `pwa_offline`** en un solo lote (spec +
 implementación + review). El #14 (`inventory_signature_pdf`) queda para
 después del lote.
+
+### 2026-08-01 — Lote de inventarios: #12 y #13 cerrados (`done`)
+
+El humano autorizó cerrar #12 y #13 tras el review con mutaciones
+(`0832813`, veredicto APPROVED en ambas).
+
+- **#12 `inventory_creation`** — 24/24 tasks, 8 mutaciones de riesgo
+  verificadas (3 rojas + 1 test del reviewer):
+  - Migración `0016`: 4 tablas `inventario*` con RLS ENABLE+FORCE, CHECKs
+    de estado/tipo_evento, `activo` para la baja lógica.
+  - PA-12-1..4 ejecutadas: estado en columna; 409 borrador único por
+    (propiedad, tipo_evento); plantilla TENANT o SISTEMA
+    (`resolverPlantillaParaTenant`, test del reviewer de la prioridad);
+    foto con baja lógica (el objeto en MinIO se conserva).
+  - 11 rutas de borrador; `AlmacenamientoService.obtener` añadido (lo
+    usará #14). Regla «Nunca borrar»: la eliminación es baja lógica en
+    cascada. Test de frontera de #25 actualizado (invariante: sin FK hacia
+    `inventario*`).
+  - Deuda: D-1 doble barrera no observable con RLS activo (patrón
+    aceptado); D-2 N+1 de `listar`.
+- **#13 `inventory_tenant_review`** — 24/24 tasks; el reviewer encontró y
+  corrigió un **incumplimiento de R7** (faltaba la notificación al empleado
+  al completar la revisión; ahora por el outbox de #10 con test que lo
+  sostiene):
+  - Migración `0017`: `invitacion_inventario`, `codigo_otp`,
+    `inventario_item_revision` con RLS + `inventario.perfil_inquilino_id`
+    (scoping R9) + 4ª vía SECURITY DEFINER `invitacion_por_token`
+    (PA-13-4) + GRANT.
+  - Flujo completo por la API real: invitación (token 48 B solo hash) →
+    bootstrap mínimo → registro con contraseña + OTP (PA-13-1, cuenta
+    persistente, la invitación es personal por documento) → login #27 →
+    revisión ítem por ítem con foto `autor = 'INQUILINO'` (PA-13-2, UNIQUE
+    una ronda) → `revision_completada_en` + aviso al empleado.
+  - OTP entregado por el motor de #10 (PA-13-3); propósito `FIRMA` listo
+    para #14 (R8). 401 uniforme en invitación/OTP (R12).
+  - Deuda: D-1 reuso con doble capa (servicio + RLS, solo observable en
+    mutación compuesta); D-2 sin límite de intentos de OTP (anotado para
+    #14); D-3 consolidar generación de OTP en `RegistroInvitacionService`.
+
+Línea base al cierre: `./init.sh` exit 0 (22 OK), `test` **786**,
+`test:db` **140**, lint/typecheck/build verdes.

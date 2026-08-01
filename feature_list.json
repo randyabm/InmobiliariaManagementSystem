@@ -342,7 +342,7 @@
       "name": "inventory_creation",
       "phase": "1b",
       "sdd": true,
-      "status": "in_progress",
+      "status": "done",
       "title": "Creación del inventario con fotos",
       "prd_refs": [
         "RF-I1",
@@ -364,7 +364,7 @@
       "name": "inventory_tenant_review",
       "phase": "1b",
       "sdd": true,
-      "status": "spec_ready",
+      "status": "done",
       "title": "Revisión del inventario por el inquilino",
       "prd_refs": [
         "RF-I4",
@@ -409,7 +409,7 @@
       "name": "pwa_offline",
       "phase": "1b",
       "sdd": true,
-      "status": "spec_ready",
+      "status": "in_progress",
       "title": "PWA de campo con soporte offline",
       "prd_refs": [
         "RF-I14",
