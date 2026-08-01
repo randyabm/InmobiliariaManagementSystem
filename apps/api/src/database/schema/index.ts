@@ -11,11 +11,14 @@
  * `user.email` y `user.password_hash` a NULL-able (D-5).
  * Las tablas `tarifa_retencion`, `codeudor_inquilino` y `referencia_inquilino`
  * se crearon en la feature #25 `retencion_codeudor_referencias`.
+ * La tabla `sesion` se creó en la feature #27 `sesion_y_revocacion`, que
+ * además añadió `user.token_version` (R2).
  */
 export { tenant } from './tenant';
 export { user } from './user';
 export { userRole } from './user-role';
 export { auditLog } from './audit-log';
+export { sesion } from './sesion';
 export { perfilPropietario } from './perfil-propietario';
 export { perfilInquilino } from './perfil-inquilino';
 export { cuentaBancaria } from './cuenta-bancaria';

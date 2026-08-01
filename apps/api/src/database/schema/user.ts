@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, unique, uuid } from 'drizzle-orm/pg-core';
+import { integer, pgTable, text, timestamp, unique, uuid } from 'drizzle-orm/pg-core';
 
 import { tenant } from './tenant';
 
@@ -62,6 +62,16 @@ export const user = pgTable(
      */
     tipoDocumento: text('tipo_documento'),
     documento: text('documento'),
+    /**
+     * Versión de la identidad (**R2** de la #27, migración `0011`).
+     *
+     * Se incrementa cada vez que se revoca un rol de esta identidad. Todo
+     * access token lleva el valor en el claim `ver` (R3), y la validación de
+     * sesión (R4) rechaza con 401 cualquier token con una versión vieja:
+     * así, revocar un rol invalida de **inmediato** los tokens ya emitidos,
+     * sin esperar a que expiren (PA-3, R12).
+     */
+    tokenVersion: integer('token_version').notNull().default(0),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),

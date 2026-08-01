@@ -78,6 +78,13 @@
       "when": 1754352000000,
       "tag": "0010_retencion_codeudor_referencias",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1754438400000,
+      "tag": "0011_sesion_y_revocacion",
+      "breakpoints": true
     }
   ]
 }

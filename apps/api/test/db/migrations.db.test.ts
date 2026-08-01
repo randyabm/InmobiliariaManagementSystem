@@ -492,9 +492,11 @@ describe('Aplicación real de las migraciones (R10)', () => {
       expect(rows[0]?.proacl ?? '').not.toMatch(/(^|,)=X\//);
     });
 
-    it('no hay ninguna OTRA función SECURITY DEFINER sobre `user` (R52)', async () => {
-      // R52 dice "única ruta": si mañana alguien añade otra puerta que evite el
-      // RLS, este test la ve.
+    it('no hay ninguna OTRA función SECURITY DEFINER sobre `user` (R52, R18)', async () => {
+      // R52 decía "única ruta" y R18 (feature #27) añade exactamente una más:
+      // sesion_por_refresh_token, la única vía del refresh previa al tenant.
+      // Si mañana alguien abre una tercera puerta que evite el RLS, este
+      // test la ve.
       const { rows } = await pool.query<{ proname: string }>(
         `SELECT p.proname
            FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
@@ -502,7 +504,10 @@ describe('Aplicación real de las migraciones (R10)', () => {
           ORDER BY p.proname`,
       );
 
-      expect(rows.map((r) => r.proname)).toEqual(['tenant_por_codigo']);
+      expect(rows.map((r) => r.proname)).toEqual([
+        'sesion_por_refresh_token',
+        'tenant_por_codigo',
+      ]);
     });
   });
 
@@ -633,6 +638,139 @@ describe('Aplicación real de las migraciones (R10)', () => {
         /porcentaje|tarifa|retencion_pct|pct_retencion/.test(c),
       );
       expect(tarifas).toEqual([]);
+    });
+  });
+
+  // ─── Feature #27 sesion_y_revocacion (T7: R1, R2, R10, R18, R20) ─────────
+
+  describe('esquema de #27 (R1, R2, R10, R18, R20)', () => {
+    it('la tabla sesion existe con RLS habilitado Y FORZADO (R1)', async () => {
+      const { rows } = await pool.query<{
+        relrowsecurity: boolean;
+        relforcerowsecurity: boolean;
+      }>(
+        `SELECT c.relrowsecurity, c.relforcerowsecurity
+           FROM pg_class c
+           JOIN pg_namespace n ON n.oid = c.relnamespace
+          WHERE n.nspname = 'public' AND c.relname = 'sesion'`,
+      );
+
+      expect(rows, 'la tabla sesion no existe').toHaveLength(1);
+      expect(rows[0]?.relrowsecurity).toBe(true);
+      expect(rows[0]?.relforcerowsecurity).toBe(true);
+    });
+
+    it('la política de aislamiento de sesion filtra por app.current_tenant (R1)', async () => {
+      const { rows } = await pool.query<{ polname: string; qual: string | null }>(
+        `SELECT policyname AS polname, qual
+           FROM pg_policies WHERE schemaname = 'public' AND tablename = 'sesion'`,
+      );
+
+      expect(rows.map((r) => r.polname)).toContain('sesion_tenant_isolation');
+      const politica = rows.find((r) => r.polname === 'sesion_tenant_isolation');
+      expect(politica?.qual).toContain('app.current_tenant');
+    });
+
+    it('user.token_version existe, NOT NULL, con default 0 (R2)', async () => {
+      const { rows } = await pool.query<{
+        is_nullable: string;
+        column_default: string | null;
+      }>(
+        `SELECT is_nullable, column_default FROM information_schema.columns
+          WHERE table_schema = 'public' AND table_name = 'user'
+            AND column_name = 'token_version'`,
+      );
+
+      expect(rows).toHaveLength(1);
+      expect(rows[0]?.is_nullable).toBe('NO');
+      expect(rows[0]?.column_default).toBe('0');
+    });
+
+    it('el índice único parcial sobre refresh_token_hash existe (R10)', async () => {
+      const { rows } = await pool.query<{ indexname: string; indexdef: string }>(
+        `SELECT indexname, indexdef FROM pg_indexes
+          WHERE schemaname = 'public' AND tablename = 'sesion'`,
+      );
+
+      const unico = rows.find((r) => r.indexname === 'sesion_refresh_token_hash_key');
+      expect(unico).toBeDefined();
+      expect(unico?.indexdef).toMatch(/CREATE UNIQUE INDEX/i);
+      expect(unico?.indexdef).toMatch(/WHERE .*refresh_token_hash.*IS NOT NULL/is);
+    });
+
+    it('sesion_por_refresh_token es SECURITY DEFINER, no está concedida a PUBLIC y devuelve el bootstrap mínimo (R18)', async () => {
+      const { rows } = await pool.query<{
+        prosecdef: boolean;
+        proacl: string | null;
+      }>(
+        `SELECT p.prosecdef, p.proacl::text AS proacl
+           FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+          WHERE n.nspname = 'public' AND p.proname = 'sesion_por_refresh_token'`,
+      );
+
+      expect(rows).toHaveLength(1);
+      expect(rows[0]?.prosecdef).toBe(true);
+      // Tras el REVOKE, el ACL deja de tener la entrada `=X/` de PUBLIC.
+      expect(rows[0]?.proacl ?? '').not.toMatch(/(^|,)=X\//);
+
+      // El resultado es exactamente el bootstrap mínimo. `RETURNS TABLE`
+      // devuelve el pseudo-tipo `record`, así que los nombres se leen de los
+      // `fields` de una invocación vacía (0 filas, columnas declaradas).
+      const resultado = await pool.query(
+        'SELECT * FROM sesion_por_refresh_token(NULL::text)',
+      );
+      expect(resultado.fields?.map((f) => f.name)).toEqual([
+        'id',
+        'user_id',
+        'tenant_id',
+        'expira_en',
+        'revocada_at',
+      ]);
+    });
+
+    it('la función resuelve por coincidencia EXACTA de hash y devuelve solo los campos del bootstrap (R18)', async () => {
+      const { rows: tenant } = await pool.query<{ id: string }>(
+        `INSERT INTO tenant (nombre, nit, codigo)
+         VALUES ('Sesiones', '900-0027', 'sesiones') RETURNING id`,
+      );
+      const tenantId = tenant[0]?.id;
+      expect(tenantId).toBeDefined();
+
+      const { rows: usuario } = await pool.query<{ id: string }>(
+        `INSERT INTO "user" (tenant_id, email, password_hash, nombre)
+         VALUES ($1, 'sesion@example.com', 'hash', 'Persona De Sesion') RETURNING id`,
+        [tenantId],
+      );
+      const userId = usuario[0]?.id;
+
+      const { rows: sesion } = await pool.query<{ id: string }>(
+        `INSERT INTO sesion (user_id, tenant_id, refresh_token_hash, expira_en)
+         VALUES ($1, $2, repeat('a', 64), now() + interval '30 days') RETURNING id`,
+        [userId, tenantId],
+      );
+      const sesionId = sesion[0]?.id;
+
+      const { rows: encontrada } = await pool.query<{
+        id: string;
+        user_id: string;
+        tenant_id: string;
+      }>(
+        'SELECT id, user_id, tenant_id FROM sesion_por_refresh_token($1)',
+        ['a'.repeat(64)],
+      );
+      expect(encontrada).toHaveLength(1);
+      expect(encontrada[0]?.id).toBe(sesionId);
+      expect(encontrada[0]?.user_id).toBe(userId);
+      expect(encontrada[0]?.tenant_id).toBe(tenantId);
+
+      // Ni prefijos, ni substrings, ni variaciones: coincidencia exacta.
+      for (const parcial of ['a'.repeat(63), 'a'.repeat(65), `${'a'.repeat(32)}b${'a'.repeat(31)}`]) {
+        const { rows: nada } = await pool.query<{ id: string }>(
+          'SELECT id FROM sesion_por_refresh_token($1)',
+          [parcial],
+        );
+        expect(nada, `sesion_por_refresh_token('${parcial.slice(0, 8)}…')`).toHaveLength(0);
+      }
     });
   });
 });
