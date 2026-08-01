@@ -290,6 +290,79 @@ describe('Inventario — creación (#12)', () => {
       expect(rows[0]?.orden).toBe(0);
       expect(rows[rows.length - 1]?.orden).toBe(rows.length - 1);
     });
+
+    it('crear zona e ítem ad-hoc: la plantilla NO cambia (R6, RF-I24)', async () => {
+      const zona = await comoAdminA('post', `/inventarios/${idInventario}/zonas`).send({
+        nombre: 'Zona de campo',
+        repetible: false,
+        orden: 99,
+      });
+      expect(zona.status).toBe(201);
+      expect(zona.body.plantilla_zona_id).toBeNull();
+
+      const item = await comoAdminA(
+        'post',
+        `/inventarios/${idInventario}/zonas/${zona.body.id}/items`,
+      ).send({
+        nombre: 'Humedad en pared',
+        field_type: 'estado',
+        foto_obligatoria: true,
+      });
+      expect(item.status).toBe(201);
+      expect(item.body.plantilla_item_id).toBeNull();
+
+      // La plantilla del SISTEMA sigue intacta (RF-I24): no hay ninguna
+      // zona llamada así en la plantilla base.
+      const { rows: enPlantilla } = await entorno.poolAdmin.query<{ total: string }>(
+        `SELECT count(*)::text AS total
+           FROM plantilla_zona z JOIN plantilla_inmueble p ON p.id = z.plantilla_id
+          WHERE p.origen = 'SISTEMA' AND z.nombre = 'Zona de campo'`,
+      );
+      expect(Number(enPlantilla[0]?.total)).toBe(0);
+
+      // Respuesta del ítem nuevo (R6).
+      const respuesta = await comoAdminA(
+        'patch',
+        `/inventarios/${idInventario}/items/${item.body.id}`,
+      ).send({ estado_checklist: 'MALO', comentario: 'Humedad visible.' });
+      expect(respuesta.status).toBe(200);
+    });
+
+    it('baja lógica de zona e ítem ad-hoc (R6, R8)', async () => {
+      const zona = await comoAdminA('post', `/inventarios/${idInventario}/zonas`).send({
+        nombre: 'Zona a eliminar',
+        repetible: false,
+        orden: 100,
+      });
+      const item = await comoAdminA(
+        'post',
+        `/inventarios/${idInventario}/zonas/${zona.body.id}/items`,
+      ).send({ nombre: 'Item a eliminar', field_type: 'texto' });
+
+      const bajaItem = await comoAdminA(
+        'delete',
+        `/inventarios/${idInventario}/items/${item.body.id}`,
+      );
+      expect(bajaItem.status).toBe(200);
+
+      const bajaZona = await comoAdminA(
+        'delete',
+        `/inventarios/${idInventario}/zonas/${zona.body.id}`,
+      );
+      expect(bajaZona.status).toBe(200);
+
+      const { rows } = await entorno.poolAdmin.query<{ activo: boolean }>(
+        `SELECT activo FROM inventario_zona WHERE id = $1`,
+        [zona.body.id],
+      );
+      expect(rows[0]?.activo).toBe(false);
+
+      // Fuera de la ficha: ya no se lista (activo = false).
+      const detalle = await comoAdminA('get', `/inventarios/${idInventario}`);
+      expect(
+        detalle.body.zonas.some((z: { nombre: string }) => z.nombre === 'Zona a eliminar'),
+      ).toBe(false);
+    });
   });
 
   // ─── T14 — fotos (R3, R10) ───────────────────────────────────────────────

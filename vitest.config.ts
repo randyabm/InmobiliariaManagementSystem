@@ -18,6 +18,7 @@ export default defineConfig({
       './vitest.repo.config.ts',
       './apps/api/vitest.config.ts',
       './apps/web/vitest.config.ts',
+      './apps/pwa/vitest.config.ts',
     ],
   },
 });

@@ -2,6 +2,8 @@ import { Injectable } from '@nestjs/common';
 import type {
   EstadoInventario,
   InventarioCompleto,
+  InventarioItem,
+  InventarioZona,
   TipoEventoInventario,
 } from '@inmobiliaria/types';
 
@@ -203,6 +205,73 @@ export class InventariosService {
       throw new ResourceNotFoundError();
     }
     await this.repositorio.marcarFotoInactiva(ctx, fotoId);
+  }
+
+  /** R6 — crear zona en el borrador (snapshot local, la plantilla NO cambia). */
+  async crearZona(
+    ctx: ContextoPeticion,
+    id: string,
+    datos: { nombre: string; repetible: boolean; orden: number },
+  ): Promise<InventarioZona> {
+    await this.exigirBorrador(ctx, id);
+    return this.repositorio.insertarZona(ctx, {
+      inventarioId: id,
+      nombre: datos.nombre,
+      repetible: datos.repetible,
+      orden: datos.orden,
+      plantillaZonaId: null,
+    });
+  }
+
+  /** R6 — crear ítem en una zona del borrador. */
+  async crearItem(
+    ctx: ContextoPeticion,
+    id: string,
+    zonaId: string,
+    datos: {
+      nombre: string;
+      fieldType: string;
+      opcionesJson: string[] | null;
+      fotoObligatoria: boolean;
+    },
+  ): Promise<InventarioItem> {
+    const inventario = await this.exigirBorrador(ctx, id);
+    const zona = await this.repositorio.buscarZona(ctx, zonaId);
+    if (!zona || zona.inventario_id !== inventario.id) {
+      throw new ResourceNotFoundError();
+    }
+    return this.repositorio.insertarItem(ctx, {
+      zonaId,
+      nombre: datos.nombre,
+      fieldType: datos.fieldType,
+      opcionesJson: datos.opcionesJson,
+      fotoObligatoria: datos.fotoObligatoria,
+      plantillaItemId: null,
+    });
+  }
+
+  /** R6 — baja lógica de la zona del borrador. */
+  async eliminarZona(ctx: ContextoPeticion, id: string, zonaId: string): Promise<void> {
+    const inventario = await this.exigirBorrador(ctx, id);
+    const zona = await this.repositorio.buscarZona(ctx, zonaId);
+    if (!zona || zona.inventario_id !== inventario.id) {
+      throw new ResourceNotFoundError();
+    }
+    await this.repositorio.marcarZonaInactiva(ctx, zonaId);
+  }
+
+  /** R6 — baja lógica del ítem del borrador. */
+  async eliminarItem(ctx: ContextoPeticion, id: string, itemId: string): Promise<void> {
+    const inventario = await this.exigirBorrador(ctx, id);
+    const item = await this.repositorio.buscarItem(ctx, itemId);
+    if (!item) {
+      throw new ResourceNotFoundError();
+    }
+    const zona = await this.repositorio.buscarZona(ctx, item.zona_id);
+    if (!zona || zona.inventario_id !== inventario.id) {
+      throw new ResourceNotFoundError();
+    }
+    await this.repositorio.marcarItemInactivo(ctx, itemId);
   }
 
   /** R5 — eliminar el borrador (nunca un inventario no-BORRADOR). */

@@ -20,7 +20,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json && npm run typecheck --workspaces --if-present",
     "test": "vitest run",
     "test:db": "npm run test:db --workspace apps/api",
-    "build": "npm run build --workspace packages/types && npm run build --workspace apps/api && npm run build --workspace apps/web",
+    "build": "npm run build --workspace packages/types && npm run build --workspace apps/api && npm run build --workspace apps/web && npm run build --workspace apps/pwa",
     "dev": "npm run dev --workspace apps/api & npm run dev --workspace apps/web & wait",
     "db:migrate": "npm run db:migrate --workspace apps/api",
     "db:generate": "npm run db:generate --workspace apps/api"

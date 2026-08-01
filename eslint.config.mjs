@@ -40,6 +40,10 @@ export default tseslint.config(
       '**/coverage/**',
       '**/.vite/**',
       'apps/api/drizzle/**',
+      // El service worker corre en el ámbito del worker, no del navegador:
+      // `self`, `caches` y los eventos de instalación son globales de ese
+      // contexto (feature #15).
+      'apps/pwa/public/sw.js',
     ],
   },
   js.configs.recommended,

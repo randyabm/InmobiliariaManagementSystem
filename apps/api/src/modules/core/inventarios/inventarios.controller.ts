@@ -114,6 +114,85 @@ export class InventariosController {
     );
   }
 
+  /** R6 — crear zona en el borrador (la plantilla NO cambia, RF-I24). */
+  @Post(':id/zonas')
+  @Audit('crear', 'inventario_zona')
+  async crearZona(
+    @Param('id') id: string,
+    @Body() cuerpo: CuerpoZona,
+    @Req() request: unknown,
+  ) {
+    const nombre = typeof cuerpo.nombre === 'string' ? cuerpo.nombre.trim().slice(0, 200) : '';
+    if (!nombre) {
+      throw new BadRequestException('nombre es obligatorio.');
+    }
+    return this.inventarios.crearZona(
+      construirContextoPeticion(request),
+      id,
+      {
+        nombre,
+        repetible: cuerpo.repetible === true,
+        orden: typeof cuerpo.orden === 'number' ? cuerpo.orden : 0,
+      },
+    );
+  }
+
+  /** R6 — baja lógica de la zona del borrador. */
+  @Delete(':id/zonas/:zonaId')
+  @Audit('baja', 'inventario_zona')
+  async eliminarZona(
+    @Param('id') id: string,
+    @Param('zonaId') zonaId: string,
+    @Req() request: unknown,
+  ) {
+    await this.inventarios.eliminarZona(construirContextoPeticion(request), id, zonaId);
+  }
+
+  /** R6 — crear ítem en una zona del borrador. */
+  @Post(':id/zonas/:zonaId/items')
+  @Audit('crear', 'inventario_item')
+  async crearItem(
+    @Param('id') id: string,
+    @Param('zonaId') zonaId: string,
+    @Body() cuerpo: { nombre?: unknown; field_type?: unknown; opciones_json?: unknown; foto_obligatoria?: unknown },
+    @Req() request: unknown,
+  ) {
+    const nombre = typeof cuerpo.nombre === 'string' ? cuerpo.nombre.trim().slice(0, 200) : '';
+    const fieldType = typeof cuerpo.field_type === 'string' ? cuerpo.field_type : '';
+    const tipos = ['estado', 'si_no', 'si_no_estado', 'conteo', 'seleccion', 'texto'];
+    if (!nombre || !tipos.includes(fieldType)) {
+      throw new BadRequestException('nombre y field_type son obligatorios.');
+    }
+    const opciones = Array.isArray(cuerpo.opciones_json)
+      ? cuerpo.opciones_json.filter((o): o is string => typeof o === 'string')
+      : null;
+    if (fieldType === 'seleccion' && (opciones === null || opciones.length === 0)) {
+      throw new BadRequestException('seleccion requiere opciones_json.');
+    }
+    return this.inventarios.crearItem(
+      construirContextoPeticion(request),
+      id,
+      zonaId,
+      {
+        nombre,
+        fieldType,
+        opcionesJson: opciones,
+        fotoObligatoria: cuerpo.foto_obligatoria === true,
+      },
+    );
+  }
+
+  /** R6 — baja lógica del ítem del borrador. */
+  @Delete(':id/items/:idItem')
+  @Audit('baja', 'inventario_item')
+  async eliminarItem(
+    @Param('id') id: string,
+    @Param('idItem') itemId: string,
+    @Req() request: unknown,
+  ) {
+    await this.inventarios.eliminarItem(construirContextoPeticion(request), id, itemId);
+  }
+
   /** R7 — editar una zona del borrador. */
   @Patch(':id/zonas/:zonaId')
   @Audit('actualizar', 'inventario')
