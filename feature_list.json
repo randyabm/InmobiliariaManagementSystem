@@ -470,7 +470,7 @@
       "name": "contract_digitization",
       "phase": "1c",
       "sdd": true,
-      "status": "in_progress",
+      "status": "done",
       "title": "Digitalización de contratos físicos",
       "prd_refs": [
         "RF-CT6",
@@ -487,7 +487,7 @@
       "name": "contract_renewals_alerts",
       "phase": "1c",
       "sdd": true,
-      "status": "pending",
+      "status": "in_progress",
       "title": "Renovaciones y alertas de vencimiento",
       "prd_refs": [
         "RF-CT8",

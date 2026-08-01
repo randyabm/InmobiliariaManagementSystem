@@ -69,6 +69,9 @@ const archivosSql = readdirSync(rutaRepo(CARPETA))
  * Las tablas `contract` y `contrato_firma` (evidencia append-only) se
  * crearon en la feature #17 `contract_generation_signature` (R7), con
  * RLS habilitado y forzado en la misma migración.
+ * La tabla `contract_document` se creó en la feature #18
+ * `contract_digitization` (R4), con RLS habilitado y forzado en la misma
+ * migración.
  */
 const TABLAS_PERMITIDAS: readonly string[] = [
   'tenant',
@@ -108,6 +111,7 @@ const TABLAS_PERMITIDAS: readonly string[] = [
   'contract_template',
   'contract',
   'contrato_firma',
+  'contract_document',
 ];
 
 describe('Migración inicial (R10)', () => {

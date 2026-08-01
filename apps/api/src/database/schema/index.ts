@@ -56,3 +56,4 @@ export { inventarioFirma } from './inventario-firma';
 export { contractTemplate } from './contract-template';
 export { contract } from './contract';
 export { contratoFirma } from './contrato-firma';
+export { contractDocument } from './contract-document';

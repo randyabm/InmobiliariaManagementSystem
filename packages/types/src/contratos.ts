@@ -20,7 +20,7 @@ export interface Contrato {
   readonly id: string;
   readonly tenant_id: string;
   readonly property_id: string;
-  readonly inquilino_id: string;
+  readonly inquilino_id: string | null;
   readonly propietario_id: string;
   readonly fecha_inicio: string;
   readonly fecha_fin: string;
@@ -38,6 +38,19 @@ export interface FirmaContrato {
   readonly hash_documento: string;
   readonly ip: string;
   readonly otp_verificado_en: string | null;
+  readonly created_at: string;
+}
+
+export interface ContratoDocumento {
+  readonly id: string;
+  readonly tenant_id: string;
+  readonly contract_id: string;
+  readonly nombre: string;
+  readonly origen: 'generado' | 'digitalizado';
+  readonly hash_sha256: string;
+  readonly mime: string;
+  readonly tamano_bytes: number | null;
+  readonly metadatos: Readonly<Record<string, unknown>> | null;
   readonly created_at: string;
 }
 

@@ -13,7 +13,7 @@ export class ContratosRepository {
     ctx: ContextoPeticion,
     datos: {
       propertyId: string;
-      inquilinoId: string;
+      inquilinoId: string | null;
       propietarioId: string;
       fechaInicio: Date;
       fechaFin: Date;

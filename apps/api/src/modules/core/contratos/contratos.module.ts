@@ -4,6 +4,8 @@ import { AuditModule } from '../audit/audit.module';
 import { AlmacenamientoModule } from '../almacenamiento/almacenamiento.module';
 import { OtpModule } from '../otp/otp.module';
 import { ContratosController } from './contratos.controller';
+import { DigitalizacionController } from './digitalizacion.controller';
+import { DigitalizacionService } from './digitalizacion.service';
 import { ContratosRepository } from './contratos.repository';
 import { ContratosService } from './contratos.service';
 import { PlantillasContratoController } from './plantillas-contrato.controller';
@@ -18,12 +20,13 @@ import { PlantillasContratoService } from './plantillas-contrato.service';
  */
 @Module({
   imports: [AuditModule, AlmacenamientoModule, OtpModule],
-  controllers: [PlantillasContratoController, ContratosController],
+  controllers: [PlantillasContratoController, ContratosController, DigitalizacionController],
   providers: [
     PlantillasContratoRepository,
     PlantillasContratoService,
     ContratosRepository,
     ContratosService,
+    DigitalizacionService,
   ],
   exports: [PlantillasContratoService, PlantillasContratoRepository, ContratosService],
 })

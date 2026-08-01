@@ -21,9 +21,7 @@ export const contract = pgTable(
     propertyId: uuid('property_id')
       .notNull()
       .references(() => propiedad.id),
-    inquilinoId: uuid('inquilino_id')
-      .notNull()
-      .references(() => perfilInquilino.id),
+    inquilinoId: uuid('inquilino_id').references(() => perfilInquilino.id),
     propietarioId: uuid('propietario_id')
       .notNull()
       .references(() => perfilPropietario.id),

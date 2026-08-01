@@ -39,6 +39,7 @@ export type {
 export { ESTADOS_CONTRATO, ESTADOS_PLANTILLA_CONTRATO } from './contratos';
 export type {
   Contrato,
+  ContratoDocumento,
   ContractTemplate,
   EstadoContrato,
   EstadoPlantillaContrato,

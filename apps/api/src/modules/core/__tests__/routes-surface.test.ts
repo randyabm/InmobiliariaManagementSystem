@@ -146,6 +146,11 @@ const RUTAS_PERMITIDAS = [
   'POST /contratos/:id/firmas/inquilino',
   'GET /contratos/:id/pdf',
   'GET /propiedades/:id/contratos',
+  // ─── Feature #18 contract_digitization: 4 rutas (R4, design.md §2) ─────
+  'POST /contratos/digitalizados',
+  'GET /contratos/:id/documentos',
+  'GET /propiedades/:id/contratos/documentos',
+  'GET /contratos/:id/documentos/:idDocumento/pdf',
   // ─── Feature #7 workflow_engine: 9 rutas (R17, design.md §8) ───────────
   // Gestión de definiciones: solo `admin` (RF-W2). Instancias y ejecución:
   // `@Roles('admin','empleado')`.
