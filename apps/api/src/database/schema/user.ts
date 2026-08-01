@@ -48,6 +48,20 @@ export const user = pgTable(
     passwordHash: text('password_hash'),
     nombre: text('nombre').notNull(),
     telefono: text('telefono'),
+    /**
+     * Documento de la persona (**R5** de la #26, migración `0009`).
+     *
+     * Es la clave por la que se **deduplica la identidad dentro de la
+     * inmobiliaria** desde que D-9 vació `user.email` para los clientes. NULL
+     * en empleados y administradores, que se dan de alta sin documento: por eso
+     * el índice único de **R6** es **parcial** (`WHERE documento IS NOT NULL`) y
+     * vive en la migración, no aquí.
+     *
+     * Sigue sin ser único de forma global: **D-8** prohíbe reconocer a la misma
+     * persona **entre** inmobiliarias.
+     */
+    tipoDocumento: text('tipo_documento'),
+    documento: text('documento'),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),

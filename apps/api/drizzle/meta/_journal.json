@@ -64,6 +64,13 @@
       "when": 1754179200000,
       "tag": "0008_contacto_en_perfil",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1754265600000,
+      "tag": "0009_identidad_por_documento",
+      "breakpoints": true
     }
   ]
 }

@@ -33,17 +33,17 @@
 
 ## Bloque A — Identidad única por inmobiliaria
 
-- [ ] **T5** — Migración `0009_identidad_por_documento.sql`: columnas
+- [x] **T5** — Migración `0009_identidad_por_documento.sql`: columnas
       `tipo_documento`/`documento` en `user`, `CHECK` de dominio y de coherencia,
       backfill desde los perfiles e índice único parcial
       `(tenant_id, tipo_documento, documento) WHERE documento IS NOT NULL`.
       Idempotente y hacia adelante. **Cubre: R5, R6.**
-- [ ] **T6** — Test de migración (Testcontainers) que la ejercita: columnas y
+- [x] **T6** — Test de migración (Testcontainers) que la ejercita: columnas y
       `CHECK` presentes, backfill correcto sobre datos sembrados, e índice único
       creado. Incluye el caso de identidades ya duplicadas (§3 del design):
       la segunda queda con `documento` NULL y la migración **no** aborta.
       **Cubre: R5, R6.**
-- [ ] **T7** — Test de que la política `user_tenant_isolation` preexistente
+- [x] **T7** — Test de que la política `user_tenant_isolation` preexistente
       cubre las columnas nuevas: con el rol de aplicación, una identidad de otra
       inmobiliaria no es visible ni siquiera filtrando por su `documento`.
       **Cubre: R14, R22, R24.**
