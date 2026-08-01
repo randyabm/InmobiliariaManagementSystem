@@ -180,8 +180,17 @@ done
 if [ -f .env ]; then
   APP_URL=$(grep '^DATABASE_URL=' .env | head -1 | cut -d= -f2-)
   MIG_URL=$(grep '^DATABASE_MIGRATION_URL=' .env | head -1 | cut -d= -f2-)
+  # R25 (#26): esto NO es un aviso, es un defecto. Con las dos URLs iguales la
+  # API se conecta con el rol que migra —dueño de las tablas o superusuario— y
+  # el `FORCE ROW LEVEL SECURITY` deja de aislar nada en ejecución. A diferencia
+  # de las tres variables ausentes de arriba, aquí la configuración no está
+  # incompleta: está inequívocamente rota, y seguir en verde haría creer que el
+  # aislamiento se está midiendo cuando no lo está.
   if [ -n "$APP_URL" ] && [ "$APP_URL" = "$MIG_URL" ]; then
-    warn "DATABASE_URL y DATABASE_MIGRATION_URL son idénticas: la API se conectaría con el rol privilegiado y el RLS quedaría inerte (R43)"
+    fail "DATABASE_URL y DATABASE_MIGRATION_URL son idénticas: la API se conectaría con el rol privilegiado y el RLS quedaría inerte (R43, R25)"
+    EXIT_CODE=1
+  elif [ -n "$APP_URL" ]; then
+    ok "DATABASE_URL y DATABASE_MIGRATION_URL son distintas (R25)"
   fi
 fi
 

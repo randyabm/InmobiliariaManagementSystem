@@ -823,7 +823,7 @@ la que el humano eligió.
 hechas   T48 T49 T53        puerta (test:db + guard anti-DDL) y B2 cerrado
  1       T50 T51 T52        B1: escritura sobre `user` acotada al tenant
  2       T54 T55 T56        D-8 esquema: tenant_id, política estándar, tenant_por_nit
- 3       T57 T58 T59        D-8 aplicación: login por (nit, email); identidad siempre nueva
+ 3       T57 T58 T59        D-8 aplicación: login por (nit, email); identidad nunca heredada de otra inmobiliaria
  4       T69 T70 T71 T72    D-9: contacto al perfil
  5       T60 … T64          B3/D-10: rol sin BYPASSRLS (el conmutador)
  6       T65 … T68          re-verificación de §C7 con el rol real

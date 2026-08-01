@@ -143,7 +143,7 @@
 > hechas        T53            B2: triggers append-only en migración
 >  1            T50 T51 T52    B1: toda escritura sobre `user` va acotada al tenant
 >  2            T54 T73 T55 T56  D-8/D-12 esquema: user.tenant_id, tenant.codigo, política estándar, tenant_por_codigo
->  3            T57 T58 T59    D-8 aplicación: login por (codigo,email) e identidad siempre nueva
+>  3            T57 T58 T59    D-8 aplicación: login por (codigo,email); identidad nunca heredada de otra inmobiliaria
 >  4            T69 T70 T71 T72  D-9: el contacto se muda al perfil
 >  5            T60 T61 T62 T63 T64  B3/D-10: rol sin BYPASSRLS (el conmutador)
 >  6            T65 T66 T67 T68  re-verificación de §C7 con el rol real
@@ -206,7 +206,7 @@
 > *Se ejecuta en el paso 2, justo después de T54; el número es posterior solo
 > porque no se renumera lo ya hecho.*
 
-## Bloque 13 — D-8, aplicación: login por inmobiliaria e identidad siempre nueva
+## Bloque 13 — D-8, aplicación: login por inmobiliaria; identidad nunca heredada de otra inmobiliaria
 
 > Sigue con la app como superusuario. Al terminar este bloque el login ya no
 > depende de que el correo sea único global, que es la condición para que el
@@ -214,7 +214,7 @@
 
 - [x] T57 — Modificar `auth.service.ts`: `POST /auth/login` exige `codigo` además de `email` y `password` (400 si falta o si no cumple el formato de R73), lo normaliza a minúsculas sin espacios (R74) y resuelve el tenant con `tenant_por_codigo`; abre transacción, fija `app.current_tenant` y consulta `user` **bajo RLS**; conserva los 401 de R6 (sin `password_hash`) y R8 (email nulo o vacío) y responde 401 —mismo mensaje y mismo código— si el correo pertenece a otro tenant o si el `codigo` no existe. **Cubre: R51, R63, R64, R66, R74.**
 
-- [x] T58 — Modificar `identidad.service.ts`: eliminar `vincularPorEmail` y todo rastro de reutilización entre tenants; la identidad es **siempre nueva** y se inserta con el `tenant_id` de la petición. Retirar los tests de R25 que ya no aplican, dejando constancia en el informe de implementación. Ajustar el JWT para que lleve los roles del único tenant del usuario. **Cubre: R26, R55, R62, R67.**
+- [x] T58 — Modificar `identidad.service.ts`: eliminar `vincularPorEmail` y todo rastro de reutilización entre tenants; la identidad **nunca se hereda de otra inmobiliaria** y se inserta con el `tenant_id` de la petición (dentro de la misma inmobiliaria sí se reutiliza, RF-C2 y `design.md` §7.4; enunciado corregido por R26 de la #26, deuda D6, sin reabrir la task). Retirar los tests de R25 que ya no aplican, dejando constancia en el informe de implementación. Ajustar el JWT para que lleve los roles del único tenant del usuario. **Cubre: R26, R55, R62, R67.**
 
 - [x] T59 — Tests deterministas del login por inmobiliaria: dos personas con **el mismo correo** en tenants distintos se autentican cada una con su `codigo` y obtienen el token de su tenant; ninguna de las dos autentica con el `codigo` de la otra (401); `codigo` inexistente → 401 (mismo cuerpo que unas credenciales inválidas); falta el `codigo` o tiene formato inválido → 400; el `codigo` en mayúsculas o con espacios sobrantes autentica igual (R74); siguen en verde los 401 de R6 y R8. **Cubre: R51, R63, R64, R65, R74.**
 

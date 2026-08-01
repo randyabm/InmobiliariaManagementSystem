@@ -16,19 +16,19 @@
 
 ## Bloque 0 — Deuda del arnés (primero: es independiente y desbloquea el resto)
 
-- [ ] **T1** — `init.sh`: convertir el chequeo `DATABASE_URL == DATABASE_MIGRATION_URL`
+- [x] **T1** — `init.sh`: convertir el chequeo `DATABASE_URL == DATABASE_MIGRATION_URL`
       (`init.sh:180-186`) de `warn` a `fail` con salida distinta de cero. Los
       tres `warn` por variables ausentes **se dejan como están**. **Cubre: R25.**
-- [ ] **T2** — Test de repositorio (`tests/init-sh-roles-db.test.ts`) que ejecuta
+- [x] **T2** — Test de repositorio (`tests/init-sh-roles-db.test.ts`) que ejecuta
       `init.sh` con un `.env` de prueba donde ambas URLs coinciden y afirma exit
       code ≠ 0; y un segundo caso donde difieren y no falla por este motivo.
       **Cubre: R25.**
-- [ ] **T3** — Corregir el **texto** del titular de R62 en
+- [x] **T3** — Corregir el **texto** del titular de R62 en
       `specs/owner_tenant_profiles/requirements.md` y el enunciado de T58 en su
       `tasks.md` para que digan "nunca heredada de otra inmobiliaria" en vez de
       "siempre nueva". **No** se tocan su código, su estado ni sus `[x]`.
       **Cubre: R26.**
-- [ ] **T4** — Test de repositorio que afirma que ni el titular de R62 ni el
+- [x] **T4** — Test de repositorio que afirma que ni el titular de R62 ni el
       enunciado de T58 contienen la afirmación sin acotar. **Cubre: R26.**
 
 ## Bloque A — Identidad única por inmobiliaria

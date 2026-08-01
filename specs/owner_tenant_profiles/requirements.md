@@ -676,7 +676,7 @@ DEBE elegir un tenant por su cuenta.
 > No hay datos de producción todavía, así que abortar es seguro. Adivinar
 > repartiría identidades entre inmobiliarias sin traza.
 
-### R62 — (RF-C1, RF-C6, D-8) La identidad de un cliente es siempre nueva
+### R62 — (RF-C1, RF-C6, D-8) La identidad de un cliente nunca se hereda de otra inmobiliaria
 
 CUANDO se crea un propietario o un inquilino, el sistema DEBE crear una fila de
 `user` nueva en el tenant de la petición, y NO DEBE consultar ni reutilizar
@@ -684,6 +684,14 @@ ninguna identidad existente de otro tenant, coincida o no el correo.
 
 > Sustituye a **R25** (eliminado). Dentro del mismo tenant sigue vigente R24:
 > un documento ya registrado responde 409 `PERFIL_YA_EXISTE`.
+>
+> **Titular corregido por R26 de la #26 `identidad_multirol_cliente`** (deuda D6
+> del review #2). Decía "la identidad es **siempre nueva**", que leído al pie de
+> la letra rompe RF-C2 y `design.md` §7.4: **dentro** de una misma inmobiliaria
+> la identidad **sí** se reutiliza, y desde la #26 se deduplica por documento. La
+> prohibición que este requirement fija es la de heredar identidades **de otra
+> inmobiliaria** (D-8), que es lo que su propio cuerpo siempre dijo. Se corrige
+> el texto y nada más: la implementación era correcta y el reviewer lo confirmó.
 
 ### R63 — (RF-AU1, D-8) El login identifica la inmobiliaria
 
