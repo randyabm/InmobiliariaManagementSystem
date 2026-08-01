@@ -41,7 +41,21 @@ const RUTAS_PERMITIDAS = [
   'GET /inquilinos/:id',
   'PATCH /inquilinos/:id',
   'DELETE /inquilinos/:id',
-  // Las 10 rutas de la feature #25 se añadirán en su propia corrida.
+  // ─── Feature #25 retencion_codeudor_referencias: 10 rutas (R25, design §5) ─
+  // Retención: solo `admin` (R21). Codeudores y referencias:
+  // `@Roles('admin','empleado')` (R20). Todas con @UseGuards(JwtAuthGuard,
+  // RolesGuard). Sus tres tests obligatorios están en `retencion.test.ts`,
+  // `codeudores.test.ts` y `referencias.test.ts`.
+  'GET /configuracion/retencion',
+  'PUT /configuracion/retencion/:anio',
+  'POST /inquilinos/:idInquilino/codeudores',
+  'GET /inquilinos/:idInquilino/codeudores',
+  'PATCH /inquilinos/:idInquilino/codeudores/:idCodeudor',
+  'DELETE /inquilinos/:idInquilino/codeudores/:idCodeudor',
+  'POST /inquilinos/:idInquilino/referencias',
+  'GET /inquilinos/:idInquilino/referencias',
+  'PATCH /inquilinos/:idInquilino/referencias/:idReferencia',
+  'DELETE /inquilinos/:idInquilino/referencias/:idReferencia',
 ] as const;
 
 function normalizar(segmento: unknown): string {
