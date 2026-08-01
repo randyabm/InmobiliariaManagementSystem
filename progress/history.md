@@ -425,3 +425,26 @@ real**. Por eso se adoptaron dos medidas permanentes:
   ninguna ruta de cliente, todas piden `admin` o `empleado`.
 - Feature #23 `ci_pipeline` sigue pendiente: Forgejo no está levantado.
 - Nada pusheado: el trabajo vive solo en el disco local.
+
+## 2026-08-01 — Feature #26 `identidad_multirol_cliente` (cerrada)
+
+- **Agente:** leader → spec_author → implementer → reviewer
+- **Feature:** #26 `identidad_multirol_cliente` — `in_progress` → **`done`**
+- **Veredicto del reviewer:** **APPROVED, sin bloqueantes**
+  (`progress/review_identidad_multirol_cliente.md`).
+- **Verificación:** `./init.sh` exit 0 — `test` 452 (42 archivos), `test:db` 71
+  (3 archivos). 31/31 tasks.
+- **Mutaciones reproducidas por el reviewer:** (b) 1/452, (b+d) 2/19, (d)
+  37/452, (f) 9/452, más una propia (g) revertir el arreglo del JWT → 4/452.
+  Los cuatro números del implementer coinciden exactamente.
+- **Lo que trajo:** identidad deduplicada por documento dentro de la
+  inmobiliaria; el token declara con qué rol se actúa (rol activo restringe,
+  nunca amplía); nombre divergente al deduplicar → 409 sin escribir; init.sh
+  falla si `DATABASE_URL` y `DATABASE_MIGRATION_URL` coinciden.
+- **Deuda anotada por el reviewer (no bloqueante):** D-1 comentario de
+  `vitest.config.ts` sobre Docker (preexistente de #5), D-3 R18 sin rutas de
+  cliente hasta el portal (RF-AU2/AU4), D-4 test que reutilice el token de
+  `POST /auth/login` como Bearer, D-6 PA-5 (plegado de diacríticos), D-7 PA-2
+  (herramienta de fusión de duplicados).
+- **Pendientes heredados:** PA-14 (onboarding de inmobiliaria sin RF-*),
+  push sin autorizar, Forgejo (#23) sin montar.
