@@ -196,7 +196,7 @@
       "name": "workflow_engine",
       "phase": "1a",
       "sdd": true,
-      "status": "spec_ready",
+      "status": "in_progress",
       "title": "Motor de workflows dirigido por datos",
       "prd_refs": ["RF-W1", "RF-W4", "RF-W5", "D3"],
       "acceptance": [
