@@ -248,11 +248,32 @@ describe('Invariantes de seguridad del ingreso (T14-T18)', () => {
 
   describe('frontera R14: sin templates ni contratos', () => {
     it('el ingreso responde 201 sin exigir ni crear nada de contratos', async () => {
-      const { rows: tablas } = await entorno.poolAdmin.query<{ table_name: string }>(
-        `SELECT table_name FROM information_schema.tables
-          WHERE table_schema = 'public' AND table_name LIKE 'contract%'`,
+      // Las tablas `contract*` ya existen (#16/#17), pero el invariante se
+      // mantiene: ninguna FK de las tablas del ingreso las exige. Si algún
+      // día el ingreso dependiera de un contrato, este test se pone rojo.
+      const { rows: dependencias } = await entorno.poolAdmin.query<{ conname: string }>(
+        `SELECT conname
+           FROM pg_constraint c
+          WHERE c.contype = 'f'
+            AND (
+              (EXISTS (SELECT 1 FROM pg_class r
+                        WHERE r.oid = c.conrelid
+                          AND r.relname IN ('propiedad', 'perfil_propietario',
+                                            'perfil_inquilino', 'historial_ocupacion'))
+               AND EXISTS (SELECT 1 FROM pg_class r
+                            WHERE r.oid = c.confrelid
+                              AND r.relname LIKE 'contract%'))
+              OR
+              (EXISTS (SELECT 1 FROM pg_class r
+                        WHERE r.oid = c.confrelid
+                          AND r.relname IN ('propiedad', 'perfil_propietario',
+                                            'perfil_inquilino', 'historial_ocupacion'))
+               AND EXISTS (SELECT 1 FROM pg_class r
+                            WHERE r.oid = c.conrelid
+                              AND r.relname LIKE 'contract%'))
+            )`,
       );
-      expect(tablas).toEqual([]);
+      expect(dependencias).toEqual([]);
 
       const respuesta = await comoAdminA().send({
         escenario: 'VACANTE',
