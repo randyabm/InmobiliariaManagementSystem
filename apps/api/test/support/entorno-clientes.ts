@@ -5,6 +5,7 @@ import {
 } from '@testcontainers/postgresql';
 import * as bcrypt from 'bcrypt';
 import * as jwt from 'jsonwebtoken';
+import { randomUUID } from 'node:crypto';
 import { Pool } from 'pg';
 
 import { closeDatabasePool } from '../../src/database/database.client';
@@ -100,10 +101,32 @@ export interface EntornoClientes {
   cerrar(): Promise<void>;
 }
 
-function firmar(id: string, email: string | null, roles: Array<{ tenant_id: string; rol: string }>): string {
-  return jwt.sign({ sub: id, email, roles }, JWT_SECRET_DE_PRUEBA, {
-    expiresIn: '1h',
-  });
+function firmar(
+  id: string,
+  email: string | null,
+  roles: Array<{ tenant_id: string; rol: string }>,
+  jti: string,
+  ver: number,
+): string {
+  return jwt.sign(
+    { sub: id, email, roles, jti, ver },
+    JWT_SECRET_DE_PRUEBA,
+    { expiresIn: '1h' },
+  );
+}
+
+/** Crea una sesión real para una identidad sembrada (**#27**, T1). */
+async function sembrarSesion(
+  poolAdmin: Pool,
+  userId: string,
+  tenantId: string,
+): Promise<{ id: string }> {
+  const { rows } = await poolAdmin.query<{ id: string }>(
+    `INSERT INTO sesion (id, user_id, tenant_id, refresh_token_hash, expira_en)
+     VALUES ($1, $2, $3, NULL, now() + interval '30 days') RETURNING id`,
+    [randomUUID(), userId, tenantId],
+  );
+  return { id: rows[0]!.id };
 }
 
 export async function levantarEntornoClientes(): Promise<EntornoClientes> {
@@ -175,7 +198,21 @@ export async function levantarEntornoClientes(): Promise<EntornoClientes> {
         [id, rol.tenant_id, rol.rol],
       );
     }
-    return { id, email, token: firmar(id, email, rolesEnToken) };
+
+    // #27 (T1): los tokens llevan `jti`/`ver` y la sesión existe de verdad.
+    // Sin sesión, la validación de R4/R5 rechazaría el token con 401 en
+    // cuanto `JwtStrategy` pase a exigirla. Los usuarios sin credenciales NO
+    // reciben sesión (spec #27, T1): el token que se les firma es un token
+    // muerto, y solo existe porque el arnés siempre firmó uno.
+    const sesion = conCredenciales
+      ? await sembrarSesion(poolAdmin, id, tenantId)
+      : { id: randomUUID() };
+
+    return {
+      id,
+      email,
+      token: firmar(id, email, rolesEnToken, sesion.id, 0),
+    };
   }
 
   const adminA = await sembrar(TENANT_A, 'admin-a@example.com', 'Admin A', [

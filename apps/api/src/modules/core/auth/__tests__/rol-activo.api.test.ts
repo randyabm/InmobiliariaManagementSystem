@@ -1,4 +1,5 @@
 import * as jwt from 'jsonwebtoken';
+import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
@@ -32,7 +33,7 @@ describe('Rol activo: consultar y elegir (#26 bloque B)', () => {
   let servidor: () => ReturnType<EntornoClientes['app']['getHttpServer']>;
 
   /** Identidad con dos roles reales en A: `empleado` y `propietario`. */
-  let multirol: { id: string; token: string };
+  let multirol: { id: string; token: string; sesionId: string };
 
   beforeAll(async () => {
     entorno = await levantarEntornoClientes();
@@ -59,12 +60,22 @@ describe('Rol activo: consultar y elegir (#26 bloque B)', () => {
       [id, TENANT_A],
     );
 
+    // #27: la sesión se siembra de verdad y el token declara su `jti`/`ver`:
+    // sin sesión, la validación de R4/R5 rechazaría el token con 401 antes
+    // de llegar a `RolesGuard`, y los tests de R29 (403) perderían su objeto.
+    const sesion = await entorno.poolAdmin.query<{ id: string }>(
+      `INSERT INTO sesion (id, user_id, tenant_id, refresh_token_hash, expira_en)
+       VALUES ($1, $2, $3, NULL, now() + interval '30 days') RETURNING id`,
+      [randomUUID(), id, TENANT_A],
+    );
+
     multirol = {
       id,
+      sesionId: sesion.rows[0]!.id,
       token: firmar(id, 'multirol-a@example.com', [
         { tenant_id: TENANT_A, rol: 'empleado' },
         { tenant_id: TENANT_A, rol: 'propietario' },
-      ]),
+      ], sesion.rows[0]!.id, 0),
     };
   }, 180_000);
 
@@ -76,6 +87,8 @@ describe('Rol activo: consultar y elegir (#26 bloque B)', () => {
     sub: string,
     email: string | null,
     roles: Array<{ tenant_id: string; rol: string }>,
+    jti: string,
+    ver: number,
     rolActivo?: string,
   ): string {
     return jwt.sign(
@@ -84,6 +97,8 @@ describe('Rol activo: consultar y elegir (#26 bloque B)', () => {
         email,
         tenant_id: roles[0]?.tenant_id,
         roles,
+        jti,
+        ver,
         ...(rolActivo === undefined ? {} : { rol_activo: rolActivo }),
       },
       JWT_SECRET_DE_PRUEBA,
@@ -313,9 +328,19 @@ describe('Rol activo: consultar y elegir (#26 bloque B)', () => {
         `INSERT INTO user_role (user_id, tenant_id, rol) VALUES ($1, $2, 'empleado')`,
         [id, TENANT_A],
       );
-      const token = firmar(id, 'revocable@example.com', [
-        { tenant_id: TENANT_A, rol: 'empleado' },
-      ]);
+      // #27: sesión real, token con jti/ver — igual que el resto del arnés.
+      const sesion = await entorno.poolAdmin.query<{ id: string }>(
+        `INSERT INTO sesion (id, user_id, tenant_id, refresh_token_hash, expira_en)
+         VALUES ($1, $2, $3, NULL, now() + interval '30 days') RETURNING id`,
+        [randomUUID(), id, TENANT_A],
+      );
+      const token = firmar(
+        id,
+        'revocable@example.com',
+        [{ tenant_id: TENANT_A, rol: 'empleado' }],
+        sesion.rows[0]!.id,
+        0,
+      );
 
       const antes = await request(servidor())
         .post('/auth/rol-activo')
@@ -338,11 +363,16 @@ describe('Rol activo: consultar y elegir (#26 bloque B)', () => {
     });
 
     it('R29 — un token cuyo rol_activo no figura entre sus roles da 403', async () => {
-      // Token manipulado: dice actuar como `admin` sin declarar ese rol.
+      // Token manipulado: dice actuar como `admin` sin declarar ese rol. La
+      // sesión es la REAL de `multirol` (jti/ver válidos): el 403 que se
+      // prueba es el de coherencia de `RolesGuard` (R29), no el 401 de
+      // sesión inexistente (R5) — esa distinción importa.
       const incoherente = firmar(
         multirol.id,
         'multirol-a@example.com',
         [{ tenant_id: TENANT_A, rol: 'empleado' }],
+        multirol.sesionId,
+        0,
         'admin',
       );
 

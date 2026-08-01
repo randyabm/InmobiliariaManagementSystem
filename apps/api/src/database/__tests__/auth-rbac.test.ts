@@ -101,7 +101,7 @@ describe('Auth + RBAC (R9, R10)', () => {
     );
 
     const token = jwt.sign(
-      { sub: user.id, email: 'test@example.com', roles: roleRows.rows },
+      { sub: user.id, email: 'test@example.com', roles: roleRows.rows, jti: 'aaaaaaaa-0000-0000-0000-000000000001', ver: 0 },
       JWT_SECRET,
       { expiresIn: '1h' },
     );
@@ -133,6 +133,8 @@ describe('Auth + RBAC (R9, R10)', () => {
         sub: USER_ID,
         email: 'test@example.com',
         roles: [{ tenant_id: TENANT_A, rol: 'admin' }],
+        jti: 'aaaaaaaa-0000-0000-0000-000000000002',
+        ver: 0,
       },
       JWT_SECRET,
       { expiresIn: '1h' },
@@ -155,6 +157,8 @@ describe('Auth + RBAC (R9, R10)', () => {
         sub: USER_ID,
         email: 'test@example.com',
         roles: [{ tenant_id: TENANT_A, rol: 'admin' }],
+        jti: 'aaaaaaaa-0000-0000-0000-000000000002',
+        ver: 0,
       },
       JWT_SECRET,
       { expiresIn: '1h' },
