@@ -213,15 +213,31 @@ describe('Codeudores y referencias — integración (#25)', () => {
   // ─── T20 — frontera de comportamiento (R17) ─────────────────────────────
 
   it('registra codeudor y referencia SIN que exista contrato, firma ni inventario (R17)', async () => {
-    // No solo no hay filas: ni siquiera existen las tablas de esas features
-    // (#14, #15, #17). Si algún día alguien añade una FK que las exija, este
-    // test deja de ser verde por construcción — y T21 lo señala antes.
-    const { rows: tablas } = await entorno.poolAdmin.query<{ table_name: string }>(
-      `SELECT table_name FROM information_schema.tables
-        WHERE table_schema = 'public'
-          AND (table_name ~ 'contrato|firma|inventario|otp')`,
+    // La feature #12 ya creó las tablas `inventario*`, pero el invariante se
+    // mantiene: ninguna FK de codeudores/referencias puede exigir contrato,
+    // firma ni inventario. Si algún día alguien añade una FK que las exija,
+    // este test deja de ser verde por construcción — y T21 lo señala antes.
+    const { rows: dependencias } = await entorno.poolAdmin.query<{ conname: string }>(
+      `SELECT conname
+         FROM pg_constraint c
+        WHERE c.contype = 'f'
+          AND (
+            (EXISTS (SELECT 1 FROM pg_class r
+                      WHERE r.oid = c.conrelid
+                        AND r.relname IN ('codeudor_inquilino', 'referencia_inquilino'))
+             AND EXISTS (SELECT 1 FROM pg_class r
+                          WHERE r.oid = c.confrelid
+                            AND r.relname ~ 'contrato|firma|inventario|otp'))
+            OR
+            (EXISTS (SELECT 1 FROM pg_class r
+                      WHERE r.oid = c.confrelid
+                        AND r.relname IN ('codeudor_inquilino', 'referencia_inquilino'))
+             AND EXISTS (SELECT 1 FROM pg_class r
+                          WHERE r.oid = c.conrelid
+                            AND r.relname ~ 'contrato|firma|inventario|otp'))
+          )`,
     );
-    expect(tablas).toEqual([]);
+    expect(dependencias).toEqual([]);
 
     const codeudor = await comoAdminA(
       'post',

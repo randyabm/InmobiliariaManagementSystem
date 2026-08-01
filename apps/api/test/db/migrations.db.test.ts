@@ -1278,4 +1278,71 @@ describe('Aplicación real de las migraciones (R10)', () => {
       ).rejects.toMatchObject({ code: '23514' });
     });
   });
+
+  // ─── Feature #12 inventory_creation (T4: R1, R2, R3, R11) ───────────────
+
+  describe('esquema de #12 (R1, R2, R3, R11)', () => {
+    const TABLAS_12 = [
+      'inventario',
+      'inventario_zona',
+      'inventario_item',
+      'inventario_item_foto',
+    ] as const;
+
+    it.each(TABLAS_12)(
+      'la tabla %s existe con RLS habilitado Y FORZADO (R1/R2/R3)',
+      async (tabla) => {
+        const { rows } = await pool.query<{
+          relrowsecurity: boolean;
+          relforcerowsecurity: boolean;
+        }>(
+          `SELECT c.relrowsecurity, c.relforcerowsecurity
+             FROM pg_class c
+             JOIN pg_namespace n ON n.oid = c.relnamespace
+            WHERE n.nspname = 'public' AND c.relname = $1`,
+          [tabla],
+        );
+
+        expect(rows, `la tabla ${tabla} no existe`).toHaveLength(1);
+        expect(rows[0]?.relrowsecurity).toBe(true);
+        expect(rows[0]?.relforcerowsecurity).toBe(true);
+      },
+    );
+
+    it.each(TABLAS_12)(
+      'la política de aislamiento de %s filtra por app.current_tenant (R1/R2/R3)',
+      async (tabla) => {
+        const { rows } = await pool.query<{ polname: string; qual: string | null }>(
+          `SELECT policyname AS polname, qual
+             FROM pg_policies WHERE schemaname = 'public' AND tablename = $1`,
+          [tabla],
+        );
+
+        expect(rows.map((r) => r.polname)).toContain(`${tabla}_tenant_isolation`);
+        const politica = rows.find((r) => r.polname === `${tabla}_tenant_isolation`);
+        expect(politica?.qual).toContain('app.current_tenant');
+      },
+    );
+
+    it('inventario nace en BORRADOR y los CHECKs de estado/tipo_evento existen (R1)', async () => {
+      const { rows } = await pool.query<{ conname: string }>(
+        `SELECT conname FROM pg_constraint
+          WHERE conrelid = 'inventario'::regclass AND contype = 'c'`,
+      );
+      expect(rows.map((r) => r.conname)).toEqual(
+        expect.arrayContaining([
+          'inventario_estado_check',
+          'inventario_tipo_evento_check',
+        ]),
+      );
+
+      // El default de estado es BORRADOR (PA-12-1): el motor lo impone.
+      const { rows: defaultCol } = await pool.query<{ column_default: string | null }>(
+        `SELECT column_default FROM information_schema.columns
+          WHERE table_schema = 'public' AND table_name = 'inventario'
+            AND column_name = 'estado'`,
+      );
+      expect(defaultCol[0]?.column_default).toContain("'BORRADOR'");
+    });
+  });
 });

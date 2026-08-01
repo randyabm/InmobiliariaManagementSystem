@@ -95,6 +95,16 @@ export class AlmacenamientoService {
   async borrar(clave: string): Promise<void> {
     await this.cliente.removeObject(this.bucket, clave);
   }
+
+  /** Descarga el binario completo (para firmar verificando el hash, #14). */
+  async obtener(clave: string): Promise<Buffer> {
+    const stream = await this.cliente.getObject(this.bucket, clave);
+    const chunks: Buffer[] = [];
+    for await (const chunk of stream) {
+      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    }
+    return Buffer.concat(chunks);
+  }
 }
 
 /** Extensión normalizada a partir del mime; vacía si no se reconoce. */

@@ -5,6 +5,7 @@ import type {
   PlantillaInmueble,
   PlantillaItem,
   PlantillaZona,
+  TipoPropiedad,
 } from '@inmobiliaria/types';
 
 import type { ContextoPeticion } from '../../../common/database/cliente-tenant';
@@ -36,6 +37,28 @@ export class PlantillasService {
       throw new ResourceNotFoundError();
     }
     return plantilla;
+  }
+
+  /**
+   * PA-12-3 (feature #12) — la plantilla activa para un tipo de propiedad:
+   * la copia TENANT si existe, si no la SISTEMA (mismo criterio PA-8-3).
+   */
+  async resolverPlantillaParaTenant(
+    tipo: TipoPropiedad,
+    ctx: ContextoPeticion,
+  ): Promise<PlantillaInmueble | null> {
+    const copia = await this.repositorio.buscarPlantillaPorTipo(ctx, tipo);
+    if (copia) return copia;
+
+    const { rows } = await ctx.cliente.query(
+      `SELECT id, tenant_id::text AS tenant_id, tipo, nombre, origen, version,
+              activo, created_at, updated_at
+         FROM plantilla_inmueble
+        WHERE tenant_id = '00000000-0000-0000-0000-000000000000'::uuid
+          AND tipo = $1`,
+      [tipo],
+    );
+    return rows[0] ? aPlantillaInmueblePublica(rows[0]) : null;
   }
 
   /** R5. */
@@ -207,6 +230,32 @@ export class PlantillasService {
     }
     return item;
   }
+}
+
+/** Mapea una fila de plantilla_inmueble a su tipo público (PA-12-3). */
+function aPlantillaInmueblePublica(fila: unknown): PlantillaInmueble {
+  const f = fila as {
+    id: string;
+    tenant_id: string;
+    tipo: TipoPropiedad;
+    nombre: string;
+    origen: 'SISTEMA' | 'TENANT';
+    version: number;
+    activo: boolean;
+    created_at: Date;
+    updated_at: Date;
+  };
+  return {
+    id: f.id,
+    tenant_id: f.tenant_id,
+    tipo: f.tipo,
+    nombre: f.nombre,
+    origen: f.origen,
+    version: f.version,
+    activo: f.activo,
+    created_at: f.created_at.toISOString(),
+    updated_at: f.updated_at.toISOString(),
+  };
 }
 
 /** R9 — `opciones_json` solo con `seleccion` y no vacío (defensa; el borde valida con zod). */

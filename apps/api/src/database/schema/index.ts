@@ -45,3 +45,7 @@ export { notificacionProgramada } from './notificacion-programada';
 export { plantillaInmueble, TENANT_SISTEMA_PLANTILLAS } from './plantilla-inmueble';
 export { plantillaZona } from './plantilla-zona';
 export { plantillaItem } from './plantilla-item';
+export { inventario } from './inventario';
+export { inventarioZona } from './inventario-zona';
+export { inventarioItem } from './inventario-item';
+export { inventarioItemFoto } from './inventario-item-foto';

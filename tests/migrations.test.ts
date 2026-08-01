@@ -53,6 +53,9 @@ const archivosSql = readdirSync(rutaRepo(CARPETA))
  * Las tres tablas `plantilla_*` se crearon en la feature #11
  * `inventory_templates` (R1, R2, R3), con RLS habilitado y forzado en la
  * misma migración.
+ * Las cuatro tablas `inventario*` se crearon en la feature #12
+ * `inventory_creation` (R1, R2, R3), con RLS habilitado y forzado en la
+ * misma migración.
  */
 const TABLAS_PERMITIDAS: readonly string[] = [
   'tenant',
@@ -81,6 +84,10 @@ const TABLAS_PERMITIDAS: readonly string[] = [
   'plantilla_inmueble',
   'plantilla_zona',
   'plantilla_item',
+  'inventario',
+  'inventario_zona',
+  'inventario_item',
+  'inventario_item_foto',
 ];
 
 describe('Migración inicial (R10)', () => {

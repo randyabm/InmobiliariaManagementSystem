@@ -114,6 +114,7 @@ function resolverEntityId(
     params.idCodeudor ??
     params.idReferencia ??
     params.idCuenta ??
+    params.idFoto ??
     params.id
   );
 }

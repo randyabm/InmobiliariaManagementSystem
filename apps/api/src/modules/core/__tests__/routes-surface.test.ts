@@ -90,6 +90,19 @@ const RUTAS_PERMITIDAS = [
   'DELETE /propiedades/:idPropiedad/documentos/:idDocumento',
   'POST /propiedades/:id/fotos',
   'DELETE /propiedades/:id/fotos',
+  // ─── Feature #12 inventory_creation: 11 rutas (R14, design.md §6) ───────
+  // Todas con @UseGuards(JwtAuthGuard, RolesGuard) y @Roles('admin','empleado')
+  // (R8). `@Audit` en las mutaciones; `idFoto` alimenta el fallback del
+  // AuditInterceptor para la baja de fotos (R10).
+  'POST /inventarios',
+  'GET /inventarios',
+  'GET /inventarios/:id',
+  'PATCH /inventarios/:id/zonas/orden',
+  'PATCH /inventarios/:id/zonas/:zonaId',
+  'PATCH /inventarios/:id/items/:itemId',
+  'POST /inventarios/:id/items/:itemId/fotos',
+  'DELETE /inventarios/:id/fotos/:idFoto',
+  'DELETE /inventarios/:id',
   // ─── Feature #7 workflow_engine: 9 rutas (R17, design.md §8) ───────────
   // Gestión de definiciones: solo `admin` (RF-W2). Instancias y ejecución:
   // `@Roles('admin','empleado')`.

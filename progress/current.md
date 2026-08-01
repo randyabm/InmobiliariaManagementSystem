@@ -4,11 +4,14 @@
 > `history.md`. Mientras trabajas, **mantenlo actualizado en tiempo real**,
 > no al final.
 
-- **Feature en curso:** batch **#12 `inventory_creation`**, **#13
-  `inventory_tenant_review`** y **#15 `pwa_offline`** — status
-  **`spec_ready`** (los tres) → ⏸ **puerta humana (una sola)**.
-- **Agente:** leader → spec_author (3 specs listos) → ⏸ **HUMANO** →
-  implementer → reviewer.
+- **Feature en curso:** batch **#12 `inventory_creation`** (implementada,
+  24/24 tasks, esperando **review** con mutaciones), **#13
+  `inventory_tenant_review`** (spec_ready), **#14 `inventory_signature_pdf`**
+  (spec_ready — agregada al lote por decisión del humano), **#15
+  `pwa_offline`** (spec_ready).
+- **Agente:** implementer terminó #12 → reviewer (mutaciones) → humano
+  autoriza `done` → luego #13 → #15 → #14 (o el orden que el humano decida;
+  #14 depende de #13 por el OTP FIRMA).
 - **Estado:** meta de la sesión: **completar la fase 1** (1b + 1c + #23).
 
 ## UI del proyecto
@@ -22,6 +25,14 @@ frontend. Las features de la fase 1 son backend (API). La PWA de campo
 
 #1–#5, #24, #25–#27, #6–#11.
 
+## En review
+
+- **#12 `inventory_creation`** — implementación completa:
+  - Suite: `npm run test` **761** (82 archivos) + `npm run test:db` **131**.
+  - Lint, typecheck y build verdes; `./init.sh` exit 0 (22 OK).
+  - Trazabilidad R1–R11 → test en `progress/impl_inventory_creation.md`.
+  - PA-12-1..4 ejecutadas; fronteras #13/#14/#21/#22/#15 anotadas.
+
 ## Pendientes de decisión del humano
 
 1. **El push sigue sin hacerse.** Forgejo no responde en `127.0.0.1:3000`
@@ -33,6 +44,5 @@ frontend. Las features de la fase 1 son backend (API). La PWA de campo
 
 ## Cola
 
-- **#14** `inventory_signature_pdf` — después del lote.
 - **#16–#20** — contratos y póliza (1c).
 - **#23** `ci_pipeline` — `pending` (Forgejo sin montar; bloquea el push).

@@ -35,6 +35,25 @@ export type {
   WorkflowTransicionLog,
 } from './workflows';
 
+// Feature #12 inventory_creation.
+export {
+  AUTORES_FOTO,
+  ESTADOS_CHECKLIST,
+  ESTADOS_INVENTARIO,
+  TIPOS_EVENTO_INVENTARIO,
+} from './inventarios';
+export type {
+  AutorFoto,
+  EstadoChecklist,
+  EstadoInventario,
+  Inventario,
+  InventarioCompleto,
+  InventarioItem,
+  InventarioItemFoto,
+  InventarioZona,
+  TipoEventoInventario,
+} from './inventarios';
+
 // Feature #11 inventory_templates.
 export { FIELD_TYPES, ORIGENES_PLANTILLA } from './plantillas';
 export type {
