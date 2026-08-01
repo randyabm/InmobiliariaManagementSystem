@@ -4,9 +4,34 @@
 > `history.md`. Mientras trabajas, **mantenlo actualizado en tiempo real**,
 > no al final.
 
-- **Feature en curso:** _ninguna_ — la #9 `property_intake` quedó `done` el
-  2026-08-01. **Fase 1a completa: 13 features cerradas.**
-- **Agente:** — (sesión cerrada)
+- **Feature en curso:** #10 `notifications` — status **`spec_ready`**
+- **Agente:** leader → spec_author (3 archivos listos) → ⏸ **HUMANO**
+- **Estado:** ⏸ **esperando la aprobación del spec.** Meta de la sesión:
+  **completar toda la fase 1** (1b + 1c + #23). NO se toca código hasta
+  aprobar cada spec.
+
+## Espec — `specs/notifications/`
+
+Motor de notificaciones asíncronas (RF-N1/N2, RF-W3). 18 requirements
+(R1–R18), 25 tasks (11 de test). Consume el hook `notificacion` que #7 dejó
+como dato. `./init.sh` verde (674 + 108 tests) antes de redactar el spec.
+
+## Decisiones técnicas que el humano debe confirmar (design.md §10)
+
+1. **PA-10-1 — Outbox transaccional + procesador en proceso** (cada 60 s),
+   en vez de BullMQ/Redis (PRD §11): la fila se escribe y revierte CON la
+   transición; tests deterministas sin infra nueva. BullMQ queda como
+   deuda de escalabilidad.
+2. **PA-10-2 — Interfaz + `ProveedorRegistro`** como único proveedor MVP
+   (persiste en `notificacion_enviada` append-only); email/SMS/WhatsApp se
+   enchufan detrás de la interfaz cuando existan credenciales (no hay
+   SMTP/APIs en el entorno).
+3. **PA-10-3 — Destinatario/canal**: el hook declara `destinatario`
+   (inquilino_actual / propietario_principal / email/celular directo) y el
+   canal es el del hook o el `medio_preferido_contacto` del perfil (RF-C4).
+4. **PA-10-4 — Gancho en `WorkflowService`**: tras cada transición con
+   hook, escribe el outbox en la misma transacción; sin cambiar la
+   semántica del motor (R18).
 
 ## Pendientes de decisión del humano
 

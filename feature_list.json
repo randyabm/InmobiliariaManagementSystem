@@ -239,9 +239,9 @@
     {
       "id": 10,
       "name": "notifications",
-      "phase": "1a",
+      "phase": "1b",
       "sdd": true,
-      "status": "pending",
+      "status": "spec_ready",
       "title": "Motor de notificaciones asíncronas",
       "prd_refs": ["RF-N1", "RF-N2", "RF-W3", "RF-C4"],
       "acceptance": [
