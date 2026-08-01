@@ -717,3 +717,54 @@ hardening, #25 retención, #26 identidad multi-rol, #27 sesiones, #6 hoja
 de vida del inmueble, #7 motor de workflows, #8 ciclo de vida + dashboard
 y #9 ingreso. La cola sigue con la fase 1b (#10 notifications, #11-#15
 inventarios, #23 CI) y 1c (contratos).
+
+## 2026-08-01 — Feature #10 `notifications` (cerrada)
+
+- **Agente:** leader → spec_author → implementer → reviewer
+- **Feature:** #10 `notifications` — `in_progress` → **`done`**
+- **Veredicto del reviewer:** **APPROVED, sin bloqueantes**
+  (`progress/review_notifications.md`).
+- **Verificación:** `./init.sh` exit 0 — `test` **706** (76 archivos), `test:db`
+  **116** (3 archivos). Lint, typecheck y build verdes. 25/25 tasks.
+- **Mutaciones:** 5 reproducidas por el reviewer, todas al test exacto (1/4
+  gancho del motor, 3/3 SET LOCAL del procesador, 1/3 reintentos sin tope,
+  1/6 medio preferido ignorado, 1/94 triggers append-only).
+- **Lo que trajo (cierra RF-W3 de punta a punta):**
+  - Outbox transaccional (PA-10-1): el hook `notificacion` de #7 se consume
+    escribiendo la fila en la MISMA transacción de la transición — si la
+    transición revierte, la notificación también (probado con condición
+    falsa → 0 filas).
+  - Procesador global por tenant (60 s, sin superposición): la tercera vía
+    fuera del RLS `notificaciones_tenants_a_procesar()` (patrón R52/R18,
+    vigilada por el inventario de funciones SECURITY DEFINER, que creció a
+    tres) y todo lo demás bajo `SET LOCAL` de cada tenant. Reintentos
+    acotados (3) con error sin PII.
+  - Destinatario/canal (PA-10-3): tipos resueltos desde la entidad de la
+    instancia o email/celular directos; canal del hook o
+    `medio_preferido_contacto` del perfil (RF-C4). Interfaz +
+    `ProveedorRegistro` (append-only, triggers).
+  - Recordatorios programados (RF-N2): crear/listar/cancelar + ejecución de
+    vencidos (los específicos, p. ej. inventario sin revisar, los creará
+    #13 — frontera R13).
+  - 5 rutas, migración `0014`, 3 tablas, cero dependencias nuevas (sin
+    BullMQ/Redis; anotado como deuda de escalabilidad D-1).
+  - `esquemaAnadirTransicion` e `insertarTransicion` del motor ahora
+    persisten `notificacion` (el test del gancho cazó el hueco).
+- **Desviaciones anotadas (legítimas):** la función bootstrap devuelve
+  tenants, no filas (el procesador reabre todo dentro del RLS); el test T20
+  de #8 se actualizó de «no existen tablas de notificación» a «la
+  transición del seed sin hook no genera trabajo» (la propiedad de la
+  frontera R8 se mantiene).
+- **Deuda del reviewer (no bloqueante):** D-1 mover el procesador a un
+  worker BullMQ si el volumen lo exige; D-2 propagar el canal resuelto al
+  proveedor (hoy `CORREO` fijo en el registro); D-3 los recordatorios
+  específicos son de #13.
+- **Pendientes heredados:** PA-14 (onboarding sin RF-*), push sin
+  autorizar, Forgejo (#23) sin montar, deudas de reviews
+  #25/#26/#27/#6/#7/#8/#9/#10.
+
+### Siguiente
+
+La cola sigue con la fase 1b de inventarios: **#11 `inventory_templates`**
+(plantillas de zonas e ítems), luego #12 creación, #13 revisión del
+inquilino, #14 firma+PDF y #15 PWA offline.

@@ -241,7 +241,7 @@
       "name": "notifications",
       "phase": "1b",
       "sdd": true,
-      "status": "in_progress",
+      "status": "done",
       "title": "Motor de notificaciones asíncronas",
       "prd_refs": ["RF-N1", "RF-N2", "RF-W3", "RF-C4"],
       "acceptance": [
