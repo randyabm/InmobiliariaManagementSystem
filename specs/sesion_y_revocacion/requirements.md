@@ -97,7 +97,8 @@ el sistema DEBE rechazarla con 401, aunque la firma sea válida.
 ### R6 — (RF-AU1) El login abre una sesión y entrega refresh token
 
 CUANDO `POST /auth/login` autentica con éxito, el sistema DEBE crear una
-`sesion` para esa identidad en el tenant de la petición, responder 200 con
+`sesion` para esa identidad en el tenant de la petición, responder 201 (el
+código que el endpoint ya usaba antes de esta feature) con
 `{ access_token, refresh_token, expires_in, user }` y NO DEBE exponer el
 refresh token en ninguna otra parte (ni en logs, ni en auditoría, ni en la
 base en claro — R10).

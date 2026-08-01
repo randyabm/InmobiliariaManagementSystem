@@ -61,6 +61,41 @@ Repository  → único punto de acceso a datos
 > Si el aislamiento dependiera de que cada `WHERE` incluya `tenant_id`, un
 > solo olvido filtra datos entre inmobiliarias. Por eso vive en el motor.
 
+### Las dos únicas vías de lectura fuera del RLS (R52, R18 — feature #27)
+
+Casi todo el sistema lee bajo el contexto de tenant. Existen **exactamente
+dos** excepciones, ambas `SECURITY DEFINER`, revocadas de PUBLIC y concedidas
+solo al rol de aplicación (`rol-aplicacion.ts`):
+
+1. `tenant_por_codigo(codigo) → uuid` — el login aún no sabe el tenant.
+   Coincidencia exacta, devuelve solo el uuid (R52).
+2. `sesion_por_refresh_token(hash) → TABLE(id, user_id, tenant_id,
+   expira_en, revocada_at)` — el refresh aún no sabe el tenant. Coincidencia
+   exacta de hash SHA-256, devuelve solo el bootstrap para fijar contexto
+   (R18). El servicio que la invoca **revalida la sesión dentro de una
+   transacción con `SET LOCAL`** del tenant devuelto antes de rotar nada
+   (R19): la función arranca el contexto, no es la barrera.
+
+Cualquier tercera vía que se añada es una regresión de seguridad: la
+verifican `migrations.db.test.ts` (inventario de funciones `SECURITY
+DEFINER`) y `sesiones-rls.test.ts`.
+
+### Sesiones y revocación inmediata (feature #27)
+
+El JWT es un dato firmado pero **viejo**: nada puede invalidarlo salvo un
+estado vivo consultado en cada petición. Desde la #27:
+
+- Todo access token lleva `jti` (id de la sesión) y `ver`
+  (`user.token_version`). Sin `jti`/`ver` → 401 (R5).
+- `JwtStrategy.validate` es async: una consulta por petición —dentro de
+  `SET LOCAL` del tenant resuelto— comprueba que la sesión existe, no está
+  revocada, no expiró y la versión es la actual (R4). Es el precio de la
+  revocación inmediata con tokens sin estado.
+- Revocar una sesión (logout, reuso de refresh) → `revocada_at` → 401 en la
+  siguiente petición (R8, R11).
+- Revocar un rol → `user_role.activo = false` + `token_version++` en la
+  misma transacción → 401 en la siguiente petición (R12).
+
 ## Motor de workflows (D3)
 
 Estados, transiciones, condiciones y responsables son **datos**, no `switch`
