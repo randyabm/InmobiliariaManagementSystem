@@ -44,6 +44,9 @@ const archivosSql = readdirSync(rutaRepo(CARPETA))
  * Las tablas `propiedad`, `propiedad_propietario`, `historial_ocupacion` y
  * `propiedad_documento` se crearon en la feature #6 `property_profile`
  * (R1-R4, R22), con RLS habilitado y forzado en la misma migración.
+ * Las cinco tablas `workflow_*` se crearon en la feature #7
+ * `workflow_engine` (R1, R2, R6, R12), con RLS habilitado y forzado en la
+ * misma migración.
  */
 const TABLAS_PERMITIDAS: readonly string[] = [
   'tenant',
@@ -61,6 +64,11 @@ const TABLAS_PERMITIDAS: readonly string[] = [
   'propiedad_propietario',
   'historial_ocupacion',
   'propiedad_documento',
+  'workflow_definicion',
+  'workflow_estado',
+  'workflow_transicion',
+  'workflow_instancia',
+  'workflow_transicion_log',
 ];
 
 describe('Migración inicial (R10)', () => {

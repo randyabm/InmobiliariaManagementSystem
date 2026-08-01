@@ -15,6 +15,9 @@
  * además añadió `user.token_version` (R2).
  * Las tablas `propiedad`, `propiedad_propietario`, `historial_ocupacion` y
  * `propiedad_documento` se crearon en la feature #6 `property_profile`.
+ * Las cinco tablas `workflow_*` se crearon en la feature #7
+ * `workflow_engine`, que además sembró la definición `ciclo_vida_propiedad`
+ * (R17).
  */
 export { tenant } from './tenant';
 export { user } from './user';
@@ -31,3 +34,8 @@ export { propiedad } from './propiedad';
 export { propiedadPropietario } from './propiedad-propietario';
 export { historialOcupacion } from './historial-ocupacion';
 export { propiedadDocumento } from './propiedad-documento';
+export { workflowDefinicion, TENANT_SISTEMA } from './workflow-definicion';
+export { workflowEstado } from './workflow-estado';
+export { workflowTransicion } from './workflow-transicion';
+export { workflowInstancia } from './workflow-instancia';
+export { workflowTransicionLog } from './workflow-transicion-log';

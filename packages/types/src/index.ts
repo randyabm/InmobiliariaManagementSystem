@@ -13,6 +13,28 @@ export type {
   TipoPropiedad,
 } from './propiedades';
 
+// Feature #7 workflow_engine.
+export {
+  OPERADORES_CONDICION,
+  ORIGENES_DEFINICION,
+  TIPOS_EJECUCION,
+} from './workflows';
+export type {
+  Condicion,
+  CondicionClausula,
+  DefinicionCompleta,
+  InstanciaConDisponibles,
+  NotificacionHook,
+  OperadorCondicion,
+  OrigenDefinicion,
+  TipoEjecucion,
+  WorkflowDefinicion,
+  WorkflowEstado,
+  WorkflowInstancia,
+  WorkflowTransicion,
+  WorkflowTransicionLog,
+} from './workflows';
+
 // Feature #5 owner_tenant_profiles y feature #25 retencion_codeudor_referencias.
 export {
   MEDIOS_PREFERIDOS_CONTACTO,

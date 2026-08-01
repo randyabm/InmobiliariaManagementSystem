@@ -885,4 +885,156 @@ describe('Aplicación real de las migraciones (R10)', () => {
       );
     });
   });
+
+  // ─── Feature #7 workflow_engine (T4: R13, R17) ──────────────────────────
+
+  describe('esquema y seed de #7 (R13, R17)', () => {
+    const TABLAS_7 = [
+      'workflow_definicion',
+      'workflow_estado',
+      'workflow_transicion',
+      'workflow_instancia',
+      'workflow_transicion_log',
+    ] as const;
+
+    it.each(TABLAS_7)(
+      'la tabla %s existe con RLS habilitado Y FORZADO (R13)',
+      async (tabla) => {
+        const { rows } = await pool.query<{
+          relrowsecurity: boolean;
+          relforcerowsecurity: boolean;
+        }>(
+          `SELECT c.relrowsecurity, c.relforcerowsecurity
+             FROM pg_class c
+             JOIN pg_namespace n ON n.oid = c.relnamespace
+            WHERE n.nspname = 'public' AND c.relname = $1`,
+          [tabla],
+        );
+
+        expect(rows, `la tabla ${tabla} no existe`).toHaveLength(1);
+        expect(rows[0]?.relrowsecurity).toBe(true);
+        expect(rows[0]?.relforcerowsecurity).toBe(true);
+      },
+    );
+
+    it('la política de workflow_definicion lee el sistema y escribe solo lo propio (PA-7-1, R13)', async () => {
+      const { rows } = await pool.query<{ polname: string; qual: string; with_check: string | null }>(
+        `SELECT policyname AS polname, qual, with_check
+           FROM pg_policies
+          WHERE schemaname = 'public' AND tablename = 'workflow_definicion'`,
+      );
+
+      const politica = rows.find((r) => r.polname === 'workflow_definicion_tenant_isolation');
+      expect(politica).toBeDefined();
+      expect(politica?.qual).toContain('00000000-0000-0000-0000-000000000000');
+      expect(politica?.qual).toContain('app.current_tenant');
+      expect(politica?.with_check).toContain('app.current_tenant');
+      // El WITH CHECK no debe contener el tenant del sistema: nadie lo escribe.
+      expect(politica?.with_check).not.toContain('00000000-0000-0000-0000-000000000000');
+    });
+
+    it('el seed ciclo_vida_propiedad existe como SISTEMA con sus estados y la rama condicional (R17)', async () => {
+      const { rows: def } = await pool.query<{
+        tenant_id: string;
+        origen: string;
+      }>(
+        `SELECT tenant_id::text AS tenant_id, origen FROM workflow_definicion
+          WHERE tipo = 'ciclo_vida_propiedad'`,
+      );
+      expect(def).toHaveLength(1);
+      expect(def[0]?.tenant_id).toBe('00000000-0000-0000-0000-000000000000');
+      expect(def[0]?.origen).toBe('SISTEMA');
+
+      const { rows: estados } = await pool.query<{ clave: string; es_inicial: boolean }>(
+        `SELECT e.clave, e.es_inicial FROM workflow_estado e
+          JOIN workflow_definicion d ON d.id = e.definicion_id
+         WHERE d.tipo = 'ciclo_vida_propiedad'
+         ORDER BY e.orden`,
+      );
+      expect(estados.map((e) => e.clave)).toEqual([
+        'disponible',
+        'en_checkeo',
+        'con_aseguradora',
+        'arrendada',
+        'en_desocupacion',
+        'inactiva',
+      ]);
+      expect(estados.find((e) => e.clave === 'disponible')?.es_inicial).toBe(true);
+
+      const { rows: condicionales } = await pool.query<{
+        clave: string;
+        condicion: string;
+      }>(
+        `SELECT t.clave, t.condicion::text AS condicion FROM workflow_transicion t
+          JOIN workflow_definicion d ON d.id = t.definicion_id
+         WHERE d.tipo = 'ciclo_vida_propiedad'
+           AND t.clave IN ('cerrar_entrega_ok', 'reingresar_a_checkeo')
+         ORDER BY t.clave`,
+      );
+      expect(condicionales).toHaveLength(2);
+      expect(condicionales.find((t) => t.clave === 'cerrar_entrega_ok')?.condicion)
+        .toContain('entrega_ok');
+      expect(condicionales.find((t) => t.clave === 'reingresar_a_checkeo')?.condicion)
+        .toContain('entrega_ok');
+    });
+
+    it('workflow_transicion_log es append-only incluso para el dueño (R10)', async () => {
+      const { rows: tenant } = await pool.query<{ id: string }>(
+        `INSERT INTO tenant (nombre, nit, codigo)
+         VALUES ('WF Log', '900-007', 'wf-log')
+         ON CONFLICT (nit) DO UPDATE SET nombre = EXCLUDED.nombre
+         RETURNING id`,
+      );
+      const tenantId = tenant[0]?.id;
+      expect(tenantId).toBeDefined();
+
+      const { rows: def } = await pool.query<{ id: string; estado: string }>(
+        `INSERT INTO workflow_definicion (tenant_id, nombre, tipo, origen)
+         VALUES ($1, 'Def Log', 'def_log', 'TENANT') RETURNING id`,
+        [tenantId],
+      );
+      const defId = def[0]?.id;
+
+      const { rows: estado } = await pool.query<{ id: string }>(
+        `INSERT INTO workflow_estado (definicion_id, clave, etiqueta, es_inicial)
+         VALUES ($1, 'inicio', 'Inicio', true) RETURNING id`,
+        [defId],
+      );
+      const estadoId = estado[0]?.id;
+
+      const { rows: instancia } = await pool.query<{ id: string }>(
+        `INSERT INTO workflow_instancia (tenant_id, definicion_id, entidad_tipo, entidad_id, estado_actual_id)
+         VALUES ($1, $2, 'prueba', gen_random_uuid(), $3) RETURNING id`,
+        [tenantId, defId, estadoId],
+      );
+      const instanciaId = instancia[0]?.id;
+
+      const { rows: log } = await pool.query<{ id: string }>(
+        `INSERT INTO workflow_transicion_log
+           (tenant_id, instancia_id, desde_estado_id, hacia_estado_id)
+         VALUES ($1, $2, $3, $3) RETURNING id`,
+        [tenantId, instanciaId, estadoId],
+      );
+      const logId = log[0]?.id;
+
+      // `pool` se conecta con el rol dueño de la tabla, que se salta el RLS:
+      // si la inmutabilidad dependiera de una política, esto pasaría sin ruido.
+      await expect(
+        pool.query(
+          `UPDATE workflow_transicion_log SET automatica = true WHERE id = $1`,
+          [logId],
+        ),
+      ).rejects.toThrow(/append-only/i);
+
+      await expect(
+        pool.query('DELETE FROM workflow_transicion_log WHERE id = $1', [logId]),
+      ).rejects.toThrow(/append-only/i);
+
+      const { rows: sigue } = await pool.query<{ automatica: boolean }>(
+        'SELECT automatica FROM workflow_transicion_log WHERE id = $1',
+        [logId],
+      );
+      expect(sigue[0]?.automatica).toBe(false);
+    });
+  });
 });
