@@ -4,30 +4,28 @@
 > `history.md`. Mientras trabajas, **mantenlo actualizado en tiempo real**,
 > no al final.
 
-- **Feature en curso:** #11 `inventory_templates` — status **`spec_ready`**
-- **Agente:** leader → spec_author (3 archivos listos) → ⏸ **HUMANO**
-- **Estado:** ⏸ **esperando la aprobación del spec.** Meta de la sesión:
-  **completar la fase 1** (1b + 1c + #23).
+- **Feature en curso:** #11 `inventory_templates` — status **`in_progress`**
+- **Agente:** leader → spec_author → implementer → **reviewer (APROBADO)**
+- **Estado:** ⏸ **esperando que el humano autorice marcarla `done`.**
+  Meta de la sesión: **completar la fase 1** (1b + 1c + #23).
 
-## Espec — `specs/inventory_templates/`
+## Estado de la verificación
 
-Plantillas de inmuebles (§8.8, RF-I2/I22/I23). 15 requirements (R1–R15),
-22 tasks (11 de test). Reutiliza el patrón de plantillas del sistema de #7
-(tenant reservado + RLS OR/WITH CHECK). `./init.sh` verde (706 + 116 tests)
-antes de redactar el spec.
+`./init.sh` exit 0 — `npm run test` **732** (80 archivos) y `npm run test:db`
+**122** (3 archivos). Lint, typecheck y build verdes.
 
-## Decisiones técnicas que el humano debe confirmar (design.md §10)
+22/22 tasks. Veredicto en `progress/review_inventory_templates.md`:
+**APROBADO, sin bloqueantes**. El reviewer reprodujo tres mutaciones del
+implementer (1/10 filtro del clon — tras añadir un test que siembra una
+zona inactiva y verifica el conteo crudo —, 2/15 409 del sistema, 5+ rojos
+sin el OR de la política) y confirmó que el catálogo base depende de la
+política de PA-11-1.
 
-1. **PA-11-1 — Plantillas del sistema con `tenant_id` reservado** (mismo
-   patrón que #7): una sola tabla, la escritura de filas del sistema
-   bloqueada por el motor.
-2. **PA-11-2 — Seed:** APARTAMENTO con el ejemplo completo del PRD §8.8.5;
-   las otras cinco (CASA/LOCAL/OFICINA/BODEGA/PARQUEADERO) como plantillas
-   **sin zonas** — el PRD no las enumera y no se inventa producto.
-3. **PA-11-3 — La materialización (snapshot + libertad ad-hoc) es #12**
-   (RF-I24): #11 entrega el molde y su gestión.
-4. **PA-11-4 — Gestión solo `admin`** (clonar/zonas/ítems); lectura
-   admin/empleado. `opciones_json` solo con `field_type = 'seleccion'`.
+## Espec
+
+`specs/inventory_templates/` — aprobado por el humano con las cuatro
+decisiones PA-11 (tenant reservado; seed parcial; materialización en #12;
+gestión solo admin). El molde del inventario queda listo para #12.
 
 ## Pendientes de decisión del humano
 
