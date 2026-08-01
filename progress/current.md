@@ -4,30 +4,26 @@
 > `history.md`. Mientras trabajas, **mantenlo actualizado en tiempo real**,
 > no al final.
 
-- **Feature en curso:** #9 `property_intake` — status **`spec_ready`**
-- **Agente:** leader → spec_author (3 archivos listos) → ⏸ **HUMANO**
-- **Estado:** ⏸ **esperando la aprobación del spec para pasar a
-  `in_progress`.** NO se toca código hasta entonces.
+- **Feature en curso:** #9 `property_intake` — status **`in_progress`**
+- **Agente:** leader → spec_author → implementer → **reviewer (APROBADO)**
+- **Estado:** ⏸ **esperando que el humano autorice marcarla `done`.**
 
-## Espec — `specs/property_intake/`
+## Estado de la verificación
 
-Ingreso de propiedad (RF-PI1..PI3). 14 requirements (R1–R14), 22 tasks
-(11 de test). **Sin migración**: el ingreso orquesta perfiles (#5), ficha
-(#6), instancia (#8) y transiciones por claves, atómicamente.
-`./init.sh` verde (652 + 108 tests) antes de redactar el spec.
+`./init.sh` exit 0 — `npm run test` **674** (70 archivos) y `npm run test:db`
+**108** (3 archivos). Lint, typecheck y build verdes. **Sin migración.**
 
-## Decisiones técnicas que el humano debe confirmar (design.md §8)
+22/22 tasks. Veredicto en `progress/review_property_intake.md`:
+**APROBADO, sin bloqueantes**. El reviewer reprodujo cuatro mutaciones del
+implementer: 3 con rojos (1/13 nombre sin comparar, 3/8 crear siempre, 1/9
+sin auditoría) y 1 defensiva explicada con 0 rojos (el 409 de la cadena
+bloqueada lo produce el motor, no la envoltura).
 
-1. **PA-9-1 — RF-PI3 (template de contrato validado) fuera de #9**: es la
-   feature #16 (fase 1c). El ingreso termina en el estado correcto; #16
-   extenderá el flujo.
-2. **PA-9-2 — Contrato físico del escenario B fuera de #9**: es la #18. El
-   ingreso asocia inquilino y deja la propiedad en `arrendada`.
-3. **PA-9-3 — Reutilización de perfiles por documento con comparación de
-   nombre** (criterio `nombresCoinciden` de #26): divergente → 409 sin
-   escribir nada.
-4. **PA-9-4 — Ingreso atómico**: una sola transacción; cualquier fallo
-   (incluida la cadena del escenario B) revierte todo.
+## Espec
+
+`specs/property_intake/` — aprobado por el humano con las cuatro decisiones
+PA-9 (RF-PI3 → #16; contrato físico → #18; reutilización con comparación de
+nombre; ingreso atómico).
 
 ## Pendientes de decisión del humano (previos, no bloquean la puerta del spec)
 
