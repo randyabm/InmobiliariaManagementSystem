@@ -54,6 +54,22 @@ export interface ContratoDocumento {
   readonly created_at: string;
 }
 
+export interface InsurancePolicy {
+  readonly id: string;
+  readonly tenant_id: string;
+  readonly property_id: string;
+  readonly contract_id: string | null;
+  readonly aseguradora: string;
+  readonly numero_poliza: string | null;
+  readonly vigencia_desde: string | null;
+  readonly vigencia_hasta: string | null;
+  readonly valor_cobertura: number | null;
+  readonly estado: 'en_estudio' | 'aprobada' | 'rechazada';
+  readonly observaciones: string | null;
+  readonly created_at: string;
+  readonly updated_at: string;
+}
+
 export interface ContractTemplate {
   readonly id: string;
   readonly tenant_id: string;

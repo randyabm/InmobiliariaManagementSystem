@@ -160,6 +160,12 @@ const RUTAS_PERMITIDAS = [
   'POST /contratos/vencimientos/alertas',
   'POST /contratos/:id/renovar',
   'POST /contratos/:id/no-renovar',
+  // ─── Feature #20 insurance_policy: 5 rutas (R4, design.md §2) ──────────
+  'POST /propiedades/:id/polizas',
+  'GET /propiedades/:id/polizas',
+  'GET /polizas/:id',
+  'PATCH /polizas/:id',
+  'POST /polizas/:id/documento',
   // ─── Feature #7 workflow_engine: 9 rutas (R17, design.md §8) ───────────
   // Gestión de definiciones: solo `admin` (RF-W2). Instancias y ejecución:
   // `@Roles('admin','empleado')`.

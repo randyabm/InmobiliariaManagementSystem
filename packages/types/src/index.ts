@@ -44,6 +44,7 @@ export type {
   EstadoContrato,
   EstadoPlantillaContrato,
   FirmaContrato,
+  InsurancePolicy,
   MergeFields,
 } from './contratos';
 

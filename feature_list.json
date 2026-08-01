@@ -511,7 +511,7 @@
       "name": "insurance_policy",
       "phase": "1c",
       "sdd": true,
-      "status": "pending",
+      "status": "done",
       "title": "Afianzamiento y captura de póliza",
       "prd_refs": [
         "RF-PI7",
@@ -528,7 +528,7 @@
       "name": "inventory_comparison",
       "phase": "2",
       "sdd": true,
-      "status": "pending",
+      "status": "in_progress",
       "title": "Comparación de inventario entrada vs salida",
       "prd_refs": [
         "RF-I10",

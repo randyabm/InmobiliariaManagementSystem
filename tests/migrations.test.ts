@@ -75,6 +75,8 @@ const archivosSql = readdirSync(rutaRepo(CARPETA))
  * Las tablas `config_renovacion` y `alerta_vencimiento` se crearon en la
  * feature #19 `contract_renewals_alerts` (R6), con RLS habilitado y
  * forzado en la misma migración.
+ * La tabla `insurance_policy` se creó en la feature #20 `insurance_policy`
+ * (R4), con RLS habilitado y forzado en la misma migración.
  */
 const TABLAS_PERMITIDAS: readonly string[] = [
   'tenant',
@@ -117,6 +119,7 @@ const TABLAS_PERMITIDAS: readonly string[] = [
   'contract_document',
   'config_renovacion',
   'alerta_vencimiento',
+  'insurance_policy',
 ];
 
 describe('Migración inicial (R10)', () => {
