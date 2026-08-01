@@ -67,7 +67,20 @@ toma una migración a las 3 de la mañana. La migración:
 (como hizo R61 de la #5). Se descarta porque, a diferencia de aquel caso, la
 colisión **no impide** que el sistema quede correcto hacia adelante y abortar
 dejaría a cualquiera que ya haya creado datos de prueba con la base bloqueada y
-sin camino de salida. Queda anotado en **PA-2**.
+sin camino de salida.
+
+### Esta decisión caduca (PA-2 resuelta, 2026-08-01)
+
+**Decisión del humano:** no se fusiona nada. No hay datos reales todavía; la
+migración avisa con el conteo, el invariante R6 rige hacia adelante y los datos
+de prueba con duplicados **se recrean**.
+
+**Es válida solo mientras no haya producción.** Si el sistema llega a producción
+con identidades duplicadas, hará falta una **herramienta de fusión con criterio**
+—qué credencial sobrevive, qué pasa con la auditoría ya escrita a nombre de la
+identidad que desaparece, y con los contratos firmados que la referencian— y eso
+es **feature propia**, no un apéndice de esta migración. Quien reabra este punto
+debe empezar por ahí.
 
 ---
 
@@ -77,7 +90,7 @@ sin camino de salida. Queda anotado en **PA-2**.
 
 | Archivo | Cambio |
 |---|---|
-| `identidad.service.ts` | `crearIdentidad` → **`resolverIdentidad`**. Nueva firma (§5). Se **elimina** `buscarEnEsteTenant` por email (**R11**, cierra D5) y se sustituye por `buscarPorDocumentoEnEsteTenant`. El `INSERT` incluye `tipo_documento`/`documento`. `asegurarRol` se conserva tal cual (ya es idempotente por `ON CONFLICT`). |
+| `identidad.service.ts` | `crearIdentidad` → **`resolverIdentidad`**. Nueva firma (§5). Se **elimina** `buscarEnEsteTenant` por email (**R11**, cierra D5) y se sustituye por `buscarPorDocumentoEnEsteTenant`. El `INSERT` incluye `tipo_documento`/`documento`. `asegurarRol` se conserva tal cual (ya es idempotente por `ON CONFLICT`). Nueva función pura exportada `nombresCoinciden(a, b)` (**R27**) y rechazo con 409 antes de tocar `user_role` (**R9**). |
 | `propietarios.service.ts` | `crear` pasa `tipo_documento`/`documento` a `resolverIdentidad`; el 409 de R7 se sigue comprobando **antes** (`rechazarSiDocumentoRepetido`, intacto). Audita R13 cuando la identidad se reutilizó. |
 | `inquilinos.service.ts` | Idéntico. |
 | `predicado-identidad.ts` | Sin cambios; la consulta nueva usa el mismo patrón de doble barrera (**R10**). |
@@ -92,8 +105,9 @@ en **un** sitio y aplica a los dos roles. No se crea un módulo nuevo.
 | `auth.controller.ts` | Nuevo `POST /auth/rol-activo`. `GET /auth/me` sin cambios de comportamiento (solo gana tests, **R15**/D3). |
 | `auth.service.ts` | Nuevo `elegirRolActivo(...)`. Reutiliza `rolesActivos` y `fijarTenant` ya existentes. |
 | `jwt.strategy.ts` | El payload gana `rol_activo?: string`; `validate` lo propaga sin interpretarlo. |
-| `roles.guard.ts` | **Único punto donde se aplica R18/R19/R20.** Ver §6. |
-| `errors/rol-no-disponible.error.ts` | Nuevo error de dominio → 403. |
+| `roles.guard.ts` | **Único punto donde se aplica R18/R20/R29.** Ver §6. |
+| `errors/rol-no-disponible.error.ts` | Nuevo error de dominio → 403 (R17, R29). |
+| `clientes/errors/nombre-no-coincide.error.ts` | Nuevo error de dominio → 409 (R9, R28). |
 | `packages/types` | `RolDeCliente` / payload del token si ya estaban expuestos; si no, no se añade nada. |
 
 ### 4.3 Arnés
@@ -128,6 +142,12 @@ resolverIdentidad(
   tenantId: string,
   rol: RolDeCliente,
 ): Promise<IdentidadResuelta>;
+// Lanza NombreNoCoincideConIdentidadError (409) si hay identidad con ese
+// documento y `nombresCoinciden` es false (R9). El rechazo ocurre ANTES de
+// insertar el user_role, así que no hay nada que deshacer.
+
+/** Criterio de R27: trim + colapso de espacios internos + minúsculas. Nada más. */
+export function nombresCoinciden(a: string, b: string): boolean;
 ```
 
 ```ts
@@ -154,7 +174,7 @@ token emitido antes de esta feature se invalida.
 
 ---
 
-## 6. Cómo restringe el rol activo (R18/R19/R20)
+## 6. Cómo restringe el rol activo (R18/R20/R29)
 
 En `RolesGuard.canActivate`, después de resolver el tenant (código actual
 intacto):
@@ -162,7 +182,7 @@ intacto):
 ```
 rolesDelTenant = roles del token con tenant_id == tenantResuelto
 si el token trae rol_activo:
-    si rol_activo ∉ rolesDelTenant              → 403   (token viejo, R19*)
+    si rol_activo ∉ rolesDelTenant              → 403   (coherencia, R29)
     rolesEfectivos = { rol_activo }                     (R18)
 si no:
     rolesEfectivos = rolesDelTenant                     (R20)
@@ -171,16 +191,22 @@ autorizar sii  rolesEfectivos ∩ requiredRoles ≠ ∅
 
 `rolesEfectivos` es siempre **subconjunto** de `rolesDelTenant`: por construcción
 elegir un rol no puede autorizar nada que el conjunto completo no autorizara ya.
-Esa es la propiedad que hay que poner en rojo por mutación (T19).
+Esa es la propiedad que hay que poner en rojo por mutación (T27c).
 
-**(\*) Matiz honesto sobre R19.** El guard compara `rol_activo` contra los roles
-que trae **el propio token**, que es un dato firmado pero potencialmente viejo.
-Comprobarlo contra la base de datos en cada petición sería una consulta extra en
-la ruta caliente. Decisión: **R19 se cumple contra la base de datos**, con una
-consulta de roles activos en `POST /auth/rol-activo` (emisión) y **expiración
-corta del token** como mitigación en el resto — la revocación efectiva de roles
-es un mecanismo transversal que **no existe todavía en el proyecto** y no se
-inventa aquí. Ver **PA-3**.
+**Dos comprobaciones distintas, no una a medias.** El guard solo comprueba
+**coherencia interna del token** (R29): barato, sin consultar la base, e impide
+que un `rol_activo` manipulado amplíe el conjunto autorizado. La comprobación
+**contra la base de datos** ocurre una sola vez, en la **emisión**
+(`POST /auth/rol-activo`, R19).
+
+**Lo que esta feature NO cierra (PA-3 resuelta, 2026-08-01).** Si un rol se
+revoca *después* de emitir el token, el token lo sigue concediendo hasta que
+expire. El humano **no acepta** esa ventana, y la cierra la feature
+**#27 `sesion_y_revocacion`** (`pending`: refresh tokens, revocación inmediata,
+cierre de sesión en servidor, auditoría de la revocación). **#26 no la
+implementa ni la especifica**; se limita a no empeorarla y a dejarle a #27 el
+claim `rol_activo` sobre el que construir. La dependencia es explícita en ambos
+sentidos: #27 depende de #26.
 
 ---
 
@@ -191,7 +217,27 @@ inventa aquí. Ver **PA-3**.
 | `PerfilYaExisteError` | 409 | Reutilizado (#5), R7 |
 | `ResourceNotFoundError` | 404 | Reutilizado (#5), R22 |
 | `TenantNoAutorizadoError` | 403 | Reutilizado (#5) |
-| `RolNoDisponibleError` | 403 | **Nuevo**, R17. Mensaje genérico: no revela qué roles sí tiene. |
+| `RolNoDisponibleError` | 403 | **Nuevo**, R17/R29. Mensaje genérico: no revela qué roles sí tiene. |
+| `NombreNoCoincideConIdentidadError` | 409 | **Nuevo**, R9/R28. Cuerpo accionable, ver abajo. |
+
+Cuerpo del 409 de R28 (`NOMBRE_NO_COINCIDE_CON_IDENTIDAD`):
+
+```jsonc
+{
+  "codigo": "NOMBRE_NO_COINCIDE_CON_IDENTIDAD",
+  "mensaje": "Ya existe una persona con ese documento en esta inmobiliaria, registrada con otro nombre. Corrija la ficha existente antes de continuar.",
+  "user_id": "…",              // identidad existente, misma inmobiliaria
+  "nombre_registrado": "…",    // el que está almacenado
+  "nombre_recibido": "…"       // el que venía en la petición
+}
+```
+
+Es el **único** error de esta feature que devuelve datos además del código, y es
+deliberado: sin ellos, el empleado que está creando en línea (RF-C6) queda
+bloqueado sin saber qué corregir. Los tres campos son de la misma inmobiliaria
+(R10, R14), así que no revelan nada ajeno. **No** se incluye el documento en el
+cuerpo ni en los logs (`docs/conventions.md`, Ley 1581 de 2012): quien recibe el
+error acaba de teclearlo.
 
 ## 8. Auditoría (R13, R21)
 
@@ -214,25 +260,39 @@ portal del cliente (RF-AU2 actualizado, RF-AU4), que **no existe como feature en
 depende de esta. Anotado también en `progress/current.md` para que el humano
 decida si abre la ficha.
 
-## 10. Preguntas abiertas (requieren decisión del humano)
+## 10. Decisiones y preguntas abiertas
 
-- **PA-1 — Nombre divergente entre los dos perfiles.** El contacto vive en el
-  perfil y puede divergir legítimamente (R8), pero el **`nombre`** es de la
-  identidad y es compartido. R9 opta por *first-write-wins* silencioso. Las otras
-  dos opciones son producto, no técnica: (a) responder 409 pidiendo que se
-  corrija primero la ficha existente; (b) aceptar y devolver un aviso de
-  divergencia en la respuesta. **No se inventa: se implementa R9 y se pregunta.**
-  Si el humano prefiere (a) o (b), es un cambio acotado a `resolverIdentidad`.
-- **PA-2 — Identidades ya duplicadas en bases existentes.** §3 no las fusiona.
-  ¿Se quiere una herramienta de fusión (feature aparte) o basta con recrear los
-  datos de prueba? Hoy no hay producción, así que la respuesta por defecto es
-  "recrear".
-- **PA-3 — Revocación de roles y vida del token.** R19 se cumple en la emisión;
-  un rol revocado sigue siendo válido en un token ya emitido hasta que expire.
-  El proyecto no tiene aún mecanismo de revocación (ni lista negra, ni refresh
-  tokens). ¿Se abre una feature de sesión/revocación o se acepta la ventana?
+### 10.1 Resueltas por el humano (2026-08-01)
+
+| Id | Pregunta | Decisión | Dónde vive |
+|---|---|---|---|
+| **PA-1** | Nombre discrepante al deduplicar por documento | **409, no *first-write-wins***: el alta falla y obliga a corregir antes la ficha existente | R9 (rechazo), R28 (cuerpo accionable), R27 (criterio de comparación), §7 |
+| **PA-2** | Identidades ya duplicadas en bases existentes | **No se fusiona nada.** No hay datos reales; se avisa con el conteo y se recrean los datos de prueba. **Caduca al llegar a producción** | §3 "Esta decisión caduca" |
+| **PA-3** | Ventana entre revocar un rol y que expire el token | **No se acepta la ventana, y no se cierra aquí:** sale como feature propia **#27 `sesion_y_revocacion`** | R19 (frontera), §6 |
+
+### 10.2 Abiertas
+
 - **PA-4 (heredada, sigue abierta) — PA-14 de la #5:** quién da de alta una
-  inmobiliaria y asigna su `codigo`. No la toca esta feature.
+  inmobiliaria y asigna su `codigo`. No la toca esta feature. No bloquea.
+- **PA-5 (nueva, derivada de PA-1) — Hasta dónde normaliza la comparación de
+  nombres.** R27 fija lo mínimo defendible: podar y colapsar espacios, y
+  minúsculas. Deliberadamente **no** resuelve dos casos que son producto, no
+  técnica, y que decidirlos por mi cuenta sería inventar:
+  1. **Tildes y diacríticos.** Con R27, `"Maria Perez"` **no** coincide con
+     `"María Pérez"` y dispara el 409. Es lo estricto y es probablemente
+     correcto (obliga a escribir bien el nombre legal), pero será la causa más
+     frecuente de fricción en el alta en línea. ¿Se plegan los diacríticos para
+     comparar?
+  2. **Orden de apellidos y nombres compuestos.** `"Pérez Gómez, María"` frente
+     a `"María Pérez Gómez"` son la misma persona y R27 los rechaza. Resolverlo
+     bien exige un modelo de nombre por partes (primer nombre / segundo nombre /
+     primer apellido / segundo apellido), que hoy **no existe**: `user.nombre`
+     es un texto libre. Eso es un cambio de modelo de datos, no un ajuste de
+     comparación, y sería feature propia.
+
+  **Mientras no se decida, R27 rige tal cual.** Si la respuesta a (1) es "sí,
+  plegar", es un cambio de una línea en la función de normalización más su test.
+  Si la respuesta a (2) es "sí, nombre por partes", **no** cabe en esta feature.
 
 ## 11. Alternativas descartadas
 
@@ -267,7 +327,7 @@ PRD es "entro y luego elijo", no "entro N veces".
 
 ## 12. Dimensionamiento
 
-**28 tasks, 26 requirements, una migración sin tablas nuevas.** Es
+**31 tasks, 29 requirements, una migración sin tablas nuevas.** Es
 deliberadamente menor que la #5 (73 tasks), cuya lección fue que un diff
 inrevisable esconde defectos. No se propone corte adicional: los tres bloques
 (deduplicación, rol activo, deuda del arnés) comparten el mismo módulo `core` y

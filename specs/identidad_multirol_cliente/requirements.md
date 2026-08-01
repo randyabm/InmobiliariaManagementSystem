@@ -12,8 +12,13 @@ invariantes transversales)
 Esta feature se construye **encima** de la #5 `owner_tenant_profiles`, cuyo
 código ya está en `main` y cuyo spec fue **aprobado**. No la rehace.
 
-**Dependencia dura:** la #5 debe estar `done`. De ella se reutiliza tal cual, sin
-volver a construirlo:
+**Dependencia dura:** la #5 debe estar `done` — **satisfecha**: el humano cerró
+#5, #2, #3 y #4 el 2026-08-01 tras el veredicto APROBADO del segundo review. De
+ella se reutiliza tal cual, sin volver a construirlo:
+
+**Dependencia hacia adelante:** la feature **#27 `sesion_y_revocacion`**
+(`pending`) se construye sobre el claim `rol_activo` que define esta feature.
+#26 **no** implementa revocación de sesiones ni de roles — ver R19.
 
 | Activo de #5 | Dónde | Se reutiliza para |
 |---|---|---|
@@ -121,17 +126,53 @@ nuevo declare valores distintos.
 > **Por qué no hay conflicto que resolver:** desde D-9 el contacto vive en el
 > **perfil**, no en la identidad, y cada rol tiene el suyo. Que el propietario
 > declare un correo y el inquilino otro es un estado **legítimo**, no una
-> divergencia a reconciliar. Ver PREGUNTA ABIERTA **PA-1** en `design.md` §10
-> para el único caso que sí queda abierto (el `nombre`, que sí es compartido).
+> divergencia a reconciliar. El único dato compartido es el `nombre`, y lo
+> gobiernan R9 y R27.
 
-### R9 — (RF-C1) El nombre de la identidad no lo pisa el segundo perfil
+### R9 — (RF-C1, RF-C6) Un nombre discrepante bloquea el alta
 
-CUANDO se reutiliza una identidad existente y el perfil nuevo declara un
-`nombre` distinto al de la identidad, el sistema DEBE conservar el `nombre`
-almacenado en la identidad y NO DEBE sobrescribirlo.
+SI al deduplicar por documento el `nombre` declarado en el alta no coincide,
+según el criterio de **R27**, con el `nombre` de la identidad existente en esa
+inmobiliaria ENTONCES el sistema DEBE responder **409**
+`NOMBRE_NO_COINCIDE_CON_IDENTIDAD` y NO DEBE crear ni modificar ninguna fila.
 
-> Regla conservadora y reversible: el `PATCH` de perfil de la #5 ya permite
-> corregir el nombre explícitamente. Sujeta a **PA-1**.
+> **Decisión del humano (PA-1 resuelta, 2026-08-01):** se descartó el
+> *first-write-wins* silencioso. Dos nombres distintos bajo el mismo documento
+> significan que **una de las dos fichas está mal**, y seguir adelante en
+> silencio consolida el error en la identidad compartida.
+
+### R28 — (RF-C6) El 409 de nombre discrepante es accionable
+
+CUANDO el sistema responde 409 `NOMBRE_NO_COINCIDE_CON_IDENTIDAD`, el cuerpo
+DEBE incluir el `user_id` de la identidad existente, el `nombre` almacenado en
+ella y el `nombre` recibido en la petición.
+
+> **Fricción asumida y acotada.** Esto interrumpe el "crear en línea" de RF-C6,
+> así que el error tiene que decir **qué ficha corregir y contra qué nombre
+> choca**, no solo que algo falló. Con esos tres datos el empleado resuelve con
+> un `PATCH` al perfil existente y reintenta, sin salir a buscar nada.
+>
+> Los tres datos son de **la misma inmobiliaria** (el documento nunca se busca
+> fuera, R10 y R14), así que el cuerpo no revela nada ajeno: R22 y R23 siguen
+> intactos.
+>
+> Id fuera de secuencia por ser una adición posterior al primer borrador.
+
+### R27 — (RF-C1) Criterio de comparación del nombre
+
+CUANDO el sistema compara dos nombres para R9, DEBE hacerlo tras podar espacios
+al inicio y al final, colapsar los espacios internos repetidos a uno solo y
+convertir a minúsculas, y NO DEBE aplicar ninguna otra transformación.
+
+> Es lo mínimo defendible: absorbe el ruido de tecleo (doble espacio, mayúsculas
+> inconsistentes) y **nada más**. Lo que deliberadamente **no** hace, porque
+> sería inventar producto, está en **PA-5** de `design.md` §10: no se quitan
+> tildes ni diacríticos, y no se reordenan apellidos. Con este criterio,
+> `"maría  PÉREZ "` y `"María Pérez"` coinciden; `"Maria Perez"` y
+> `"María Pérez"` **no**, y disparan el 409 de R9.
+>
+> Id fuera de secuencia por ser una adición posterior al primer borrador; los
+> ids son estables y no se renumeran.
 
 ### R10 — (RF-C6, D-4) La búsqueda de identidad nunca sale del tenant
 
@@ -208,14 +249,36 @@ aunque la identidad tenga otros roles activos en esa inmobiliaria.
 > Es la mitad que importa del acceptance nº4: elegir "propietario" **quita**
 > acceso a lo de inquilino; no se limita a ocultarlo.
 
-### R19 — (RF-C3, RF-AU6) El rol activo se revalida en cada petición
+### R19 — (RF-C3, RF-AU6) El rol activo se valida contra la base al emitirlo
 
-CUANDO llega una petición con un token que declara un rol activo que la
-identidad ya **no** tiene activo en esa inmobiliaria, el sistema DEBE rechazarla
-con **403**.
+CUANDO se invoca `POST /auth/rol-activo`, el sistema DEBE comprobar el rol
+solicitado contra las filas `activo = true` de `user_role` **en la base de
+datos**, dentro del contexto de la inmobiliaria del token, y NO DEBE aceptarlo
+basándose únicamente en los roles que trae el token.
 
-> Un token es un dato firmado pero **viejo**: si se revocó el rol, el token no
-> puede seguir concediéndolo hasta su expiración.
+> **Frontera con la feature #27 `sesion_y_revocacion` (decisión del humano,
+> PA-3 resuelta, 2026-08-01).** Un token es un dato firmado pero **viejo**: si
+> el rol se revoca después de emitirlo, el token seguiría concediéndolo hasta
+> su expiración. Esa ventana **no se acepta**, pero **no se cierra aquí**:
+> se cierra en la **#27** (refresh tokens, revocación inmediata, cierre de
+> sesión en servidor y auditoría de la revocación), que el humano ya encoló.
+>
+> **#26 NO implementa revocación** — ni lista negra, ni refresh, ni cierre de
+> sesión. Lo que sí hace es no empeorar el problema: el 403 de R17 se decide
+> contra la base, no contra el token. **Dependencia:** #27 se construye sobre
+> el claim `rol_activo` que define esta feature.
+
+### R29 — (RF-C3) El guard no acepta un rol activo incoherente con el token
+
+SI el `rol_activo` declarado por el token no figura entre los roles de esa
+inmobiliaria que el propio token transporta ENTONCES el sistema DEBE responder
+**403**.
+
+> Comprobación de coherencia interna del token, barata y sin consultar la base.
+> No sustituye a la revocación (#27); impide que un `rol_activo` manipulado o
+> incoherente amplíe el conjunto autorizado, que es la propiedad de R18.
+>
+> Id fuera de secuencia por ser una adición posterior al primer borrador.
 
 ### R20 — (RF-AU1) Compatibilidad de los tokens sin rol activo
 
@@ -291,9 +354,9 @@ inmobiliaria".
 | Acceptance | Requirements |
 |---|---|
 | Reutilizar identidad por documento | R1, R2, R3, R5, R6, R10, R11 |
-| Propietario e inquilino a la vez, una sola credencial | R3, R4, R7, R8, R9, R12, R13 |
+| Propietario e inquilino a la vez, una sola credencial | R3, R4, R7, R8, R9, R12, R13, R27, R28 |
 | Consultar y elegir rol | R15, R16, R21 |
-| El rol elegido no amplía el acceso | R17, R18, R19, R20, R23 |
+| El rol elegido no amplía el acceso | R17, R18, R19, R20, R23, R29 |
 | No se reintroduce la vinculación entre inmobiliarias | R14, R22, R24 |
 | `init.sh` falla si las dos URLs coinciden | R25 |
 | Corregir R62/T58 de la #5 | R26 |
