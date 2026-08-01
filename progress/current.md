@@ -4,11 +4,11 @@
 > `history.md`. Mientras trabajas, **mantenlo actualizado en tiempo real**,
 > no al final.
 
-- **Feature en curso:** specs del roadmap post-Fase 1 escritas (#29–#33,
-  `spec_ready`, esperando la puerta humana).
+- **Feature en curso:** #29–#33 implementadas (`done`) tras la aprobación
+  del humano. Fase 1 (27) + Fase 2/3/4 parcial = **33/33 done**.
 - **Agente:** líder autónomo.
-- **Estado:** FASE 1 COMPLETA (27/27 done); 5 features nuevas en el
-  tablero con spec (papel, pagos, mantenimiento, embebido, asistente).
+- **Estado:** roadmap completo: papel (#29), pagos (#30), mantenimiento
+  (#31), embebido (#32), asistente (#33).
 
 ## UI del proyecto
 
@@ -16,12 +16,6 @@
 scaffold (#1); `apps/pwa` no existe; el tablero no tiene features de
 frontend. Las features de la fase 1 son backend (API). La PWA de campo
 (#15) será el primer cliente real de inventarios.
-
-## En cola (spec_ready, puerta humana)
-
-- **#29** `inventory_paper_format` (Fase 2) · **#30** `payment_reconciliation`
-  (Fase 3) · **#31** `maintenance_incidents` (Fase 3) · **#32**
-  `web_embedding` (Fase 3-4) · **#33** `ai_assistant` (Fase 4+).
 
 ## Línea base final
 
