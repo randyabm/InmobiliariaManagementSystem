@@ -227,7 +227,7 @@
       "name": "property_intake",
       "phase": "1a",
       "sdd": true,
-      "status": "spec_ready",
+      "status": "in_progress",
       "title": "Ingreso de propiedad (vacante y migración)",
       "prd_refs": ["RF-PI1", "RF-PI2", "RF-PI3"],
       "acceptance": [
