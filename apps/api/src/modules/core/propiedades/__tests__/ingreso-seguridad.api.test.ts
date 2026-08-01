@@ -249,29 +249,21 @@ describe('Invariantes de seguridad del ingreso (T14-T18)', () => {
   describe('frontera R14: sin templates ni contratos', () => {
     it('el ingreso responde 201 sin exigir ni crear nada de contratos', async () => {
       // Las tablas `contract*` ya existen (#16/#17), pero el invariante se
-      // mantiene: ninguna FK de las tablas del ingreso las exige. Si algún
-      // día el ingreso dependiera de un contrato, este test se pone rojo.
+      // mantiene: ninguna FK DE las tablas del ingreso las exige (las FKs
+      // en sentido contrario —contrato → propiedad— son legítimas). Si
+      // algún día el ingreso dependiera de un contrato, este test se pone
+      // rojo.
       const { rows: dependencias } = await entorno.poolAdmin.query<{ conname: string }>(
         `SELECT conname
            FROM pg_constraint c
           WHERE c.contype = 'f'
-            AND (
-              (EXISTS (SELECT 1 FROM pg_class r
-                        WHERE r.oid = c.conrelid
-                          AND r.relname IN ('propiedad', 'perfil_propietario',
-                                            'perfil_inquilino', 'historial_ocupacion'))
-               AND EXISTS (SELECT 1 FROM pg_class r
-                            WHERE r.oid = c.confrelid
-                              AND r.relname LIKE 'contract%'))
-              OR
-              (EXISTS (SELECT 1 FROM pg_class r
-                        WHERE r.oid = c.confrelid
-                          AND r.relname IN ('propiedad', 'perfil_propietario',
-                                            'perfil_inquilino', 'historial_ocupacion'))
-               AND EXISTS (SELECT 1 FROM pg_class r
-                            WHERE r.oid = c.conrelid
-                              AND r.relname LIKE 'contract%'))
-            )`,
+            AND EXISTS (SELECT 1 FROM pg_class r
+                         WHERE r.oid = c.conrelid
+                           AND r.relname IN ('propiedad', 'perfil_propietario',
+                                             'perfil_inquilino', 'historial_ocupacion'))
+            AND EXISTS (SELECT 1 FROM pg_class r
+                         WHERE r.oid = c.confrelid
+                           AND r.relname LIKE 'contract%')`,
       );
       expect(dependencias).toEqual([]);
 
