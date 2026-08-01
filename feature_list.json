@@ -140,6 +140,25 @@
       ]
     },
     {
+      "id": 26,
+      "name": "identidad_multirol_cliente",
+      "phase": "1a",
+      "sdd": true,
+      "status": "pending",
+      "title": "Identidad unica por inmobiliaria y vista como propietario o inquilino",
+      "prd_refs": ["RF-C2", "RF-C6", "RF-AU1", "RF-AU6"],
+      "note": "Creada el 2026-08-01 por decision del humano, a partir de la deuda D5 del segundo review de la feature #5. Al mudar el contacto al perfil (D-9), user.email quedo vacio para los clientes y desaparecio la clave por la que reconocer a la misma persona dentro de una inmobiliaria: quien sea propietario e inquilino de la misma agencia son hoy dos filas de user. Se hace como feature propia y no reabriendo la #5, que ya llevaba dos revisiones y cerraba cuatro features a la vez. Incluye tambien la deuda D4 y D6 del mismo review.",
+      "acceptance": [
+        "Al crear un perfil, si ya existe una persona con el mismo documento en la misma inmobiliaria, se reutiliza su identidad y se le anade el rol en vez de crear una fila nueva.",
+        "Una misma identidad puede ser propietario e inquilino de la misma inmobiliaria a la vez, con una sola credencial.",
+        "Tras iniciar sesion, la persona con varios roles puede consultar y elegir con cual de ellos actua, y la API responde segun el rol elegido.",
+        "Un rol elegido no da acceso a nada que ese rol no tenga: el backend lo valida, no basta con no mostrarlo.",
+        "La reutilizacion de identidad sigue prohibida entre inmobiliarias distintas (D-8): esta feature no la reintroduce.",
+        "init.sh falla, no advierte, si DATABASE_URL y DATABASE_MIGRATION_URL son iguales (deuda D4).",
+        "El titular de R62 y el enunciado de T58 del spec de #5 se corrigen para que no contradigan su propio cuerpo (deuda D6)."
+      ]
+    },
+    {
       "id": 6,
       "name": "property_profile",
       "phase": "1a",
