@@ -32,7 +32,8 @@ interface JwtPayload {
  * 3. El `entity_id` se toma también de los parámetros de ruta, para que las
  *    bajas lógicas (que no devuelven cuerpo) queden trazadas. Ampliado en la
  *    feature #25 con `idCodeudor` e `idReferencia`, en la #6 con
- *    `idPropietario` e `idDocumento`, y en la #7 con `idTransicion`: el
+ *    `idPropietario` e `idDocumento`, en la #7 con `idTransicion` y en la
+ *    #11 con `idZona` e `idItem`: el
  *    fallback nunca puede caer al id del recurso raíz, o la auditoría
  *    apuntaría al recurso equivocado (R23).
  *
@@ -105,6 +106,8 @@ function resolverEntityId(
   // Las bajas lógicas no devuelven cuerpo: el id está en la ruta.
   const params = request.params ?? {};
   return (
+    params.idItem ??
+    params.idZona ??
     params.idTransicion ??
     params.idDocumento ??
     params.idPropietario ??

@@ -67,6 +67,18 @@ const RUTAS_PERMITIDAS = [
   'POST /notificaciones/programadas',
   'GET /notificaciones/programadas',
   'DELETE /notificaciones/programadas/:id',
+  // ─── Feature #11 inventory_templates: 9 rutas (R14, design.md §4) ───────
+  // Gestión (clonar/zonas/items): solo `admin` (PA-11-4); lectura:
+  // admin/empleado.
+  'GET /plantillas',
+  'GET /plantillas/:id',
+  'POST /plantillas/:id/clonar',
+  'POST /plantillas/:id/zonas',
+  'PATCH /plantillas/:id/zonas/:idZona',
+  'DELETE /plantillas/:id/zonas/:idZona',
+  'POST /plantillas/:id/zonas/:idZona/items',
+  'PATCH /plantillas/:id/zonas/:idZona/items/:idItem',
+  'DELETE /plantillas/:id/zonas/:idZona/items/:idItem',
   'PATCH /propiedades/:id',
   'DELETE /propiedades/:id',
   'POST /propiedades/:idPropiedad/propietarios',

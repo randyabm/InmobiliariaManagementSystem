@@ -9,6 +9,7 @@ import { ClientesModule } from './clientes/clientes.module';
 import { PropiedadesModule } from './propiedades/propiedades.module';
 import { WorkflowsModule } from './workflows/workflows.module';
 import { NotificacionesModule } from './notificaciones/notificaciones.module';
+import { PlantillasModule } from './plantillas/plantillas.module';
 
 /**
  * Módulo transversal: tenant, auth, usuarios, roles y auditoría viven aquí
@@ -30,6 +31,7 @@ import { NotificacionesModule } from './notificaciones/notificaciones.module';
     PropiedadesModule,
     WorkflowsModule,
     NotificacionesModule,
+    PlantillasModule,
   ],
   controllers: [HealthController],
   providers: [HealthService],
@@ -41,6 +43,7 @@ import { NotificacionesModule } from './notificaciones/notificaciones.module';
     PropiedadesModule,
     WorkflowsModule,
     NotificacionesModule,
+    PlantillasModule,
   ],
 })
 export class CoreModule {}
