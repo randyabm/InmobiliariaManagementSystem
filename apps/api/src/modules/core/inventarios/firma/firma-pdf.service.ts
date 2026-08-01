@@ -37,10 +37,13 @@ export class FirmaPdfService {
   async confirmarAcuerdo(ctx: ContextoPeticion, inventarioId: string): Promise<void> {
     const inventario = await this.inventarios.buscarInventarioPorId(ctx, inventarioId);
     if (!inventario) throw new ResourceNotFoundError();
-    // #13 deja el inventario en ENVIADO tras la invitación; #22 usará
-    // EN_REVISION. Ambos con revisión completa son confirmables (R6).
+    // #13 deja el inventario en ENVIADO tras la invitación; #22 añade
+    // EN_NEGOCIACION (versionado, RF-I6). Todos con revisión completa son
+    // confirmables (R6).
     const revisable =
-      inventario.estado === 'ENVIADO' || inventario.estado === 'EN_REVISION';
+      inventario.estado === 'ENVIADO' ||
+      inventario.estado === 'EN_REVISION' ||
+      inventario.estado === 'EN_NEGOCIACION';
     if (!revisable || inventario.revision_completada_en === null) {
       throw new AcuerdoIncompletoError(
         `El inventario está en ${inventario.estado}; se requiere la revisión completa.`,

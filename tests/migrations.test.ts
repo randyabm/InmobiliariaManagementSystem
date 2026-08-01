@@ -77,6 +77,9 @@ const archivosSql = readdirSync(rutaRepo(CARPETA))
  * forzado en la misma migración.
  * La tabla `insurance_policy` se creó en la feature #20 `insurance_policy`
  * (R4), con RLS habilitado y forzado en la misma migración.
+ * La tabla `inventario_version` se creó en la feature #22
+ * `inventory_versioning` (R5), con RLS habilitado y forzado en la misma
+ * migración.
  */
 const TABLAS_PERMITIDAS: readonly string[] = [
   'tenant',
@@ -120,6 +123,7 @@ const TABLAS_PERMITIDAS: readonly string[] = [
   'config_renovacion',
   'alerta_vencimiento',
   'insurance_policy',
+  'inventario_version',
 ];
 
 describe('Migración inicial (R10)', () => {

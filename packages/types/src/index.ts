@@ -76,6 +76,7 @@ export type {
   Inventario,
   InventarioCompleto,
   InventarioItem,
+  InventarioVersion,
   InventarioItemFoto,
   InventarioZona,
   TipoEventoInventario,

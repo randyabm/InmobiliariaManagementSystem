@@ -81,6 +81,16 @@ export interface InventarioItemFoto {
   readonly created_at: string;
 }
 
+export interface InventarioVersion {
+  readonly id: string;
+  readonly tenant_id: string;
+  readonly inventario_id: string;
+  readonly version: number;
+  readonly snapshot_json: Readonly<Record<string, unknown>>;
+  readonly creado_por: string | null;
+  readonly created_at: string;
+}
+
 /** Ficha completa de `GET /inventarios/:id` (R7). */
 export interface InventarioCompleto extends Inventario {
   readonly zonas: ReadonlyArray<

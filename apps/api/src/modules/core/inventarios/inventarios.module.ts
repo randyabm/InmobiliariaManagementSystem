@@ -11,6 +11,8 @@ import { FirmaPdfService } from './firma/firma-pdf.service';
 import { ComparacionInventariosController } from './comparacion-inventarios.controller';
 import { ComparacionInventariosService } from './comparacion-inventarios.service';
 import { InventariosController } from './inventarios.controller';
+import { VersionadoInventariosController } from './versionado-inventarios.controller';
+import { VersionadoInventariosService } from './versionado-inventarios.service';
 import { InventariosRepository } from './inventarios.repository';
 import { InventariosService } from './inventarios.service';
 import { RevisionInventarioController } from './revision-inventario.controller';
@@ -32,7 +34,7 @@ import { RevisionInventarioService } from './revision-inventario.service';
     NotificacionesModule,
     OtpModule,
   ],
-  controllers: [InventariosController, RevisionInventarioController, FirmaPdfController, ComparacionInventariosController],
+  controllers: [InventariosController, RevisionInventarioController, FirmaPdfController, ComparacionInventariosController, VersionadoInventariosController],
   providers: [
     InventariosRepository,
     InventariosService,
@@ -41,6 +43,7 @@ import { RevisionInventarioService } from './revision-inventario.service';
     FirmaPdfRepository,
     FirmaPdfService,
     ComparacionInventariosService,
+    VersionadoInventariosService,
   ],
   exports: [InventariosService],
 })
