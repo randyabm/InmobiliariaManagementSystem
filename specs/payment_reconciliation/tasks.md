@@ -1,0 +1,11 @@
+# Tasks — payment_reconciliation
+- [ ] T1 Tipos Pagos; T2 schemas (3); T3 migración 0025; T4 journal+TABLAS+test RLS.
+- [ ] T5 `InferidorEstructura` interfaz + impl determinista (PA-30-1); unit de la inferencia.
+- [ ] T6 Parser determinista del modelo canónico (PA-30-2): unit de valores/formatos.
+- [ ] T7 Importaciones: carga (hash, 202 con mapeo), confirmación de mapeo (perfil reutilizable), procesar (R1–R3).
+- [ ] T8 Idempotencia: recarga mismo hash → Duplicado, sin dobles (R3, RF-PA4).
+- [ ] T9 Emparejamiento por estrategias combinadas + confianza + tres grupos (R4, RF-PA7/8/11).
+- [ ] T10 Bandeja de excepciones + referencia única ARR-XXXXX (R5).
+- [ ] T11 Estado de cuenta + morosidad + alertas por #10 (R6); frontera portales/KPIs anotada.
+- [ ] T12 Seguridad: 404 cross-tenant, RBAC, 401; RLS real (3 tablas).
+- [ ] T13 Verificación completa + trazabilidad R1–R7.

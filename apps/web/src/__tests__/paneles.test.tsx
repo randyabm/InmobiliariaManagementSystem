@@ -31,11 +31,11 @@ class TransportePaneles implements Transporte {
       return {
         status: 200,
         cuerpo: {
-          por_estado: [
-            { estado: 'Disponible', cantidad: 2 },
-            { estado: 'Arrendada', cantidad: 1 },
+          conteos: [
+            { clave: 'disponible', etiqueta: 'Disponible', cantidad: 2 },
+            { clave: 'arrendada', etiqueta: 'Arrendada', cantidad: 1 },
           ],
-          propiedades: [{ id: 'p1', direccion: 'Calle 1', estado: 'Disponible' }],
+          propiedades: [{ id: 'p1', direccion: 'Calle 1', estado_ciclo_vida: 'Disponible' }],
         },
       };
     }

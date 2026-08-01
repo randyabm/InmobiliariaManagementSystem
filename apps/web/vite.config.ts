@@ -16,6 +16,16 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    // El navegador habla SIEMPRE con el mismo origen (feature #28): Vite
+    // reenvía /api a la API real. Así la web funciona igual en local y
+    // cuando el puerto llega reenviado desde otro equipo/entorno.
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+        rewrite: (ruta) => ruta.replace(/^\/api/, ''),
+      },
+    },
   },
   build: {
     outDir: 'dist',

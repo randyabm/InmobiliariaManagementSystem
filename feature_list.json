@@ -583,6 +583,113 @@
         "Clientes: propietarios e inquilinos. Plantillas: listar y clonar.",
         "Tokens en IndexedDB, nunca localStorage (patrón #15)."
       ]
+    },
+    {
+      "id": 29,
+      "name": "inventory_paper_format",
+      "phase": "2",
+      "sdd": true,
+      "status": "spec_ready",
+      "title": "Formato de inventario en papel y reconstrucción digital (RF-I19–I21, §10.5)",
+      "prd_refs": [
+        "RF-I19",
+        "RF-I20",
+        "RF-I21",
+        "RF-I2"
+      ],
+      "note": "Fase 2 del roadmap.",
+      "acceptance": []
+    },
+    {
+      "id": 30,
+      "name": "payment_reconciliation",
+      "phase": "3",
+      "sdd": true,
+      "status": "spec_ready",
+      "title": "Conciliación de pagos (RF-PA1–PA15, §15, D9) — el sistema no procesa pagos",
+      "prd_refs": [
+        "RF-PA1",
+        "RF-PA2",
+        "RF-PA3",
+        "RF-PA4",
+        "RF-PA5",
+        "RF-PA6",
+        "RF-PA7",
+        "RF-PA8",
+        "RF-PA9",
+        "RF-PA10",
+        "RF-PA11",
+        "RF-PA12",
+        "RF-PA13",
+        "RF-PA14",
+        "RF-PA15"
+      ],
+      "note": "Fase 3 del roadmap.",
+      "acceptance": []
+    },
+    {
+      "id": 31,
+      "name": "maintenance_incidents",
+      "phase": "3",
+      "sdd": true,
+      "status": "spec_ready",
+      "title": "Autogestión de reclamos y reparaciones (RF-M1–M7, §6.5)",
+      "prd_refs": [
+        "RF-M1",
+        "RF-M2",
+        "RF-M3",
+        "RF-M4",
+        "RF-M5",
+        "RF-M6",
+        "RF-M7"
+      ],
+      "note": "Fase 3 del roadmap.",
+      "acceptance": []
+    },
+    {
+      "id": 32,
+      "name": "web_embedding",
+      "phase": "3",
+      "sdd": true,
+      "status": "spec_ready",
+      "title": "Integración WordPress y portales embebibles (RF-INT1–INT6, §6.6, D7)",
+      "prd_refs": [
+        "RF-INT1",
+        "RF-INT2",
+        "RF-INT3",
+        "RF-INT4",
+        "RF-INT5",
+        "RF-INT6"
+      ],
+      "note": "Fase 3-4 del roadmap.",
+      "acceptance": []
+    },
+    {
+      "id": 33,
+      "name": "ai_assistant",
+      "phase": "4",
+      "sdd": true,
+      "status": "spec_ready",
+      "title": "Asistente conversacional / Chatbot IA (RF-CB1–CB15, §14, D8)",
+      "prd_refs": [
+        "RF-CB1",
+        "RF-CB2",
+        "RF-CB3",
+        "RF-CB4",
+        "RF-CB5",
+        "RF-CB6",
+        "RF-CB7",
+        "RF-CB8",
+        "RF-CB9",
+        "RF-CB10",
+        "RF-CB11",
+        "RF-CB12",
+        "RF-CB13",
+        "RF-CB14",
+        "RF-CB15"
+      ],
+      "note": "Fase 4+ del roadmap.",
+      "acceptance": []
     }
   ]
 }

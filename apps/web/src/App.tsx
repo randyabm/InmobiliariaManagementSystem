@@ -19,7 +19,7 @@ export function App(props: { cliente?: ClienteWeb } = {}): JSX.Element {
     () =>
       props.cliente ??
       new ClienteWeb({
-        baseUrl: import.meta.env.VITE_API_URL ?? 'http://localhost:3000',
+        baseUrl: import.meta.env.VITE_API_URL ?? '/api',
         tenantId: import.meta.env.VITE_TENANT_ID ?? '',
       }),
   );

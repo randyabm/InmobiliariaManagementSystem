@@ -959,3 +959,34 @@ Se quitó Forgejo por completo del repositorio:
 Línea base tras la eliminación: `./init.sh` exit 0 (22 OK), `test` **838**
 (los 42 tests de Forgejo → 7 de GitHub), `test:db` **143**. El push
 pendiente solo depende de autorizar `origin` → GitHub.
+
+### 2026-08-01 — Specs del roadmap post-Fase 1 (29–33)
+
+El humano pidió «continuemos con las specs que falta». Se añadieron al
+tablero las 5 features del roadmap del PRD (todas `spec_ready`, puerta
+humana pendiente):
+
+- **#29 `inventory_paper_format`** (Fase 2, RF-I19–I21, §10.5): formato
+  en papel sin imágenes con QR/ID, reconstrucción digital manual (fotos
+  sueltas → ítem, escaneo como evidencia) y confirmación electrónica con
+  el flujo OTP existente de #13.
+- **#30 `payment_reconciliation`** (Fase 3, RF-PA1–PA15, §15, D9): espejo
+  de pagos (nunca procesa dinero); inferencia de estructura tras interfaz
+  con MVP determinista (PA-30-1), parseo 100% determinista (PA-30-2,
+  salvaguarda §15.3), idempotencia por hash, emparejamiento por
+  estrategias con confianza, bandeja de excepciones, referencia única
+  ARR-XXXXX, morosidad con alertas por #10; reportes/KPIs anclados a
+  portales (frontera).
+- **#31 `maintenance_incidents`** (Fase 3, RF-M1–M7, §6.5): tickets como
+  instancias del motor de #7 (sin tabla propia, PA-31-1), scoping por
+  rol, aprobación de costos del propietario (PA-31-2), SLA con el motor.
+- **#32 `web_embedding`** (Fase 3-4, RF-INT1–INT6, §6.6, D7): web
+  component con Shadow DOM (PA-32-1), SSO handshake de un solo uso
+  (PA-32-2), CORS por tenant (PA-32-3), white-label y feature flag.
+- **#33 `ai_assistant`** (Fase 4+, RF-CB1–CB15, §14, D8): herramientas
+  acotadas que llaman SERVICIOS con la sesión (PA-33-2, nunca acceso
+  amplio), límite duro que escala, auditoría completa, seguridad probada
+  determinista y capacidades con evals (§16.1); sin RAG en la primera
+  iteración (PA-33-3).
+
+`./init.sh` exit 0 (25 OK) — valida el tablero (33 features) y los specs.

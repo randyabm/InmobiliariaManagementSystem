@@ -69,7 +69,7 @@ export class ClienteWeb {
     transporte?: Transporte;
     enLogout?: () => void;
   } = {}) {
-    const baseUrl = opciones.baseUrl ?? '';
+    const baseUrl = opciones.baseUrl ?? '/api';
     const tenantId = opciones.tenantId ?? '';
     this.transporte =
       opciones.transporte ?? new TransporteFetch(baseUrl, tenantId);
