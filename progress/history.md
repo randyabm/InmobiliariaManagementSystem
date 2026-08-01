@@ -574,3 +574,50 @@ Con #6 quedan cerradas las features 1a del tablero: #1 scaffold, #2 RLS,
 #26 identidad multi-rol, #27 sesiones y #6 hoja de vida del inmueble. La
 cola sigue con #8 `property_lifecycle` (ciclo de vida + dashboard), #7
 `workflow_engine`, #9 `property_intake` y el resto de la fase 1a/1b.
+
+## 2026-08-01 — Feature #7 `workflow_engine` (cerrada)
+
+- **Agente:** leader → spec_author → implementer → reviewer
+- **Feature:** #7 `workflow_engine` — `in_progress` → **`done`**
+- **Veredicto del reviewer:** **APPROVED, sin bloqueantes**
+  (`progress/review_workflow_engine.md`).
+- **Verificación:** `./init.sh` exit 0 — `test` **619** (61 archivos), `test:db`
+  **108** (3 archivos). Lint, typecheck y build verdes. 27/27 tasks.
+- **Mutaciones:** 5 reproducidas por el reviewer (1/8 fail-open del
+  evaluador, 1/6 límite de cascada, 1/13 clon, 1/8 política del sistema,
+  1/6 contexto fusionado) + verificación de que sin el límite de la cascada
+  el test de ciclo **se cuelga** (barrera de disponibilidad).
+- **Lo que trajo (la base de todos los procesos del tablero):**
+  - Motor 100% dirigido por datos (RF-A4/D3): 5 tablas (migración `0013`)
+    — definición, estados, transiciones, instancia (contexto JSONB) y log
+    append-only con triggers (patrón `audit_log`). Sin `switch` de estados
+    en ningún módulo.
+  - Seed como datos: `ciclo_vida_propiedad` (RF-P4) con la rama condicional
+    de `entrega_ok`; el criterio de aceptación recorre la máquina entera
+    por HTTP.
+  - Condiciones JSONB whitelisted (fail closed, sin eval); responsables
+    contra `user_role` en la base; cascada automática en la misma
+    transacción con límite 10 → `CICLO_AUTOMATICO` y rollback total.
+  - Plantillas del sistema con tenant reservado + RLS con OR de lectura,
+    `WITH CHECK` propio y `IS NOT NULL` endurecido (conexión virgen → 0
+    filas). Clonar + editar la copia solo `admin` (RF-W2 base); RF-W3 como
+    hook declarativo (`notificacion` dato); RF-A5 anotado para la feature
+    de paquetes.
+  - **Defecto real cazado por los tests:** el clon apuntaba las transiciones
+    a los estados del ORIGEN (`copiarDefinicion` unía contra `$2` en vez de
+    `$1`); corregido y con test de regresión (mutación 3 lo sostiene).
+- **Desviaciones anotadas (legítimas):** política del sistema endurecida
+  con `current_setting(...) IS NOT NULL`; `workflow_estado`/
+  `workflow_transicion` sin `tenant_id` propio (RLS por subconsulta);
+  `@Audit` de la ejecución registra `entity_id` = instancia.
+- **Deuda del reviewer (no bloqueante):** D-1 inventario de políticas por
+  subconsulta de estado/transición; D-2 revisar la constante de cascada si
+  un workflow real la necesita mayor; D-3 el selector de clonado es UI del
+  #8.
+- **Pendientes heredados:** PA-14 (onboarding sin RF-*), push sin
+  autorizar, Forgejo (#23) sin montar, deudas de reviews #25/#26/#27/#6/#7.
+
+### Siguiente
+
+La cola sigue con **#8 `property_lifecycle`** (ciclo de vida + dashboard,
+RF-P4/P5), que transicionará propiedades sobre el motor #7 recién cerrado.
