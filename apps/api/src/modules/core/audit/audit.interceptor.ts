@@ -30,7 +30,11 @@ interface JwtPayload {
  *    Con `tap` la promesa quedaba suelta y la respuesta podía salir antes de
  *    que la fila existiera: una auditoría que llega "quizá" no es auditoría.
  * 3. El `entity_id` se toma también de los parámetros de ruta, para que las
- *    bajas lógicas (que no devuelven cuerpo) queden trazadas.
+ *    bajas lógicas (que no devuelven cuerpo) queden trazadas. Ampliado en la
+ *    feature #25 con `idCodeudor` e `idReferencia`: las bajas de las rutas
+ *    anidadas `/inquilinos/:idInquilino/codeudores/:idCodeudor` no pueden
+ *    caer al `:idInquilino` de la raíz, o la auditoría apuntaría al recurso
+ *    equivocado (R23).
  *
  * `metadata` se deja deliberadamente vacío: **R36** prohíbe que documentos,
  * celulares, teléfonos, emails y números de cuenta lleguen a `audit_log`.
@@ -100,5 +104,10 @@ function resolverEntityId(
 
   // Las bajas lógicas no devuelven cuerpo: el id está en la ruta.
   const params = request.params ?? {};
-  return params.idCuenta ?? params.id;
+  return (
+    params.idCodeudor ??
+    params.idReferencia ??
+    params.idCuenta ??
+    params.id
+  );
 }
