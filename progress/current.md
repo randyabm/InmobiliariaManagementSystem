@@ -6,12 +6,12 @@
 
 - **Feature en curso:** batch **#12 `inventory_creation`** (implementada,
   24/24 tasks, esperando **review** con mutaciones), **#13
-  `inventory_tenant_review`** (spec_ready), **#14 `inventory_signature_pdf`**
-  (spec_ready — agregada al lote por decisión del humano), **#15
-  `pwa_offline`** (spec_ready).
-- **Agente:** implementer terminó #12 → reviewer (mutaciones) → humano
-  autoriza `done` → luego #13 → #15 → #14 (o el orden que el humano decida;
-  #14 depende de #13 por el OTP FIRMA).
+  `inventory_tenant_review`** (implementada, 24/24 tasks, esperando
+  **review**), **#14 `inventory_signature_pdf`** (spec_ready — agregada al
+  lote por decisión del humano), **#15 `pwa_offline`** (spec_ready).
+- **Agente:** implementer terminó #12 y #13 → reviewer (mutaciones) →
+  humano autoriza `done` → luego #15 → #14 (o el orden que el humano
+  decida; #14 depende de #13 por el OTP FIRMA).
 - **Estado:** meta de la sesión: **completar la fase 1** (1b + 1c + #23).
 
 ## UI del proyecto
@@ -28,10 +28,17 @@ frontend. Las features de la fase 1 son backend (API). La PWA de campo
 ## En review
 
 - **#12 `inventory_creation`** — implementación completa:
-  - Suite: `npm run test` **761** (82 archivos) + `npm run test:db` **131**.
+  - Suite: `npm run test` **761** + `npm run test:db` **131**.
   - Lint, typecheck y build verdes; `./init.sh` exit 0 (22 OK).
   - Trazabilidad R1–R11 → test en `progress/impl_inventory_creation.md`.
   - PA-12-1..4 ejecutadas; fronteras #13/#14/#21/#22/#15 anotadas.
+
+- **#13 `inventory_tenant_review`** — implementación completa:
+  - Suite: `npm run test` **785** + `npm run test:db` **140**.
+  - Lint, typecheck y build verdes; `./init.sh` exit 0 (22 OK).
+  - Trazabilidad R1–R13 → test en `progress/impl_inventory_tenant_review.md`.
+  - PA-13-1..4 ejecutadas; `inventario.perfil_inquilino_id` (scoping R9)
+    añadido en la migración 0017; primeras rutas de CLIENTE.
 
 ## Pendientes de decisión del humano
 
