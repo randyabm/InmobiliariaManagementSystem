@@ -50,6 +50,9 @@ const archivosSql = readdirSync(rutaRepo(CARPETA))
  * Las tres tablas `notificacion_*` se crearon en la feature #10
  * `notifications` (R1, R6, R10), con RLS habilitado y forzado en la misma
  * migración.
+ * Las tres tablas `plantilla_*` se crearon en la feature #11
+ * `inventory_templates` (R1, R2, R3), con RLS habilitado y forzado en la
+ * misma migración.
  */
 const TABLAS_PERMITIDAS: readonly string[] = [
   'tenant',
@@ -75,6 +78,9 @@ const TABLAS_PERMITIDAS: readonly string[] = [
   'notificacion_pendiente',
   'notificacion_enviada',
   'notificacion_programada',
+  'plantilla_inmueble',
+  'plantilla_zona',
+  'plantilla_item',
 ];
 
 describe('Migración inicial (R10)', () => {

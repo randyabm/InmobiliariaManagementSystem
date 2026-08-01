@@ -35,6 +35,17 @@ export type {
   WorkflowTransicionLog,
 } from './workflows';
 
+// Feature #11 inventory_templates.
+export { FIELD_TYPES, ORIGENES_PLANTILLA } from './plantillas';
+export type {
+  FieldType,
+  OrigenPlantilla,
+  PlantillaCompleta,
+  PlantillaInmueble,
+  PlantillaItem,
+  PlantillaZona,
+} from './plantillas';
+
 // Feature #10 notifications.
 export { CANALES_NOTIFICACION, ESTADOS_PENDIENTE, ESTADOS_PROGRAMADA } from './notificaciones';
 export type {

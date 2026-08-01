@@ -1135,4 +1135,147 @@ describe('Aplicación real de las migraciones (R10)', () => {
       );
     });
   });
+
+  // ─── Feature #11 inventory_templates (T4: R1, R2, R3, R4, R14) ─────────
+
+  describe('esquema y seed de #11 (R1, R2, R3, R4, R14)', () => {
+    const TABLAS_11 = [
+      'plantilla_inmueble',
+      'plantilla_zona',
+      'plantilla_item',
+    ] as const;
+
+    it.each(TABLAS_11)(
+      'la tabla %s existe con RLS habilitado Y FORZADO (R1/R2/R3)',
+      async (tabla) => {
+        const { rows } = await pool.query<{
+          relrowsecurity: boolean;
+          relforcerowsecurity: boolean;
+        }>(
+          `SELECT c.relrowsecurity, c.relforcerowsecurity
+             FROM pg_class c
+             JOIN pg_namespace n ON n.oid = c.relnamespace
+            WHERE n.nspname = 'public' AND c.relname = $1`,
+          [tabla],
+        );
+
+        expect(rows, `la tabla ${tabla} no existe`).toHaveLength(1);
+        expect(rows[0]?.relrowsecurity).toBe(true);
+        expect(rows[0]?.relforcerowsecurity).toBe(true);
+      },
+    );
+
+    it('la política de plantilla_inmueble lee el sistema y escribe solo lo propio (PA-11-1)', async () => {
+      const { rows } = await pool.query<{ polname: string; qual: string; with_check: string | null }>(
+        `SELECT policyname AS polname, qual, with_check
+           FROM pg_policies
+          WHERE schemaname = 'public' AND tablename = 'plantilla_inmueble'`,
+      );
+
+      const politica = rows.find((r) => r.polname === 'plantilla_inmueble_tenant_isolation');
+      expect(politica).toBeDefined();
+      expect(politica?.qual).toContain('00000000-0000-0000-0000-000000000000');
+      expect(politica?.qual).toContain('app.current_tenant');
+      expect(politica?.with_check).toContain('app.current_tenant');
+      expect(politica?.with_check).not.toContain('00000000-0000-0000-0000-000000000000');
+    });
+
+    it('el seed siembra las 6 plantillas base y APARTAMENTO con el ejemplo completo (R4)', async () => {
+      const { rows: plantillas } = await pool.query<{ tipo: string }>(
+        `SELECT tipo FROM plantilla_inmueble
+          WHERE tenant_id = '00000000-0000-0000-0000-000000000000'
+          ORDER BY tipo`,
+      );
+      expect(plantillas.map((p) => p.tipo)).toEqual([
+        'APARTAMENTO',
+        'BODEGA',
+        'CASA',
+        'LOCAL',
+        'OFICINA',
+        'PARQUEADERO',
+      ]);
+
+      const { rows: apartamento } = await pool.query<{ id: string }>(
+        `SELECT id FROM plantilla_inmueble
+          WHERE tipo = 'APARTAMENTO' AND origen = 'SISTEMA'`,
+      );
+      const apartamentoId = apartamento[0]?.id;
+
+      const { rows: zonas } = await pool.query<{ nombre: string; repetible: boolean }>(
+        `SELECT nombre, repetible FROM plantilla_zona
+          WHERE plantilla_id = $1 AND activo = true ORDER BY orden`,
+        [apartamentoId],
+      );
+      expect(zonas.map((z) => z.nombre)).toEqual([
+        'Sala',
+        'Cocina',
+        'Habitación',
+        'Baño',
+        'Entrega de llaves',
+      ]);
+      expect(zonas.find((z) => z.nombre === 'Habitación')?.repetible).toBe(true);
+      expect(zonas.find((z) => z.nombre === 'Baño')?.repetible).toBe(true);
+
+      const { rows: items } = await pool.query<{
+        nombre: string;
+        field_type: string;
+      }>(
+        `SELECT i.nombre, i.field_type FROM plantilla_item i
+          JOIN plantilla_zona z ON z.id = i.zona_id
+         WHERE z.plantilla_id = $1 AND i.activo = true`,
+        [apartamentoId],
+      );
+      const nombres = items.map((i) => i.nombre);
+      expect(nombres).toEqual(
+        expect.arrayContaining([
+          'Paredes',
+          'Piso',
+          'Techo',
+          'Ventanas',
+          'Iluminación',
+          'Mesón',
+          'Estufa',
+          'Lavaplatos',
+          'Electrodomésticos',
+          'Clóset',
+          'Sanitario',
+          'Ducha/Regadera',
+          'Grifería',
+          'Llaves puerta principal',
+          'Control(es) parqueadero',
+          'Tarjeta(s) acceso',
+        ]),
+      );
+      expect(
+        items.filter((i) => i.nombre === 'Ventanas')[0]?.field_type,
+      ).toBe('si_no_estado');
+      expect(
+        items.filter((i) => i.nombre === 'Llaves puerta principal')[0]?.field_type,
+      ).toBe('conteo');
+    });
+
+    it('el CHECK de opciones solo admite seleccion con opciones (R9)', async () => {
+      const { rows: zona } = await pool.query<{ id: string }>(
+        `SELECT z.id FROM plantilla_zona z
+          JOIN plantilla_inmueble p ON p.id = z.plantilla_id
+         WHERE p.tipo = 'APARTAMENTO' AND z.nombre = 'Sala'`,
+      );
+
+      await expect(
+        pool.query(
+          `INSERT INTO plantilla_item (zona_id, nombre, field_type, opciones_json)
+           VALUES ($1, 'Opciones sin seleccion', 'estado', '["a"]')`,
+          [zona[0]?.id],
+        ),
+      ).rejects.toMatchObject({ code: '23514' });
+
+      await expect(
+        pool.query(
+          `INSERT INTO plantilla_item (zona_id, nombre, field_type)
+           VALUES ($1, 'Seleccion sin opciones', 'seleccion')`,
+          [zona[0]?.id],
+        ),
+      ).rejects.toMatchObject({ code: '23514' });
+    });
+  });
 });

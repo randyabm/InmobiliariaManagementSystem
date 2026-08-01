@@ -42,3 +42,6 @@ export { workflowTransicionLog } from './workflow-transicion-log';
 export { notificacionPendiente } from './notificacion-pendiente';
 export { notificacionEnviada } from './notificacion-enviada';
 export { notificacionProgramada } from './notificacion-programada';
+export { plantillaInmueble, TENANT_SISTEMA_PLANTILLAS } from './plantilla-inmueble';
+export { plantillaZona } from './plantilla-zona';
+export { plantillaItem } from './plantilla-item';
