@@ -163,7 +163,7 @@
       "name": "sesion_y_revocacion",
       "phase": "1a",
       "sdd": true,
-      "status": "pending",
+      "status": "spec_ready",
       "title": "Sesiones, refresh tokens y revocacion inmediata",
       "prd_refs": ["RF-AU1", "RF-C3", "RF-AU6"],
       "note": "Creada el 2026-08-01 por decision del humano, a partir de PA-3 del spec de la feature #26. Hoy el rol se valida contra la base solo en la emision del token: si a alguien se le revoca un rol, su token ya emitido sigue siendo valido hasta que expire. El proyecto no tiene refresh tokens ni revocacion. El humano prefirio resolverlo de verdad en vez de aceptar la ventana con expiracion corta.",
