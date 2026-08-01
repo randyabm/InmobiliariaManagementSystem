@@ -128,6 +128,16 @@ const RUTAS_PERMITIDAS = [
   'POST /inventarios/:id/firmas/empleado',
   'POST /inventarios/:id/firmas/inquilino',
   'GET /inventarios/:id/pdf',
+  // ─── Feature #16 contract_templates: 7 rutas (R6, design.md §2) ────────
+  // Lectura/edición de la base y propuesta por propiedad: admin/empleado.
+  // La validación (base y copia): solo `admin` (PA-16-3).
+  'GET /plantillas-contrato',
+  'POST /plantillas-contrato',
+  'PATCH /plantillas-contrato',
+  'POST /plantillas-contrato/validar',
+  'POST /propiedades/:id/contrato/plantilla',
+  'GET /propiedades/:id/contrato/plantilla',
+  'POST /propiedades/:id/contrato/plantilla/validar',
   // ─── Feature #7 workflow_engine: 9 rutas (R17, design.md §8) ───────────
   // Gestión de definiciones: solo `admin` (RF-W2). Instancias y ejecución:
   // `@Roles('admin','empleado')`.

@@ -433,7 +433,7 @@
       "name": "contract_templates",
       "phase": "1c",
       "sdd": true,
-      "status": "pending",
+      "status": "done",
       "title": "Templates de contrato en tres ámbitos",
       "prd_refs": [
         "RF-CT1",
@@ -452,7 +452,7 @@
       "name": "contract_generation_signature",
       "phase": "1c",
       "sdd": true,
-      "status": "pending",
+      "status": "in_progress",
       "title": "Generación del contrato y firma electrónica",
       "prd_refs": [
         "RF-CT3",

@@ -63,6 +63,9 @@ const archivosSql = readdirSync(rutaRepo(CARPETA))
  * La tabla `inventario_firma` (evidencia de la firma, append-only) se
  * creó en la feature #14 `inventory_signature_pdf` (R3), con RLS
  * habilitado y forzado en la misma migración.
+ * La tabla `contract_template` se creó en la feature #16
+ * `contract_templates` (R6), con RLS habilitado y forzado en la misma
+ * migración.
  */
 const TABLAS_PERMITIDAS: readonly string[] = [
   'tenant',
@@ -99,6 +102,7 @@ const TABLAS_PERMITIDAS: readonly string[] = [
   'codigo_otp',
   'inventario_item_revision',
   'inventario_firma',
+  'contract_template',
 ];
 
 describe('Migración inicial (R10)', () => {

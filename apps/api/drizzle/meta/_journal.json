@@ -134,6 +134,13 @@
       "when": 1755043200000,
       "tag": "0018_inventory_signature_pdf",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1755129600000,
+      "tag": "0019_contract_templates",
+      "breakpoints": true
     }
   ]
 }

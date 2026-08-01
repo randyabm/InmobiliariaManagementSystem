@@ -35,6 +35,14 @@ export type {
   WorkflowTransicionLog,
 } from './workflows';
 
+// Feature #16 contract_templates.
+export { ESTADOS_PLANTILLA_CONTRATO } from './contratos';
+export type {
+  ContractTemplate,
+  EstadoPlantillaContrato,
+  MergeFields,
+} from './contratos';
+
 // Feature #14 inventory_signature_pdf.
 export { FIRMANTES } from './inventario-firma';
 export type { FirmaInventario, FirmanteTipo } from './inventario-firma';

@@ -13,6 +13,7 @@ import { PlantillasModule } from './plantillas/plantillas.module';
 import { InventariosModule } from './inventarios/inventarios.module';
 import { InvitacionesModule } from './invitaciones/invitaciones.module';
 import { OtpModule } from './otp/otp.module';
+import { ContratosModule } from './contratos/contratos.module';
 
 /**
  * Módulo transversal: tenant, auth, usuarios, roles y auditoría viven aquí
@@ -38,6 +39,7 @@ import { OtpModule } from './otp/otp.module';
     InventariosModule,
     InvitacionesModule,
     OtpModule,
+    ContratosModule,
   ],
   controllers: [HealthController],
   providers: [HealthService],
@@ -53,6 +55,7 @@ import { OtpModule } from './otp/otp.module';
     InventariosModule,
     InvitacionesModule,
     OtpModule,
+    ContratosModule,
   ],
 })
 export class CoreModule {}
