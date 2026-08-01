@@ -131,10 +131,140 @@ SELECT u.id, u.tenant_id, u.nombre
 Un cliente **con perfil** y **sin** documento en su identidad solo puede venir
 de una colisión limpiada por `0009`.
 
+### Bloque B — Vista como propietario o como inquilino (T19–T26) — hecho
+
+- **T19, T20, T22 (R16, R17, R19, R21)** — `AuthService.elegirRolActivo` +
+  `POST /auth/rol-activo` + `RolNoDisponibleError` (403, mensaje genérico). El
+  rol se comprueba contra `user_role` con `activo = true` **en la base**, dentro
+  del contexto de tenant, no contra lo que afirma el token. Se audita
+  `auth.rol_activo_elegido`. **No se implementa revocación**: es la #27.
+- **T21 (R18, R20, R29)** — `jwt.strategy.ts` propaga `rol_activo` sin
+  interpretarlo; `roles.guard.ts` es el **único** punto donde se aplica la
+  regla, con `rolesEfectivos ⊆ rolesDelTenant` por construcción.
+- **T23–T26** — `auth/__tests__/rol-activo.api.test.ts` (19 tests, API real) y
+  `auth/__tests__/rol-activo-guard.test.ts` (9 tests, guard puro).
+
+**Decisión de diseño que el reviewer debe mirar: cómo se demuestra R18.**
+R18 pide que elegir "propietario" quite el acceso a lo de inquilino. Para
+demostrarlo extremo a extremo harían falta **rutas que exijan rol de cliente**, y
+**hoy no existe ninguna**: todas las rutas del sistema piden `admin` o
+`empleado`, y el portal del cliente (RF-AU2/AU4) no está en el tablero. No se
+inventaron endpoints para poder probarse. Se hizo así:
+
+1. **Extremo a extremo, sobre rutas reales**, con una identidad `empleado` +
+   `propietario`: eligiendo `propietario` las rutas de empleado pasan de 200 a
+   **403** —misma identidad, mismos roles en la base, solo cambia la elección— y
+   el `POST` tampoco escribe (verificado con `SELECT`).
+2. **En el guard**, que es el único punto donde la regla vive, con los roles
+   `propietario`/`inquilino` exactos del requirement y en las dos direcciones.
+
+Ninguna de las dos sustituye a la otra. Cuando exista el portal del cliente, el
+caso (1) debería reescribirse con sus rutas.
+
+**Defecto latente encontrado y corregido de paso.** `AuthModule` hacía
+`JwtModule.register({ secret: process.env.JWT_SECRET ?? 'dev-secret' })`, que
+congela el secreto **al importar el archivo**. Cuando algo fija `JWT_SECRET`
+después —lo que hace el arnés de tests—, la API **firmaba** con `dev-secret` y
+`JwtStrategy` **verificaba** con el secreto real: todo token emitido por la
+propia API era rechazado por ella misma. No se había visto porque ningún test
+volvía a usar el token de `POST /auth/login`, y la #26 es la primera feature
+cuyo endpoint existe para emitir uno. Pasa a `registerAsync` y **sin**
+`dev-secret` de reserva: un valor por defecto solo sirve para que un despliegue
+mal configurado emita tokens falsificables en silencio.
+
+---
+
 ## Verificación por mutación (T27)
 
-Pendiente: bloque C.
+Cada invariante se declara cubierto **solo** porque se le ha visto ponerse rojo.
+Números reales, reproducibles: se aplica la mutación, se corre la suite, se
+revierte con `git checkout`. Línea base: `npm run test` **452**,
+`npm run test:db` **71**.
+
+| # | Mutación | Suite | Rojos | Requirement | Qué se pone rojo |
+|---|---|---|---|---|---|
+| **a** | `CREATE UNIQUE INDEX` → `CREATE INDEX` en `0009` | `test:db` | **2 / 71** | R6 | el índice deja de ser único y dos identidades con el mismo documento entran en el mismo tenant (`backfill-documento.db.test.ts`) |
+| **b** | quitar `AND tenant_id = $3` de `buscarPorDocumentoEnEsteTenant` | `test` | **1 / 452** | R10 | `identidad.service.test.ts` › "la búsqueda … lleva tenant_id explícito" |
+| **b+d** | lo anterior **y** `BYPASSRLS` al rol de aplicación | `identidad-multirol.api` | **2 / 19** | R10, R14 | T17: la misma persona en A y en B pasa a ser **una sola** identidad y el 409 de R9 se dispara con datos de la otra inmobiliaria |
+| **c** | `rolesEfectivos = rolesDelTenant` en el guard | `test` | **4 / 452** | R18 | 2 en el guard (las dos direcciones propietario/inquilino) y 2 extremo a extremo (la ruta de empleado vuelve a autorizar y el POST vuelve a escribir) |
+| **d** | `NOBYPASSRLS` → `BYPASSRLS` en `asegurarRolDeAplicacion` | `test` | **37 / 452** | R22, R24 | todo el aislamiento del proyecto, incluidos los 7 de `identidad-por-documento-rls.test.ts` y el "no obtiene perfil ninguno" de `/auth/me` |
+| **e** | anular la llamada de auditoría de `auditarRolAnadido` | `clientes` | **2 / 116** | R13 | T18: no existe la entrada `identidad.rol_anadido` |
+| **f** | `nombresCoinciden` devuelve siempre `true` | `test` | **9 / 452** | R9, R27 | 5 unitarios (criterio y 409) y 4 de API (el alta discrepante pasa a **201** y escribe) |
+
+**Sobre (b), y es importante que el reviewer lo lea.** La mutación (b) sola
+produce **un** rojo, no varios: con el rol correctamente configurado, el RLS ya
+impide que la consulta alcance otra inmobiliaria, así que el predicado explícito
+es —como dice su comentario— **defensa en profundidad**, no la barrera
+principal. La mutación **(b+d)** es la que demuestra para qué sirve: en cuanto
+el motor deja de aislar, quitar ese `AND tenant_id` reintroduce **exactamente**
+la vinculación entre inmobiliarias que D-8 prohíbe. Se documentan las dos: la
+primera dice qué test lo fija, la segunda dice por qué el código existe.
+
+**R25** tiene su propia mutación permanente en el test: el cuarto caso de
+`init-sh-roles-db.test.ts` afirma que el chequeo es `fail` y **no** `warn`, de
+modo que devolverlo a `warn` pone dos tests en rojo (ese y el del exit code).
+
+---
 
 ## Trazabilidad R → test (T28)
 
-Pendiente: bloque C.
+| R | Test que lo fija |
+|---|---|
+| R1, R2 | `identidad-multirol.api.test.ts` › T13 "el segundo alta reutiliza la identidad"; `inquilinos.api.test.ts` › "la misma persona con los dos roles es UNA identidad" |
+| R3 | `identidad-multirol.api.test.ts` › T13 (roles activos); `identidad.service.test.ts` › "el rol se inserta con activo = true e idempotente" |
+| R4 | `identidad-multirol.api.test.ts` › "una sola credencial…"; `identidad.service.test.ts` › "no toca email, password_hash ni nombre" |
+| R5 | `backfill-documento.db.test.ts` › columnas y backfill; `identidad-multirol.api.test.ts` › T13 (documento en `user`) |
+| R6 | `backfill-documento.db.test.ts` › "el índice único parcial…" (4 tests) · **mutación a** |
+| R7 | `identidad-multirol.api.test.ts` › T15 (409 + `SELECT`) |
+| R8 | `identidad-multirol.api.test.ts` › T14 (contactos independientes) |
+| R9 | `identidad-multirol.api.test.ts` › T31 (a); `identidad.service.test.ts` › "lanza 409…" · **mutación f** |
+| R10 | `identidad.service.test.ts` › "lleva tenant_id explícito" · **mutaciones b, b+d** |
+| R11 | `identidad.service.test.ts` › "ninguna consulta filtra `user` por email" |
+| R12 | `propietarios.api.test.ts` › "si falla el perfil tras reutilizar la identidad, el user_role se deshace" |
+| R13 | `identidad-multirol.api.test.ts` › T18 (3 tests) · **mutación e** |
+| R14 | `identidad-multirol.api.test.ts` › T17 (3 tests); `identidad-por-documento-rls.test.ts` · **mutación b+d** |
+| R15 | `rol-activo.api.test.ts` › T23 (5 tests) — cierra la deuda **D3** |
+| R16 | `rol-activo.api.test.ts` › "devuelve un token nuevo con el rol elegido" |
+| R17 | `rol-activo.api.test.ts` › T25 (403, sin token, sin revelar roles) |
+| R18 | `rol-activo-guard.test.ts` › R18 (4 tests); `rol-activo.api.test.ts` › T24 · **mutación c** |
+| R19 | `rol-activo.api.test.ts` › "la comprobación es contra la BASE, no contra el token" |
+| R20 | `rol-activo-guard.test.ts` › R20 (2 tests); `rol-activo.api.test.ts` › T26 (4 tests) |
+| R21 | `rol-activo.api.test.ts` › "la elección queda auditada con el rol" |
+| R22 | `identidad-por-documento-rls.test.ts` (7 tests); `rol-activo.api.test.ts` › "un token que AFIRMA un rol ajeno no obtiene perfil"; `identidad-multirol.api.test.ts` › T17 · **mutación d** |
+| R23 | `rol-activo.api.test.ts` › "el token con rol de cliente tampoco escribe" y T26 |
+| R24 | `identidad-por-documento-rls.test.ts` › "el rol de la conexión NO es superusuario ni tiene BYPASSRLS" · **mutación d** |
+| R25 | `init-sh-roles-db.test.ts` (4 tests) |
+| R26 | `spec-identidad-siempre-nueva.test.ts` (5 tests) |
+| R27 | `identidad.service.test.ts` › `nombresCoinciden` (5 tests); `identidad-multirol.api.test.ts` › "los espacios y las mayúsculas sí se absorben" · **mutación f** |
+| R28 | `identidad-multirol.api.test.ts` › T31 (cuerpo accionable, sin documento) |
+| R29 | `rol-activo-guard.test.ts` › R29 (2 tests); `rol-activo.api.test.ts` › "un token cuyo rol_activo no figura entre sus roles" |
+
+---
+
+## Estado final
+
+- `./init.sh` → **exit 0**.
+- `npm run test` → **452** (línea base 372, +80).
+- `npm run test:db` → **71** (línea base 56, +15).
+- **31 / 31 tasks** marcadas en `specs/identidad_multirol_cliente/tasks.md`.
+- La lista blanca de `tests/ddl-en-tests.test.ts` **no se amplió**.
+- `feature_list.json` **no se ha tocado**: la feature sigue en `in_progress` a
+  la espera del reviewer.
+
+## Decisiones abiertas que quedan sobre la mesa
+
+1. **PA-5 (heredada del spec, sigue abierta).** Si la comparación de nombres
+   debe plegar diacríticos (una línea en `normalizarNombre` más su test) y qué
+   hacer con el orden de apellidos (cambio de modelo de datos, feature propia).
+   Mientras tanto **R27 rige tal cual** y `Maria` ≠ `María`.
+2. **El selector visual no existe.** Esta feature deja el contrato
+   (`GET /auth/me` + `POST /auth/rol-activo`) y nada más. El portal del cliente
+   (RF-AU2/AU4) **no está en `feature_list.json`**; el humano decide si abre la
+   ficha. Hasta que exista, R18 no se puede demostrar sobre rutas de cliente
+   (ver arriba).
+3. **La ventana de revocación sigue abierta y es de la #27.** Un `rol_activo`
+   emitido sigue valiendo hasta que el token expire aunque se revoque el rol.
+   Está así por decisión del humano (PA-3) y esta feature no lo empeora.
+4. **PA-2 caduca al llegar a producción.** La migración avisa de las identidades
+   duplicadas y no las fusiona. Con datos reales hará falta una herramienta de
+   fusión con criterio, que es feature propia.

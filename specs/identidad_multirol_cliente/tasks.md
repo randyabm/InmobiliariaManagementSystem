@@ -137,7 +137,7 @@
 
 ## Bloque C — Cierre y verificación por mutación
 
-- [ ] **T27** — Verificación por mutación documentada en
+- [x] **T27** — Verificación por mutación documentada en
       `progress/impl_identidad_multirol_cliente.md`, con el conteo de rojos de
       cada una: (a) quitar el índice único parcial de T5 → R6; (b) quitar el
       predicado `tenant_id` de `buscarPorDocumentoEnEsteTenant` → R10/R14;
@@ -146,7 +146,7 @@
       (e) comentar la llamada de auditoría de R13 → R13; (f) hacer que
       `nombresCoinciden` devuelva siempre `true` → R9/R27.
       **Cubre: R6, R9, R10, R13, R14, R18, R22, R24, R27.**
-- [ ] **T28** — Mapa de trazabilidad `R<n>` → test concreto en
+- [x] **T28** — Mapa de trazabilidad `R<n>` → test concreto en
       `progress/impl_identidad_multirol_cliente.md`, y `./init.sh` en verde.
       **Cubre: todos.**
 
