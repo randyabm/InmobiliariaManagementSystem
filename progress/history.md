@@ -448,3 +448,38 @@ real**. Por eso se adoptaron dos medidas permanentes:
   (herramienta de fusión de duplicados).
 - **Pendientes heredados:** PA-14 (onboarding de inmobiliaria sin RF-*),
   push sin autorizar, Forgejo (#23) sin montar.
+
+## 2026-08-01 — Feature #25 `retencion_codeudor_referencias` (cerrada)
+
+- **Agente:** leader → spec_author → implementer → reviewer
+- **Feature:** #25 `retencion_codeudor_referencias` — `in_progress` → **`done`**
+- **Veredicto del reviewer:** **APPROVED, sin bloqueantes**
+  (`progress/review_retencion_codeudor_referencias.md`).
+- **Verificación:** `./init.sh` exit 0 — `test` **495** (47 archivos), `test:db`
+  **82** (3 archivos). Lint, typecheck y build verdes. 27/27 tasks.
+- **Mutaciones:** el reviewer reprodujo las seis del implementer (1/8, 1/14,
+  1/8, 1/8, 1/11, 0) y añadió una propia —quitar las políticas RLS de la
+  migración 0010— que da 3/10 contra PostgreSQL real.
+- **Lo que trajo:**
+  - Tarifa de retención por tenant y año (D-2): tabla `tarifa_retencion`
+    con `numeric(5,2)`, upsert por `(tenant_id, anio)`, solo-`admin`,
+    `resolverPorcentaje` que **lanza** si el año no está configurado (sin
+    default), y `sujeto_retencion=false` que no consulta la tarifa. El
+    `porcentaje` viaja como string exacto (`'3.50'`), nunca por `number`.
+  - Codeudores/coarrendatarios y referencias como **captura de datos** (D-6):
+    8 rutas anidadas bajo `/inquilinos/:idInquilino/...`, baja lógica, 409
+    `CODEUDOR_YA_EXISTE`, y las dos fronteras probadas (comportamiento: ni
+    existen las tablas de contrato/firma/inventario; estructura: sin FKs).
+  - Migración `0010` con RLS `ENABLE`+`FORCE`+política en las tres tablas
+    nuevas, en la misma migración que las crea.
+- **Desviaciones anotadas (legítimas):** parámetro de ruta normalizado a
+  `:idInquilino` (design.md mezclaba `:id`); `AuditInterceptor` ampliado con
+  `idCodeudor`/`idReferencia` para que las bajas lógicas anidadas auditen el
+  recurso correcto.
+- **Deuda del reviewer (no bloqueante):** D-1 reescribir el unit test de
+  `resolverRetencionDePropietario` con repositorio real cuando exista el
+  consumidor (módulo de pagos); D-2 test de forma SQL para el predicado
+  `tenant_id` de `sujetoDeRetencion`; D-3 esquema whitelisted de `metadata`
+  si algún día se auditan campos cambiados.
+- **Pendientes heredados:** PA-14 (onboarding de inmobiliaria sin RF-*),
+  push sin autorizar, Forgejo (#23) sin montar.

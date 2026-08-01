@@ -126,7 +126,7 @@
       "name": "retencion_codeudor_referencias",
       "phase": "1a",
       "sdd": true,
-      "status": "in_progress",
+      "status": "done",
       "title": "Retención en la fuente por tenant, codeudores y referencias del inquilino",
       "prd_refs": ["RF-C4", "RF-C5"],
       "note": "Separada de la feature #5 el 2026-07-26 por decisión del humano. Implementa las decisiones D-2 (la tarifa de retención es configuración del tenant y por año, no una columna del propietario) y D-6 (codeudor/coarrendatario y referencias entran como captura de datos; el amarre a la firma es de #14/#17). Dependencia dura: no puede implementarse antes de que la #5 esté done.",

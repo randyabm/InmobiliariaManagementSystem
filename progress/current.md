@@ -4,29 +4,11 @@
 > `history.md`. Mientras trabajas, **mantenlo actualizado en tiempo real**,
 > no al final.
 
-- **Feature en curso:** #25 `retencion_codeudor_referencias` — status
-  **`in_progress`**
-- **Agente:** leader → spec_author → implementer → **reviewer (APROBADO)**
-- **Estado:** ⏸ **esperando que el humano autorice marcarla `done`.**
+- **Feature en curso:** _ninguna_ — la #25 `retencion_codeudor_referencias`
+  quedó `done` el 2026-08-01.
+- **Agente:** — (sesión cerrada)
 
-## Estado de la verificación
-
-`./init.sh` exit 0 — `npm run test` **495** (47 archivos) y `npm run test:db`
-**82** (3 archivos). Lint, typecheck y build verdes.
-
-27/27 tasks. Veredicto en
-`progress/review_retencion_codeudor_referencias.md`: **APROBADO, sin
-bloqueantes**. El reviewer reprodujo seis mutaciones del implementer
-(1/8, 1/14, 1/8, 1/8, 1/11, 0) y añadió una propia —quitar las políticas RLS
-de la migración 0010— que da 3/10.
-
-## Espec
-
-`specs/retencion_codeudor_referencias/` — sin decisiones de producto
-pendientes. Dependencia dura #5 satisfecha. Tarifa por tenant/año (D-2) y
-codeudores/referencias como captura de datos (D-6).
-
-## Pendientes de decisión del humano (no bloquean #25)
+## Pendientes de decisión del humano
 
 1. **El push sigue sin hacerse.** Forgejo no responde en `127.0.0.1:3000`
    (feature #23, aún sin montar). El remoto `origin` → GitHub no está
@@ -34,6 +16,9 @@ codeudores/referencias como captura de datos (D-6).
 2. **PA-14** sigue abierta: quién da de alta una inmobiliaria y asigna su
    `codigo`. El PRD menciona el Super Admin pero no define ningún `RF-*` de
    onboarding.
+3. **Deuda del review de #25 (D-1, D-2):** cuando exista el consumidor de la
+   tarifa (módulo de pagos), reescribir el unit test con repositorio real y
+   añadir el test de forma SQL para `sujetoDeRetencion`.
 
 ## Cola
 
