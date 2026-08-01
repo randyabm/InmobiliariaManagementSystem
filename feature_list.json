@@ -257,7 +257,7 @@
       "name": "inventory_templates",
       "phase": "1b",
       "sdd": true,
-      "status": "spec_ready",
+      "status": "in_progress",
       "title": "Plantillas de inmuebles (zonas e ítems)",
       "prd_refs": ["RF-I2", "RF-I22", "RF-I23", "8.8"],
       "acceptance": [
