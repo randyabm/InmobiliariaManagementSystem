@@ -5,9 +5,9 @@
 > no al final.
 
 - **Feature en curso:** batch **#12 `inventory_creation`**, **#13
-  `inventory_tenant_review`** y **#15 `pwa_offline`** — status **spec en
-  redacción** → ⏸ **puerta humana (una sola)**.
-- **Agente:** leader → spec_author (3 specs del lote) → ⏸ **HUMANO** →
+  `inventory_tenant_review`** y **#15 `pwa_offline`** — status
+  **`spec_ready`** (los tres) → ⏸ **puerta humana (una sola)**.
+- **Agente:** leader → spec_author (3 specs listos) → ⏸ **HUMANO** →
   implementer → reviewer.
 - **Estado:** meta de la sesión: **completar la fase 1** (1b + 1c + #23).
 
