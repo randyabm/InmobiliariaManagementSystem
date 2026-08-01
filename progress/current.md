@@ -4,31 +4,26 @@
 > `history.md`. Mientras trabajas, **mantenlo actualizado en tiempo real**,
 > no al final.
 
-- **Feature en curso:** #8 `property_lifecycle` — status **`spec_ready`**
-- **Agente:** leader → spec_author (3 archivos listos) → ⏸ **HUMANO**
-- **Estado:** ⏸ **esperando la aprobación del spec para pasar a
-  `in_progress`.** NO se toca código hasta entonces.
+- **Feature en curso:** #8 `property_lifecycle` — status **`in_progress`**
+- **Agente:** leader → spec_author → implementer → **reviewer (APROBADO)**
+- **Estado:** ⏸ **esperando que el humano autorice marcarla `done`.**
 
-## Espec — `specs/property_lifecycle/`
+## Estado de la verificación
 
-Ciclo de vida + dashboard (RF-P4/P5, RF-PI4..PI6). 16 requirements
-(R1–R16), 24 tasks (12 de test). **Sin migración**: el estado vive en las
-tablas del motor #7 (PA-8-1); cierra la frontera PA-6-3 de la #6.
-`./init.sh` verde (619 + 108 tests) antes de redactar el spec.
+`./init.sh` exit 0 — `npm run test` **652** (67 archivos) y `npm run test:db`
+**108** (3 archivos). Lint, typecheck y build verdes. **Sin migración.**
 
-## Decisiones técnicas que el humano debe confirmar (design.md §10)
+24/24 tasks. Veredicto en `progress/review_property_lifecycle.md`:
+**APROBADO, sin bloqueantes**. El reviewer reprodujo cinco mutaciones del
+implementer: 3 con rojos (4/5 vínculo, 1/5 precedencia, 1/5 envoltura) y 2
+de defensa en profundidad verificadas con 0 rojos (extractor de auditoría
+redundante con `params.id`; aislamiento del dashboard sostenido por el RLS).
 
-1. **PA-8-1 — El estado NO se duplica en `propiedad`.** La ficha y el
-   dashboard lo leen por join de la instancia del motor; cero esquema
-   nuevo. (Alternativa: columna denormalizada — divergencia silenciosa.)
-2. **PA-8-2 — La instancia se crea al crear la propiedad**, en la misma
-   transacción; las preexistentes sin instancia se muestran sin estado
-   hasta #9 (no hay producción).
-3. **PA-8-3 — La definición usada es la copia TENANT si existe; si no, la
-   SISTEMA.** Los clones futuros no cambian máquinas en curso.
-4. **PA-8-4 — Acciones por rutas de negocio** (`/propiedades/:id/ciclo-vida/
-   transiciones/:clave`) que envuelven al motor; el endpoint genérico queda
-   para otros módulos.
+## Espec
+
+`specs/property_lifecycle/` — aprobado por el humano con las cuatro
+decisiones PA-8 (estado solo en el motor; instancia al crear la propiedad;
+copia TENANT o SISTEMA; rutas de negocio que envuelven al motor).
 
 ## Pendientes de decisión del humano (previos, no bloquean la puerta del spec)
 
