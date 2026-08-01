@@ -61,6 +61,6 @@ import { PropietariosDePropiedadService } from './propietarios-de-propiedad.serv
     ResolverPerfilService,
     IngresoService,
   ],
-  exports: [PropiedadesService],
+  exports: [PropiedadesService, CicloVidaService],
 })
 export class PropiedadesModule {}

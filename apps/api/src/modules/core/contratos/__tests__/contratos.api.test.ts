@@ -23,7 +23,6 @@ describe('Contratos — generación y firma (#17)', () => {
 
   let idPropiedad: string;
   let idInquilino: string;
-  let tokenInquilino: string;
   let idContrato: string;
   let hashPdf: string;
 

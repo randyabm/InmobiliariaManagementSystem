@@ -151,6 +151,15 @@ const RUTAS_PERMITIDAS = [
   'GET /contratos/:id/documentos',
   'GET /propiedades/:id/contratos/documentos',
   'GET /contratos/:id/documentos/:idDocumento/pdf',
+  // ─── Feature #19 contract_renewals_alerts: 5 rutas (R6, design.md §2) ──
+  // Configuración y alertas: solo admin; panel/renovar/no-renovar:
+  // admin/empleado.
+  'GET /configuracion-renovacion',
+  'PUT /configuracion-renovacion',
+  'GET /contratos/vencimientos',
+  'POST /contratos/vencimientos/alertas',
+  'POST /contratos/:id/renovar',
+  'POST /contratos/:id/no-renovar',
   // ─── Feature #7 workflow_engine: 9 rutas (R17, design.md §8) ───────────
   // Gestión de definiciones: solo `admin` (RF-W2). Instancias y ejecución:
   // `@Roles('admin','empleado')`.
