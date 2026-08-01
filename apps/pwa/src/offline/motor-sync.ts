@@ -106,41 +106,52 @@ export class MotorSync {
     this.enSync = true;
     const resultado: ResultadoSync = { confirmadas: 0, conflictos: 0, errores: 0 };
     try {
-      const cola = await almacen.listarCola();
-      // R8: solo los inventarios CREADOS en campo tienen que esperar al
-      // `crear_inventario`; los descargados (editados offline) pasan.
-      const creadoresPendientes = cola.filter(
-        (o) => o.tipo === 'crear_inventario' && o.estado !== 'confirmada',
-      );
-      const confirmados = new Set<string>();
-      for (const op of cola) {
-        if (op.estado === 'confirmada') continue;
-        if (op.estado === 'conflicto') {
-          resultado.conflictos += 1;
-          continue;
-        }
-        // R8: los hijos esperan al padre confirmado (solo si el padre es
-        // una creación local aún no confirmada).
-        if (op.tipo !== 'crear_inventario') {
-          const esperaPadre = creadoresPendientes.some(
-            (c) => c.inventario_id === op.inventario_id && !confirmados.has(c.inventario_id),
-          );
-          if (esperaPadre) continue;
-        }
-        try {
-          const confirmado = await this.enviar(op);
-          if (confirmado) {
-            confirmados.add(op.inventario_id);
-            resultado.confirmadas += 1;
-          } else {
-            // R6: divergencia de versión → conflicto (ya marcado en la cola).
+      // R8: pasadas repetidas hasta que no quede nada que avanzar — un hijo
+      // encolado ANTES que su padre espera y se envía en la pasada siguiente.
+      let progreso = true;
+      let pasadas = 0;
+      while (progreso && pasadas < 100) {
+        progreso = false;
+        pasadas += 1;
+        const cola = await almacen.listarCola();
+        // R8: solo los inventarios CREADOS en campo tienen que esperar al
+        // `crear_inventario`; los descargados (editados offline) pasan.
+        const creadoresPendientes = cola.filter(
+          (o) => o.tipo === 'crear_inventario' && o.estado !== 'confirmada',
+        );
+        const confirmados = new Set<string>();
+        for (const op of cola) {
+          if (op.estado === 'confirmada') continue;
+          if (op.estado === 'conflicto') {
             resultado.conflictos += 1;
+            continue;
           }
-        } catch (error) {
-          // 4xx/5xx persistente: visible, la cola NO se pierde (R8).
-          resultado.errores += 1;
-          await marcarConflicto(op.id, error instanceof Error ? error.message : String(error));
-          resultado.conflictos += 1;
+          // R8: los hijos esperan al padre confirmado (solo si el padre es
+          // una creación local aún no confirmada).
+          if (op.tipo !== 'crear_inventario') {
+            const esperaPadre = creadoresPendientes.some(
+              (c) => c.inventario_id === op.inventario_id && !confirmados.has(c.inventario_id),
+            );
+            if (esperaPadre) continue;
+          }
+          try {
+            const confirmado = await this.enviar(op);
+            if (confirmado) {
+              confirmados.add(op.inventario_id);
+              resultado.confirmadas += 1;
+              progreso = true;
+            } else {
+              // R6: divergencia de versión → conflicto (ya marcado en la cola).
+              resultado.conflictos += 1;
+              progreso = true;
+            }
+          } catch (error) {
+            // 4xx/5xx persistente: visible, la cola NO se pierde (R8).
+            resultado.errores += 1;
+            await marcarConflicto(op.id, error instanceof Error ? error.message : String(error));
+            resultado.conflictos += 1;
+            progreso = true;
+          }
         }
       }
       return resultado;

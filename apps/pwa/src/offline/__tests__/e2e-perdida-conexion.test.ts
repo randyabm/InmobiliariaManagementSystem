@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { abrirAlmacen, almacen } from '../almacen-local';
 import { ClienteApi, type Peticion, type Respuesta, type Transporte } from '../../api/cliente-api';
 import { MotorSync } from '../motor-sync';
+import { encolarOperacion } from '../cola-sync';
 
 /**
  * E2E de pérdida de conexión (T11 → R2, R5, R7, R8, R11).
@@ -147,5 +148,32 @@ describe('E2E — pérdida de conexión (T11: R2, R5, R7, R8, R11)', () => {
     const cola = await almacen.listarCola();
     expect(cola.length).toBeGreaterThan(0); // la cola NO se perdió
     expect(cola.some((o) => o.estado === 'conflicto')).toBe(true);
+  });
+
+  it('un hijo encolado ANTES que su padre espera: el padre se envía primero (R8)', async () => {
+    // Foto encolada con orden anterior al `crear_inventario`: el motor DEBE
+    // hacerla esperar (padres antes que hijos).
+    await encolarOperacion({
+      tipo: 'subir_foto',
+      entidad_id: 'item-x',
+      inventario_id: 'inv-x',
+      datos: { buffer: new Uint8Array(4).buffer, mime: 'image/webp' },
+      base_version: null,
+    });
+    await encolarOperacion({
+      tipo: 'crear_inventario',
+      entidad_id: 'inv-x',
+      inventario_id: 'inv-x',
+      datos: { propiedad_id: 'prop-x', tipo_evento: 'ENTREGA' },
+      base_version: null,
+    });
+
+    const resultado = await motor.sincronizar();
+    expect(resultado.conflictos).toBe(0);
+    expect(resultado.errores).toBe(0);
+
+    const rutas = transporte.recibidas.map((r) => r.ruta);
+    expect(rutas[0]).toBe('/inventarios'); // el padre PRIMERO
+    expect(rutas[1]).toContain('/fotos');
   });
 });
