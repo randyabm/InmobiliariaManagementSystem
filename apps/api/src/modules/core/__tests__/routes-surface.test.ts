@@ -47,8 +47,15 @@ const RUTAS_PERMITIDAS = [
   'GET /inquilinos/:id',
   'PATCH /inquilinos/:id',
   'DELETE /inquilinos/:id',
+  // ─── Feature #6 property_profile: 14 rutas (R22, design.md §6) ──────────
+  // Todas con @UseGuards(JwtAuthGuard, RolesGuard) y @Roles('admin','empleado')
+  // (R18). Sus tests obligatorios están en `modules/core/propiedades/__tests__/`.
+  'POST /propiedades',
+  'GET /propiedades',
+  'GET /propiedades/:id',
+  'PATCH /propiedades/:id',
+  'DELETE /propiedades/:id',
   // ─── Feature #25 retencion_codeudor_referencias: 10 rutas (R25, design §5) ─
-  // Retención: solo `admin` (R21). Codeudores y referencias:
   // `@Roles('admin','empleado')` (R20). Todas con @UseGuards(JwtAuthGuard,
   // RolesGuard). Sus tres tests obligatorios están en `retencion.test.ts`,
   // `codeudores.test.ts` y `referencias.test.ts`.
@@ -118,8 +125,11 @@ describe('Superficie HTTP expuesta (R16)', () => {
   });
 
   it('una ruta inexistente devuelve 404 en español y sin traza de pila', async () => {
+    // `no-existe/...` no puede colisionar con la lista blanca: es un prefijo
+    // que ninguna feature registra. Antes se sondaba `/propiedades/secretas`,
+    // que desde #6 es un `GET /propiedades/:id` legítimo (401 sin token).
     const respuesta = await request(app.getHttpServer()).get(
-      '/propiedades/secretas',
+      '/no-existe/secretas',
     );
 
     expect(respuesta.status).toBe(404);
