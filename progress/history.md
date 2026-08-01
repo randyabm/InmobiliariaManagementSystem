@@ -483,3 +483,44 @@ real**. Por eso se adoptaron dos medidas permanentes:
   si algún día se auditan campos cambiados.
 - **Pendientes heredados:** PA-14 (onboarding de inmobiliaria sin RF-*),
   push sin autorizar, Forgejo (#23) sin montar.
+
+## 2026-08-01 — Feature #27 `sesion_y_revocacion` (cerrada)
+
+- **Agente:** leader → spec_author → implementer → reviewer
+- **Feature:** #27 `sesion_y_revocacion` — `in_progress` → **`done`**
+- **Veredicto del reviewer:** **APPROVED, sin bloqueantes**
+  (`progress/review_sesion_y_revocacion.md`).
+- **Verificación:** `./init.sh` exit 0 — `test` **524** (50 archivos), `test:db`
+  **88** (3 archivos). Lint, typecheck y build verdes. 28/28 tasks.
+- **Mutaciones:** el reviewer reprodujo las seis del implementer (1/16, 2/16,
+  1/16, 3/15, 3/16, 1/5), todas al test exacto.
+- **Lo que trajo (cierra PA-3):**
+  - Tabla `sesion` (migración `0011`, RLS ENABLE+FORCE) y
+    `user.token_version`. Todo access token declara `jti`/`ver`, y **cada
+    petición valida la sesión contra la base** dentro del contexto de
+    tenant: la revocación es inmediata o no es. Tokens sin `jti`/`ver` →
+    401 (PA-27-1).
+  - Login abre sesión y entrega `{access_token, refresh_token, expires_in,
+    user}`; el refresh solo vive como hash SHA-256 (vigente + huella
+    rotada), 30 días por defecto (PA-27-3).
+  - `POST /auth/refresh`: rotación con detección de reuso → el reuso revoca
+    la sesión completa y queda auditado (PA-27-4). `POST /auth/logout`:
+    revoca en servidor.
+  - Revocar un rol (`activo=false` + `token_version++` en la misma
+    transacción) invalida los tokens emitidos en la siguiente petición;
+    mecanismo probado por test, sin endpoint (PA-27-2).
+  - `sesion_por_refresh_token` `SECURITY DEFINER` como segunda y última vía
+    fuera del RLS (patrón R52); el inventario de funciones la vigila.
+  - Auditoría: `auth.sesion_abierta`, `auth.refresh_emitido`,
+    `auth.sesion_cerrada`, `auth.sesion_revocada_por_reuso` — sin tokens ni
+    PII.
+- **Desviaciones anotadas (legítimas):** login responde 201 (contrato
+  previo); JwtStrategy resuelve el tenant como el interceptor
+  (`passReqToCallback`, mut. 4: sin ello caen 3 invariantes R33/R35 de #5);
+  ejecución por dependencias (migración antes que arnés);
+  `rol-aplicacion.ts` ampliado con el GRANT de la función nueva.
+- **Deuda del reviewer (no bloqueante):** D-1 revisar header `x-tenant-id`
+  en refresh/logout cuando exista el primer cliente HTTP real; D-2 el arnés
+  firma `ver: 0` fijo; D-3 `auth.refresh_emitido` sin ip/request_id.
+- **Pendientes heredados:** PA-14 (onboarding de inmobiliaria sin RF-*),
+  push sin autorizar, Forgejo (#23) sin montar, deudas de reviews #25 y #26.
