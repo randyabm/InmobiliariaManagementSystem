@@ -108,3 +108,70 @@ export interface HojaDeVidaPropietario extends PerfilPropietario {
   readonly cuentas_bancarias: readonly CuentaBancaria[];
   readonly cuenta_predeterminada_id: string | null;
 }
+
+// ───────────────────────────────────────────────────────────────────────────
+// Feature #25 — retención, codeudores y referencias (R1, R2, R3, R11)
+// ───────────────────────────────────────────────────────────────────────────
+
+/**
+ * Tarifa de retención en la fuente de un tenant para un año (R1, D-2).
+ *
+ * `porcentaje` es **string**, nunca `number` (R11): el driver `pg` devuelve
+ * `numeric` como cadena y convertirlo a `number` de JavaScript introduciría
+ * error de coma flotante en un valor con consecuencias fiscales
+ * (`docs/conventions.md`, "Dinero y fechas"). La cadena es decimal exacta
+ * (ej. `'3.50'`).
+ */
+export interface TarifaRetencion {
+  readonly id: string;
+  readonly tenant_id: string;
+  readonly anio: number;
+  readonly porcentaje: string;
+  readonly created_at: string;
+  readonly updated_at: string;
+}
+
+export const TIPOS_CODEUDOR = ['CODEUDOR', 'COARRENDATARIO'] as const;
+export type TipoCodeudor = (typeof TIPOS_CODEUDOR)[number];
+
+/**
+ * Codeudor o coarrendatario del inquilino (R2, D-6).
+ *
+ * Es captura de datos de la hoja de vida del inquilino: no es una identidad
+ * del sistema (no hay `user` detrás), no exige contrato ni firma (R17) y sus
+ * datos personales nunca entran en logs ni en `audit_log.metadata` (R24).
+ */
+export interface CodeudorInquilino {
+  readonly id: string;
+  readonly tenant_id: string;
+  readonly perfil_inquilino_id: string;
+  readonly tipo: TipoCodeudor;
+  readonly nombre: string;
+  readonly tipo_documento: TipoDocumento;
+  readonly documento: string;
+  readonly email: string | null;
+  readonly celular: string | null;
+  readonly activo: boolean;
+  readonly created_at: string;
+  readonly updated_at: string;
+}
+
+/**
+ * Referencia personal del inquilino (R3, D-6).
+ *
+ * `relacion` es texto libre: el PRD no define una taxonomía de referencias y
+ * no se inventa una. Mismas fronteras que el codeudor: captura de datos, sin
+ * identidad de sistema, sin amarre a la firma (R17, R18).
+ */
+export interface ReferenciaInquilino {
+  readonly id: string;
+  readonly tenant_id: string;
+  readonly perfil_inquilino_id: string;
+  readonly nombre: string;
+  readonly telefono: string;
+  readonly relacion: string | null;
+  readonly email: string | null;
+  readonly activo: boolean;
+  readonly created_at: string;
+  readonly updated_at: string;
+}

@@ -1,6 +1,9 @@
 import { Module } from '@nestjs/common';
 
 import { AuditModule } from '../audit/audit.module';
+import { CodeudoresController } from './codeudores.controller';
+import { CodeudoresRepository } from './codeudores.repository';
+import { CodeudoresService } from './codeudores.service';
 import { CuentasBancariasController } from './cuentas-bancarias.controller';
 import { CuentasBancariasRepository } from './cuentas-bancarias.repository';
 import { CuentasBancariasService } from './cuentas-bancarias.service';
@@ -11,6 +14,12 @@ import { InquilinosService } from './inquilinos.service';
 import { PropietariosController } from './propietarios.controller';
 import { PropietariosRepository } from './propietarios.repository';
 import { PropietariosService } from './propietarios.service';
+import { ReferenciasController } from './referencias.controller';
+import { ReferenciasRepository } from './referencias.repository';
+import { ReferenciasService } from './referencias.service';
+import { RetencionController } from './retencion.controller';
+import { RetencionRepository } from './retencion.repository';
+import { RetencionService } from './retencion.service';
 
 /**
  * Hoja de vida de propietario e inquilino (feature #5).
@@ -34,6 +43,9 @@ import { PropietariosService } from './propietarios.service';
     PropietariosController,
     CuentasBancariasController,
     InquilinosController,
+    RetencionController,
+    CodeudoresController,
+    ReferenciasController,
   ],
   providers: [
     IdentidadService,
@@ -43,7 +55,20 @@ import { PropietariosService } from './propietarios.service';
     CuentasBancariasService,
     InquilinosRepository,
     InquilinosService,
+    RetencionRepository,
+    RetencionService,
+    CodeudoresRepository,
+    CodeudoresService,
+    ReferenciasRepository,
+    ReferenciasService,
   ],
-  exports: [CuentasBancariasService, PropietariosService, InquilinosService],
+  exports: [
+    CuentasBancariasService,
+    PropietariosService,
+    InquilinosService,
+    RetencionService,
+    CodeudoresService,
+    ReferenciasService,
+  ],
 })
 export class ClientesModule {}
