@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import type { ContextoPeticion } from '../../../../common/database/cliente-tenant';
 import { WorkflowRepository } from '../workflow.repository';

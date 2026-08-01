@@ -4,6 +4,10 @@ import { AlmacenamientoModule } from '../almacenamiento/almacenamiento.module';
 import { AuditModule } from '../audit/audit.module';
 import { ClientesModule } from '../clientes/clientes.module';
 import { WorkflowsModule } from '../workflows/workflows.module';
+import { CicloVidaController } from './ciclo-vida.controller';
+import { CicloVidaService } from './ciclo-vida.service';
+import { DashboardController } from './dashboard.controller';
+import { DashboardService } from './dashboard.service';
 import { DocumentosController } from './documentos.controller';
 import { DocumentosService } from './documentos.service';
 import { FotosController } from './fotos.controller';
@@ -25,17 +29,20 @@ import { PropietariosDePropiedadService } from './propietarios-de-propiedad.serv
  * ciclo de vida: la propiedad nace con su instancia y transiciona por el
  * motor). Todas son dependencias legales dentro de `core/`.
  *
- * Los submódulos de #8 (ciclo de vida y dashboard) se registran en sus
- * tasks del bloque 2.
+ * **El orden del array de controllers importa:** `DashboardController`
+ * (GET /propiedades/dashboard) va ANTES de `PropiedadesController`
+ * (GET /propiedades/:id) — Express empareja en orden de registro.
  */
 @Module({
   imports: [ClientesModule, AlmacenamientoModule, AuditModule, WorkflowsModule],
   controllers: [
+    DashboardController,
     PropiedadesController,
     PropietariosDePropiedadController,
     OcupacionController,
     DocumentosController,
     FotosController,
+    CicloVidaController,
   ],
   providers: [
     PropiedadesRepository,
@@ -45,6 +52,8 @@ import { PropietariosDePropiedadService } from './propietarios-de-propiedad.serv
     OcupacionService,
     DocumentosService,
     FotosService,
+    CicloVidaService,
+    DashboardService,
   ],
   exports: [PropiedadesService],
 })

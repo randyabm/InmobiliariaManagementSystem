@@ -176,6 +176,24 @@ export class WorkflowService {
     return this.repositorio.buscarDefinicionParaTenant(ctx, tipo);
   }
 
+  /** Feature #8 — las transiciones de una definición (lectura con RLS). */
+  transicionesDeDefinicion(definicionId: string, ctx: ContextoPeticion) {
+    return this.repositorio.transicionesDe(ctx.cliente, definicionId);
+  }
+
+  /** Feature #8 — la instancia de una entidad (una por definición y entidad). */
+  async buscarInstanciaDeEntidad(
+    entidadTipo: string,
+    entidadId: string,
+    ctx: ContextoPeticion,
+  ) {
+    return this.repositorio.buscarInstanciaPorEntidadSinDefinicion(
+      ctx,
+      entidadTipo,
+      entidadId,
+    );
+  }
+
   // ─── Privado ────────────────────────────────────────────────────────────
 
   private async registrar(

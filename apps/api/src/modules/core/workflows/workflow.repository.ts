@@ -295,6 +295,21 @@ export class WorkflowRepository {
     return rows[0] ? aInstancia(rows[0]) : null;
   }
 
+  /** Feature #8 — la instancia de una entidad, sin importar la definición. */
+  async buscarInstanciaPorEntidadSinDefinicion(
+    ctx: ContextoPeticion,
+    entidadTipo: string,
+    entidadId: string,
+  ): Promise<WorkflowInstancia | null> {
+    const { rows } = await ctx.cliente.query(
+      `${WorkflowRepository.SELECT_INSTANCIA}
+        WHERE tenant_id = $1 AND entidad_tipo = $2 AND entidad_id = $3
+        ORDER BY created_at DESC LIMIT 1`,
+      [ctx.tenantId, entidadTipo, entidadId],
+    );
+    return rows[0] ? aInstancia(rows[0]) : null;
+  }
+
   async actualizarEstado(
     cliente: PoolClient,
     instanciaId: string,

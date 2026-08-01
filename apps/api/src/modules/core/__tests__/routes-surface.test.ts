@@ -53,6 +53,12 @@ const RUTAS_PERMITIDAS = [
   'POST /propiedades',
   'GET /propiedades',
   'GET /propiedades/:id',
+  // ─── Feature #8 property_lifecycle: 3 rutas (R16, design.md §3) ─────────
+  // El dashboard se registra antes que `GET /propiedades/:id` (el segmento
+  // `dashboard` nunca es un uuid). Las acciones se ejecutan por clave.
+  'GET /propiedades/dashboard',
+  'GET /propiedades/:id/ciclo-vida',
+  'POST /propiedades/:id/ciclo-vida/transiciones/:claveTransicion',
   'PATCH /propiedades/:id',
   'DELETE /propiedades/:id',
   'POST /propiedades/:idPropiedad/propietarios',
