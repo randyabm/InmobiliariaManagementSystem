@@ -80,6 +80,10 @@ const archivosSql = readdirSync(rutaRepo(CARPETA))
  * La tabla `inventario_version` se creó en la feature #22
  * `inventory_versioning` (R5), con RLS habilitado y forzado en la misma
  * migración.
+ * Las tablas `payment_import`, `payment_import_fila`, `payment_record` y
+ * `payment_mapping_profile` se crearon en la feature #30
+ * `payment_reconciliation` (R7), con RLS habilitado y forzado en la misma
+ * migración.
  */
 const TABLAS_PERMITIDAS: readonly string[] = [
   'tenant',
@@ -124,6 +128,10 @@ const TABLAS_PERMITIDAS: readonly string[] = [
   'alerta_vencimiento',
   'insurance_policy',
   'inventario_version',
+  'payment_import',
+  'payment_import_fila',
+  'payment_record',
+  'payment_mapping_profile',
 ];
 
 describe('Migración inicial (R10)', () => {

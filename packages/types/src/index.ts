@@ -48,6 +48,10 @@ export type {
   MergeFields,
 } from './contratos';
 
+// Feature #30 payment_reconciliation.
+export { ESTADOS_REGISTRO_PAGO } from './pagos';
+export type { EstadoRegistroPago, MapeoColumnas, PaymentRecord } from './pagos';
+
 // Feature #14 inventory_signature_pdf.
 export { FIRMANTES } from './inventario-firma';
 export type { FirmaInventario, FirmanteTipo } from './inventario-firma';

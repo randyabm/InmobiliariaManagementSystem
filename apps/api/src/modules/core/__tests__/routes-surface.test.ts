@@ -175,6 +175,15 @@ const RUTAS_PERMITIDAS = [
   'POST /inventarios/:id/formato-papel',
   'POST /inventarios/:id/reconstruir',
   'POST /inventarios/:id/confirmar-papel',
+  // ─── Feature #30 payment_reconciliation: 8 rutas (R7, design.md §2) ────
+  'POST /pagos/importaciones',
+  'GET /pagos/importaciones',
+  'POST /pagos/importaciones/:id/mapeo',
+  'POST /pagos/importaciones/:id/procesar',
+  'GET /pagos/importaciones/:id',
+  'PATCH /pagos/registros/:id',
+  'GET /contratos/:id/referencia-pago',
+  'GET /contratos/:id/estado-cuenta',
   // ─── Feature #7 workflow_engine: 9 rutas (R17, design.md §8) ───────────
   // Gestión de definiciones: solo `admin` (RF-W2). Instancias y ejecución:
   // `@Roles('admin','empleado')`.

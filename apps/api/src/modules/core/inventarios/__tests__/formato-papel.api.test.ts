@@ -131,10 +131,6 @@ describe('Formato en papel (#29)', () => {
         )
         .attach('fotos', foto, { filename: `${itemParedes.id}.jpg`, contentType: 'image/jpeg' })
         .attach('escaneo_papel', escaneo, { filename: 'papel.pdf', contentType: 'application/pdf' });
-      if (respuesta.status !== 201) {
-        // eslint-disable-next-line no-console
-        console.error('DEBUG 400 body:', JSON.stringify(respuesta.body));
-      }
       expect(respuesta.status).toBe(201);
 
       // Notas transcritas al comentario del ítem (SELECT).
