@@ -4,37 +4,27 @@
 > `history.md`. Mientras trabajas, **mantenlo actualizado en tiempo real**,
 > no al final.
 
-- **Feature en curso:** #7 `workflow_engine` — status **`spec_ready`**
-- **Agente:** leader → spec_author (3 archivos listos) → ⏸ **HUMANO**
-- **Estado:** ⏸ **esperando la aprobación del spec para pasar a
-  `in_progress`.** NO se toca código hasta entonces.
+- **Feature en curso:** #7 `workflow_engine` — status **`in_progress`**
+- **Agente:** leader → spec_author → implementer → **reviewer (APROBADO)**
+- **Estado:** ⏸ **esperando que el humano autorice marcarla `done`.**
 
-## Espec — `specs/workflow_engine/`
+## Estado de la verificación
 
-Motor de workflows dirigido por datos (RF-W1..W5, RF-A4, D3). 17
-requirements (R1–R17), 27 tasks (14 de test). Siembra el ciclo de vida de
-la propiedad (RF-P4) como datos: es el primer consumidor real y el test de
-la aceptación. `./init.sh` verde (576 + 100 tests) antes de redactar el
-spec.
+`./init.sh` exit 0 — `npm run test` **619** (61 archivos) y `npm run test:db`
+**108** (3 archivos). Lint, typecheck y build verdes.
 
-## Decisiones técnicas que el humano debe confirmar (design.md §13)
+27/27 tasks. Veredicto en `progress/review_workflow_engine.md`:
+**APROBADO, sin bloqueantes**. El reviewer reprodujo cinco mutaciones del
+implementer (1/8 fail-open, 1/6 límite de cascada, 1/13 clon, 1/8 política
+del sistema, 1/6 contexto fusionado) y confirmó que sin el límite de la
+cascada el test de ciclo **se cuelga** (barrera de disponibilidad).
 
-1. **PA-7-1 — Plantillas del sistema con `tenant_id` reservado.** Misma
-   tabla con la política RLS `USING (tenant_id = contexto OR tenant_id =
-   reservado)` y `WITH CHECK` de escritura propia: cualquier tenant lee la
-   plantilla, nadie escribe filas del sistema (verificado por test).
-2. **PA-7-2 — Condiciones JSONB whitelisted** (`igual`, `distinto`,
-   `es_nulo`, `no_nulo`, `mayor_que`, `menor_que`) evaluadas sobre el
-   contexto de la instancia; sin `eval` ni SQL dinámico; operador
-   desconocido = falso (fail closed).
-3. **PA-7-3 — Transiciones automáticas en cascada** en la misma
-   transacción de la petición, máx. 10 consecutivas → 409 `CICLO_AUTOMATICO`
-   y rollback total (la humana incluida).
-4. **PA-7-4 — Alcance de RF-W2:** clonar la plantilla del sistema + añadir/
-   dar de baja transiciones en la copia del tenant (solo `admin`). Límites
-   por paquete y versionado (RF-A5) quedan para la feature de paquetes.
-   RF-W3 queda como hook declarativo (`notificacion` como dato); la
-   ejecución es #10.
+## Espec
+
+`specs/workflow_engine/` — aprobado por el humano con las cuatro decisiones
+PA-7 (tenant reservado + RLS con OR/WITH CHECK; condiciones whitelisted;
+cascada con límite; RF-W2 base). La migración siembra `ciclo_vida_propiedad`
+como datos: el #8 transicionará sobre él.
 
 ## Pendientes de decisión del humano (previos, no bloquean la puerta del spec)
 
