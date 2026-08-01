@@ -13,6 +13,8 @@
  * se crearon en la feature #25 `retencion_codeudor_referencias`.
  * La tabla `sesion` se creó en la feature #27 `sesion_y_revocacion`, que
  * además añadió `user.token_version` (R2).
+ * Las tablas `propiedad`, `propiedad_propietario`, `historial_ocupacion` y
+ * `propiedad_documento` se crearon en la feature #6 `property_profile`.
  */
 export { tenant } from './tenant';
 export { user } from './user';
@@ -25,3 +27,7 @@ export { cuentaBancaria } from './cuenta-bancaria';
 export { tarifaRetencion } from './tarifa-retencion';
 export { codeudorInquilino } from './codeudor-inquilino';
 export { referenciaInquilino } from './referencia-inquilino';
+export { propiedad } from './propiedad';
+export { propiedadPropietario } from './propiedad-propietario';
+export { historialOcupacion } from './historial-ocupacion';
+export { propiedadDocumento } from './propiedad-documento';

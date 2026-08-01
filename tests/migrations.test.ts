@@ -41,6 +41,9 @@ const archivosSql = readdirSync(rutaRepo(CARPETA))
  * también con RLS habilitado y forzado en la misma migración.
  * La tabla `sesion` se creó en la feature #27 `sesion_y_revocacion` (R1,
  * R20), con RLS habilitado y forzado en la misma migración.
+ * Las tablas `propiedad`, `propiedad_propietario`, `historial_ocupacion` y
+ * `propiedad_documento` se crearon en la feature #6 `property_profile`
+ * (R1-R4, R22), con RLS habilitado y forzado en la misma migración.
  */
 const TABLAS_PERMITIDAS: readonly string[] = [
   'tenant',
@@ -54,6 +57,10 @@ const TABLAS_PERMITIDAS: readonly string[] = [
   'tarifa_retencion',
   'codeudor_inquilino',
   'referencia_inquilino',
+  'propiedad',
+  'propiedad_propietario',
+  'historial_ocupacion',
+  'propiedad_documento',
 ];
 
 describe('Migración inicial (R10)', () => {

@@ -773,4 +773,116 @@ describe('Aplicación real de las migraciones (R10)', () => {
       }
     });
   });
+
+  // ─── Feature #6 property_profile (T4: R1, R2, R3, R4, R22) ──────────────
+
+  describe('esquema de #6 (R1, R2, R3, R4, R22)', () => {
+    const TABLAS_6 = [
+      'propiedad',
+      'propiedad_propietario',
+      'historial_ocupacion',
+      'propiedad_documento',
+    ] as const;
+
+    it.each(TABLAS_6)(
+      'la tabla %s existe con RLS habilitado Y FORZADO (R1-R4)',
+      async (tabla) => {
+        const { rows } = await pool.query<{
+          relrowsecurity: boolean;
+          relforcerowsecurity: boolean;
+        }>(
+          `SELECT c.relrowsecurity, c.relforcerowsecurity
+             FROM pg_class c
+             JOIN pg_namespace n ON n.oid = c.relnamespace
+            WHERE n.nspname = 'public' AND c.relname = $1`,
+          [tabla],
+        );
+
+        expect(rows, `la tabla ${tabla} no existe`).toHaveLength(1);
+        expect(rows[0]?.relrowsecurity).toBe(true);
+        expect(rows[0]?.relforcerowsecurity).toBe(true);
+      },
+    );
+
+    it.each(TABLAS_6)(
+      'la política de aislamiento de %s filtra por app.current_tenant (R1-R4)',
+      async (tabla) => {
+        const { rows } = await pool.query<{ polname: string; qual: string | null }>(
+          `SELECT policyname AS polname, qual
+             FROM pg_policies WHERE schemaname = 'public' AND tablename = $1`,
+          [tabla],
+        );
+
+        expect(rows.map((r) => r.polname)).toContain(`${tabla}_tenant_isolation`);
+        const politica = rows.find((r) => r.polname === `${tabla}_tenant_isolation`);
+        expect(politica?.qual).toContain('app.current_tenant');
+      },
+    );
+
+    it('propiedad tiene los CHECK de tipo, estrato, area y canon (R1)', async () => {
+      const { rows } = await pool.query<{ conname: string }>(
+        `SELECT conname FROM pg_constraint
+          WHERE conrelid = 'propiedad'::regclass
+            AND contype = 'c'`,
+      );
+      const nombres = rows.map((r) => r.conname);
+      expect(nombres).toEqual(
+        expect.arrayContaining([
+          'propiedad_tipo_check',
+          'propiedad_estrato_check',
+          'propiedad_area_check',
+          'propiedad_canon_check',
+        ]),
+      );
+
+      // El dominio de tipo es el mismo que usará la feature #11 (inventarios).
+      const { rows: check } = await pool.query<{ consrc: string }>(
+        `SELECT pg_get_constraintdef(oid) AS consrc FROM pg_constraint
+          WHERE conname = 'propiedad_tipo_check'`,
+      );
+      expect(check[0]?.consrc).toContain("'APARTAMENTO'");
+      expect(check[0]?.consrc).toContain("'PARQUEADERO'");
+    });
+
+    it('las FKs de propiedad apuntan a perfil_propietario, cuenta_bancaria y perfil_inquilino (R1)', async () => {
+      const { rows } = await pool.query<{ referenciada: string }>(
+        `SELECT ccu.table_name AS referenciada
+           FROM information_schema.table_constraints tc
+           JOIN information_schema.constraint_column_usage ccu
+             ON ccu.constraint_name = tc.constraint_name
+            AND ccu.table_schema = tc.table_schema
+          WHERE tc.table_schema = 'public'
+            AND tc.table_name = 'propiedad'
+            AND tc.constraint_type = 'FOREIGN KEY'`,
+      );
+
+      expect(rows.map((r) => r.referenciada).sort()).toEqual([
+        'cuenta_bancaria',
+        'perfil_inquilino',
+        'perfil_propietario',
+        'tenant',
+      ]);
+    });
+
+    it('el índice único parcial de ocupación vigente existe (R3)', async () => {
+      const { rows } = await pool.query<{ indexdef: string }>(
+        `SELECT indexdef FROM pg_indexes
+          WHERE schemaname = 'public' AND indexname = 'historial_ocupacion_vigente_key'`,
+      );
+
+      expect(rows).toHaveLength(1);
+      expect(rows[0]?.indexdef).toMatch(/CREATE UNIQUE INDEX/i);
+      expect(rows[0]?.indexdef).toMatch(/WHERE .*hasta.*IS NULL/is);
+    });
+
+    it('la UNIQUE de clave_storage de propiedad_documento existe (R4)', async () => {
+      const { rows } = await pool.query<{ indexname: string }>(
+        `SELECT indexname FROM pg_indexes
+          WHERE schemaname = 'public' AND tablename = 'propiedad_documento'`,
+      );
+      expect(rows.map((r) => r.indexname)).toContain(
+        'propiedad_documento_clave_storage_key',
+      );
+    });
+  });
 });
