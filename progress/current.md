@@ -6,10 +6,19 @@
 
 - **Feature en curso:** #25 `retencion_codeudor_referencias` — status
   **`in_progress`**
-- **Agente:** leader → spec_author → implementer (T1–T27, **completas**) →
-  ⏸ **reviewer**
-- **Estado:** esperando el review. Informe en
-  `progress/impl_retencion_codeudor_referencias.md`.
+- **Agente:** leader → spec_author → implementer → **reviewer (APROBADO)**
+- **Estado:** ⏸ **esperando que el humano autorice marcarla `done`.**
+
+## Estado de la verificación
+
+`./init.sh` exit 0 — `npm run test` **495** (47 archivos) y `npm run test:db`
+**82** (3 archivos). Lint, typecheck y build verdes.
+
+27/27 tasks. Veredicto en
+`progress/review_retencion_codeudor_referencias.md`: **APROBADO, sin
+bloqueantes**. El reviewer reprodujo seis mutaciones del implementer
+(1/8, 1/14, 1/8, 1/8, 1/11, 0) y añadió una propia —quitar las políticas RLS
+de la migración 0010— que da 3/10.
 
 ## Espec
 
