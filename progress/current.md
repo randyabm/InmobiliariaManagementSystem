@@ -4,31 +4,24 @@
 > `history.md`. Mientras trabajas, **mantenlo actualizado en tiempo real**,
 > no al final.
 
-- **Feature en curso:** #27 `sesion_y_revocacion` — status **`spec_ready`**
-- **Agente:** leader → spec_author (3 archivos listos) → ⏸ **HUMANO**
-- **Estado:** ⏸ **esperando la aprobación del spec para pasar a
-  `in_progress`.** NO se toca código hasta entonces.
+- **Feature en curso:** #27 `sesion_y_revocacion` — status **`in_progress`**
+- **Agente:** leader → spec_author → implementer → **reviewer (APROBADO)**
+- **Estado:** ⏸ **esperando que el humano autorice marcarla `done`.**
 
-## Espec — `specs/sesion_y_revocacion/`
+## Estado de la verificación
 
-Cierra **PA-3** (el rol se validaba solo en la emisión del token). 20
-requirements (R1–R20), 28 tasks, de las cuales 12 de test. `./init.sh` verde
-(495 + 82 tests) antes de redactar el spec.
+`./init.sh` exit 0 — `npm run test` **524** (50 archivos) y `npm run test:db`
+**88** (3 archivos). Lint y typecheck verdes.
 
-## Decisiones técnicas que el humano debe confirmar (design.md §12)
+28/28 tasks. Veredicto en `progress/review_sesion_y_revocacion.md`:
+**APROBADO, sin bloqueantes**. El reviewer reprodujo seis mutaciones del
+implementer (1/16, 2/16, 1/16, 3/15, 3/16, 1/5), todas al test exacto.
 
-1. **PA-27-1 — Tokens sin `jti`/`ver` → 401.** Se invalidan los tokens
-   fabricados o emitidos antes de esta feature. No hay producción; un token
-   sin sesión es un token no revocable. (Alternativa rechazada: dejarlos
-   pasar.)
-2. **PA-27-2 — La revocación de rol queda como mecanismo probado por test
-   con mutación directa a la base**, sin endpoint y sin auditoría de actor
-   hasta que exista la feature de administración de roles (el PRD no tiene
-   RF-* de administración de usuarios).
-3. **PA-27-3 — Refresh de 30 días por defecto** (env configurable); access
-   sigue en 1 hora.
-4. **PA-27-4 — Reuso de un refresh rotado → se revoca la sesión completa**
-   (estándar contra fugas, RFC 6749 §10.4).
+## Espec
+
+`specs/sesion_y_revocacion/` — aprobado por el humano con las cuatro
+decisiones PA-27 (tokens sin `jti`/`ver` → 401; revocación de rol como
+mecanismo sin endpoint; refresh 30 días; reuso → revocación completa).
 
 ## Pendientes de decisión del humano (previos, no bloquean la puerta del spec)
 
