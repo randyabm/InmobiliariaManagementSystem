@@ -169,7 +169,8 @@ DO $$ BEGIN
   ) THEN
     CREATE POLICY "workflow_definicion_tenant_isolation" ON "workflow_definicion"
       USING ("tenant_id" = current_setting('app.current_tenant', true)::uuid
-          OR "tenant_id" = '00000000-0000-0000-0000-000000000000'::uuid)
+          OR ("tenant_id" = '00000000-0000-0000-0000-000000000000'::uuid
+              AND current_setting('app.current_tenant', true) IS NOT NULL))
       WITH CHECK ("tenant_id" = current_setting('app.current_tenant', true)::uuid);
   END IF;
 END $$;
@@ -184,7 +185,8 @@ DO $$ BEGIN
       USING ("definicion_id" IN (
         SELECT d.id FROM "workflow_definicion" d
          WHERE d."tenant_id" = current_setting('app.current_tenant', true)::uuid
-            OR d."tenant_id" = '00000000-0000-0000-0000-000000000000'::uuid
+            OR (d."tenant_id" = '00000000-0000-0000-0000-000000000000'::uuid
+                AND current_setting('app.current_tenant', true) IS NOT NULL)
       ))
       WITH CHECK ("definicion_id" IN (
         SELECT d.id FROM "workflow_definicion" d
@@ -203,7 +205,8 @@ DO $$ BEGIN
       USING ("definicion_id" IN (
         SELECT d.id FROM "workflow_definicion" d
          WHERE d."tenant_id" = current_setting('app.current_tenant', true)::uuid
-            OR d."tenant_id" = '00000000-0000-0000-0000-000000000000'::uuid
+            OR (d."tenant_id" = '00000000-0000-0000-0000-000000000000'::uuid
+                AND current_setting('app.current_tenant', true) IS NOT NULL)
       ))
       WITH CHECK ("definicion_id" IN (
         SELECT d.id FROM "workflow_definicion" d

@@ -23,9 +23,9 @@ describe('Motor de workflows — integración (#7)', () => {
   let idDefinicion: string;
 
   /** claves de estado del seed, resueltas del GET de la definición. */
-  let estados: Record<string, string> = {};
+  const estados: Record<string, string> = {};
   /** claves de transición del seed, resueltas del GET. */
-  let transiciones: Record<string, string> = {};
+  const transiciones: Record<string, string> = {};
 
   beforeAll(async () => {
     entorno = await levantarEntornoClientes();
@@ -63,7 +63,7 @@ describe('Motor de workflows — integración (#7)', () => {
 
   const servidor = () => entorno.app.getHttpServer();
 
-  const comoAdminA = (metodo: 'post' | 'get', ruta: string) =>
+  const comoAdminA = (metodo: 'post' | 'get' | 'delete', ruta: string) =>
     request(servidor())
       [metodo](ruta)
       .set('Authorization', `Bearer ${entorno.adminA.token}`)
