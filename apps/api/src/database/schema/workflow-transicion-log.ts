@@ -1,4 +1,4 @@
-import { boolean, index, jsonb, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import { boolean, index, jsonb, pgTable, timestamp, uuid } from 'drizzle-orm/pg-core';
 import { tenant } from './tenant';
 import { workflowInstancia } from './workflow-instancia';
 import { workflowTransicion } from './workflow-transicion';

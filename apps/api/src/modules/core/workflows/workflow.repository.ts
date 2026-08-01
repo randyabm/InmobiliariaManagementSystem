@@ -202,11 +202,11 @@ export class WorkflowRepository {
               t.notificacion, t.orden, t.activo
          FROM workflow_transicion t
          JOIN workflow_estado oe
-           ON oe.definicion_id = $2 AND oe.clave = (
+           ON oe.definicion_id = $1 AND oe.clave = (
              SELECT clave FROM workflow_estado WHERE id = t.origen_estado_id
            )
          JOIN workflow_estado de
-           ON de.definicion_id = $2 AND de.clave = (
+           ON de.definicion_id = $1 AND de.clave = (
              SELECT clave FROM workflow_estado WHERE id = t.destino_estado_id
            )
         WHERE t.definicion_id = $2`,
