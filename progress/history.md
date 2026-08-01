@@ -621,3 +621,50 @@ cola sigue con #8 `property_lifecycle` (ciclo de vida + dashboard), #7
 
 La cola sigue con **#8 `property_lifecycle`** (ciclo de vida + dashboard,
 RF-P4/P5), que transicionará propiedades sobre el motor #7 recién cerrado.
+
+## 2026-08-01 — Feature #8 `property_lifecycle` (cerrada)
+
+- **Agente:** leader → spec_author → implementer → reviewer
+- **Feature:** #8 `property_lifecycle` — `in_progress` → **`done`**
+- **Veredicto del reviewer:** **APPROVED, sin bloqueantes**
+  (`progress/review_property_lifecycle.md`).
+- **Verificación:** `./init.sh` exit 0 — `test` **652** (67 archivos), `test:db`
+  **108** (3 archivos). Lint, typecheck y build verdes. 24/24 tasks.
+  **Sin migración**: el estado vive en las tablas del motor #7.
+- **Mutaciones:** 5 reproducidas por el reviewer: 3 con rojos (4/5 vínculo
+  propiedad↔instancia, 1/5 precedencia de definición, 1/5 envoltura que
+  aceptaba automáticas) + 2 de defensa en profundidad verificadas con 0
+  rojos y documentadas (extractor de auditoría redundante con `params.id`;
+  aislamiento del dashboard sostenido por el RLS del motor).
+- **Lo que trajo (cierra la frontera PA-6-3 de la #6):**
+  - La propiedad nace con su máquina: al crear la ficha se crea la
+    instancia `ciclo_vida_propiedad` en la misma transacción (estado
+    `disponible`), usando la copia TENANT si existe o la SISTEMA (PA-8-3).
+  - El estado NO se duplica en `propiedad` (PA-8-1, verificado contra
+    `information_schema`): ficha y dashboard leen por join del motor.
+  - Rutas de negocio que envuelven al motor: `GET /propiedades/:id/
+    ciclo-vida` (estado + disponibles para el actor) y `POST /propiedades/
+    :id/ciclo-vida/transiciones/:clave` (409/403, contexto fusionado,
+    cascada automática heredada); auditoría con `entity_id` = id de la
+    PROPIEDAD (vía `extractEntityId`).
+  - Dashboard (`GET /propiedades/dashboard`): conteos por estado, filtros
+    `estado`/`tipo`, `tiempo_en_estado_segundos` (estancadas primero),
+    `instancia_id` para ejecutar desde el dashboard (RF-PI6).
+  - Fronteras respetadas: notificaciones = hook declarativo (#10); ingreso
+    en línea = #9; póliza = #20.
+- **Desviaciones anotadas (legítimas):** `@Audit` con `extractEntityId`
+  (el response del motor es la instancia); `DashboardController` registrado
+  antes de `PropiedadesController` (orden de emparejado de Express);
+  `WorkflowService` ganó tres métodos de solo-lectura.
+- **Deuda del reviewer (no bloqueante):** D-1 conservar el comentario del
+  extractor de auditoría; D-2 mantener el predicado `p.tenant_id` del
+  dashboard (doble barrera sobre el RLS); D-3 backfill de propiedades sin
+  instancia es de #9 o de una migración de datos.
+- **Pendientes heredados:** PA-14 (onboarding sin RF-*), push sin
+  autorizar, Forgejo (#23) sin montar, deudas de reviews #25/#26/#27/#6/#7/#8.
+
+### Siguiente
+
+La cola sigue con **#9 `property_intake`** (ingreso de propiedad con
+creación en línea, RF-PI1..PI3), que reutilizará el camino de #6/#8 para el
+alta y la instancia del ciclo de vida.
