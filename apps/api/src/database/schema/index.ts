@@ -54,3 +54,5 @@ export { codigoOtp } from './codigo-otp';
 export { inventarioItemRevision } from './inventario-item-revision';
 export { inventarioFirma } from './inventario-firma';
 export { contractTemplate } from './contract-template';
+export { contract } from './contract';
+export { contratoFirma } from './contrato-firma';

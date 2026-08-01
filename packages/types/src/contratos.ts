@@ -13,6 +13,34 @@ export interface MergeFields {
   readonly [campo: string]: string;
 }
 
+export const ESTADOS_CONTRATO = ['vigente', 'firmado'] as const;
+export type EstadoContrato = (typeof ESTADOS_CONTRATO)[number];
+
+export interface Contrato {
+  readonly id: string;
+  readonly tenant_id: string;
+  readonly property_id: string;
+  readonly inquilino_id: string;
+  readonly propietario_id: string;
+  readonly fecha_inicio: string;
+  readonly fecha_fin: string;
+  readonly estado: EstadoContrato;
+  readonly created_at: string;
+  readonly updated_at: string;
+}
+
+export interface FirmaContrato {
+  readonly id: string;
+  readonly tenant_id: string;
+  readonly contract_id: string;
+  readonly firmante_tipo: 'EMPLEADO' | 'INQUILINO';
+  readonly firmante_user_id: string;
+  readonly hash_documento: string;
+  readonly ip: string;
+  readonly otp_verificado_en: string | null;
+  readonly created_at: string;
+}
+
 export interface ContractTemplate {
   readonly id: string;
   readonly tenant_id: string;

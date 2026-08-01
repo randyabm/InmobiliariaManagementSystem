@@ -452,7 +452,7 @@
       "name": "contract_generation_signature",
       "phase": "1c",
       "sdd": true,
-      "status": "in_progress",
+      "status": "done",
       "title": "Generación del contrato y firma electrónica",
       "prd_refs": [
         "RF-CT3",
@@ -470,7 +470,7 @@
       "name": "contract_digitization",
       "phase": "1c",
       "sdd": true,
-      "status": "pending",
+      "status": "in_progress",
       "title": "Digitalización de contratos físicos",
       "prd_refs": [
         "RF-CT6",

@@ -141,6 +141,13 @@
       "when": 1755129600000,
       "tag": "0019_contract_templates",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1755216000000,
+      "tag": "0020_contract_generation_signature",
+      "breakpoints": true
     }
   ]
 }

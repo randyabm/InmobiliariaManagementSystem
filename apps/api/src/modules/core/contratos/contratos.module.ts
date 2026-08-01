@@ -1,6 +1,11 @@
 import { Module } from '@nestjs/common';
 
 import { AuditModule } from '../audit/audit.module';
+import { AlmacenamientoModule } from '../almacenamiento/almacenamiento.module';
+import { OtpModule } from '../otp/otp.module';
+import { ContratosController } from './contratos.controller';
+import { ContratosRepository } from './contratos.repository';
+import { ContratosService } from './contratos.service';
 import { PlantillasContratoController } from './plantillas-contrato.controller';
 import { PlantillasContratoRepository } from './plantillas-contrato.repository';
 import { PlantillasContratoService } from './plantillas-contrato.service';
@@ -12,9 +17,14 @@ import { PlantillasContratoService } from './plantillas-contrato.service';
  * #17 para el merge; el servicio se exporta como punto de extensión.
  */
 @Module({
-  imports: [AuditModule],
-  controllers: [PlantillasContratoController],
-  providers: [PlantillasContratoRepository, PlantillasContratoService],
-  exports: [PlantillasContratoService, PlantillasContratoRepository],
+  imports: [AuditModule, AlmacenamientoModule, OtpModule],
+  controllers: [PlantillasContratoController, ContratosController],
+  providers: [
+    PlantillasContratoRepository,
+    PlantillasContratoService,
+    ContratosRepository,
+    ContratosService,
+  ],
+  exports: [PlantillasContratoService, PlantillasContratoRepository, ContratosService],
 })
 export class ContratosModule {}

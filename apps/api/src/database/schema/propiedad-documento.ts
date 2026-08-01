@@ -44,6 +44,8 @@ export const propiedadDocumento = pgTable(
     /** Vínculo genérico de entidad (PA-14-2): el PDF firmado apunta a su inventario. */
     entidadTipo: text('entidad_tipo'),
     entidadId: uuid('entidad_id'),
+    /** RF-I12 (#17): el inventario firmado queda como anexo del contrato. */
+    anexoDeContratoId: uuid('anexo_de_contrato_id'),
     subidoPor: uuid('subido_por').references(() => user.id),
     activo: boolean('activo').notNull().default(true),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

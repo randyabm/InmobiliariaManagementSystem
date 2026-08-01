@@ -36,10 +36,13 @@ export type {
 } from './workflows';
 
 // Feature #16 contract_templates.
-export { ESTADOS_PLANTILLA_CONTRATO } from './contratos';
+export { ESTADOS_CONTRATO, ESTADOS_PLANTILLA_CONTRATO } from './contratos';
 export type {
+  Contrato,
   ContractTemplate,
+  EstadoContrato,
   EstadoPlantillaContrato,
+  FirmaContrato,
   MergeFields,
 } from './contratos';
 
