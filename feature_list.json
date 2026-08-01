@@ -212,7 +212,7 @@
       "name": "property_lifecycle",
       "phase": "1a",
       "sdd": true,
-      "status": "spec_ready",
+      "status": "in_progress",
       "title": "Ciclo de vida de la propiedad y dashboard",
       "prd_refs": ["RF-P4", "RF-P5", "RF-PI4", "RF-PI5", "RF-PI6"],
       "acceptance": [
