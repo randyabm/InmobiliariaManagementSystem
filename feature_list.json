@@ -632,7 +632,7 @@
       "name": "maintenance_incidents",
       "phase": "3",
       "sdd": true,
-      "status": "spec_ready",
+      "status": "done",
       "title": "Autogestión de reclamos y reparaciones (RF-M1–M7, §6.5)",
       "prd_refs": [
         "RF-M1",
@@ -651,7 +651,7 @@
       "name": "web_embedding",
       "phase": "3",
       "sdd": true,
-      "status": "spec_ready",
+      "status": "in_progress",
       "title": "Integración WordPress y portales embebibles (RF-INT1–INT6, §6.6, D7)",
       "prd_refs": [
         "RF-INT1",

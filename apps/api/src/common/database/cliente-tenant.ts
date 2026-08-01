@@ -28,12 +28,24 @@ export interface ContextoPeticion {
   readonly tenantId: string;
   /** `user.id` de quien ejecuta la acción; alimenta `audit_log.actor_id`. */
   readonly actorId?: string;
+  /** Rol activo del token (#26): 'admin' | 'empleado' | 'propietario' | 'inquilino'. */
+  readonly rolActivo?: string;
+  /** Roles del token para este tenant (login sin rol-activo los trae todos). */
+  readonly roles?: ReadonlyArray<{ rol: string }>;
+}
+
+/** El rol efectivo: el activo si existe; si no, el único rol declarado. */
+export function rolEfectivo(ctx: ContextoPeticion): string | undefined {
+  if (ctx.rolActivo) return ctx.rolActivo;
+  const roles = ctx.roles;
+  if (roles && roles.length === 1) return roles[0]?.rol;
+  return undefined;
 }
 
 interface PeticionConTenant {
   tenantClient?: unknown;
   tenantResuelto?: unknown;
-  user?: { sub?: string };
+  user?: { sub?: string; rol_activo?: string; roles?: Array<{ rol: string }> };
 }
 
 function esPoolClient(valor: unknown): valor is PoolClient {
@@ -73,5 +85,11 @@ export function construirContextoPeticion(request: unknown): ContextoPeticion {
     throw new SinContextoDeTenantError();
   }
 
-  return { cliente, tenantId, actorId: peticion?.user?.sub };
+  return {
+    cliente,
+    tenantId,
+    actorId: peticion?.user?.sub,
+    rolActivo: peticion?.user?.rol_activo,
+    roles: peticion?.user?.roles,
+  };
 }

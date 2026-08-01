@@ -48,6 +48,9 @@ export type {
   MergeFields,
 } from './contratos';
 
+// Feature #31 maintenance_incidents.
+export type { TicketResumen } from './tickets';
+
 // Feature #30 payment_reconciliation.
 export { ESTADOS_REGISTRO_PAGO } from './pagos';
 export type { EstadoRegistroPago, MapeoColumnas, PaymentRecord } from './pagos';

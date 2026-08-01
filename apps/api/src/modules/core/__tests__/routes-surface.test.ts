@@ -184,6 +184,14 @@ const RUTAS_PERMITIDAS = [
   'PATCH /pagos/registros/:id',
   'GET /contratos/:id/referencia-pago',
   'GET /contratos/:id/estado-cuenta',
+  // ─── Feature #31 maintenance_incidents: 6 rutas (R6, design.md §2) ─────
+  'POST /propiedades/:id/tickets',
+  'GET /tickets',
+  'GET /tickets/:id',
+  'POST /tickets/:id/comentarios',
+  'POST /tickets/:id/resolucion',
+  'POST /tickets/:id/costos/aprobar',
+  'POST /tickets/:id/transiciones/:clave',
   // ─── Feature #7 workflow_engine: 9 rutas (R17, design.md §8) ───────────
   // Gestión de definiciones: solo `admin` (RF-W2). Instancias y ejecución:
   // `@Roles('admin','empleado')`.
