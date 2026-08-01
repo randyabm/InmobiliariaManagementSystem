@@ -36,6 +36,9 @@ const archivosSql = readdirSync(rutaRepo(CARPETA))
  * crearon en la feature #5 `owner_tenant_profiles`
  * (specs/owner_tenant_profiles/, R37), todas con RLS habilitado y forzado en
  * la misma migración que las crea.
+ * Las tablas `tarifa_retencion`, `codeudor_inquilino` y `referencia_inquilino`
+ * se crearon en la feature #25 `retencion_codeudor_referencias` (R4, R25),
+ * también con RLS habilitado y forzado en la misma migración.
  */
 const TABLAS_PERMITIDAS: readonly string[] = [
   'tenant',
@@ -45,6 +48,9 @@ const TABLAS_PERMITIDAS: readonly string[] = [
   'perfil_propietario',
   'perfil_inquilino',
   'cuenta_bancaria',
+  'tarifa_retencion',
+  'codeudor_inquilino',
+  'referencia_inquilino',
 ];
 
 describe('Migración inicial (R10)', () => {

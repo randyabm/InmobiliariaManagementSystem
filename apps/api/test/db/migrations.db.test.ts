@@ -505,4 +505,134 @@ describe('Aplicación real de las migraciones (R10)', () => {
       expect(rows.map((r) => r.proname)).toEqual(['tenant_por_codigo']);
     });
   });
+
+  // ─── Feature #25 retencion_codeudor_referencias (T7: R1, R2, R3, R4, R5) ──
+
+  describe('esquema de #25 (R1, R2, R3, R4, R5, R18, R25)', () => {
+    const TABLAS_25 = [
+      'tarifa_retencion',
+      'codeudor_inquilino',
+      'referencia_inquilino',
+    ] as const;
+
+    it.each(TABLAS_25)(
+      'la tabla %s existe con RLS habilitado Y FORZADO (R4)',
+      async (tabla) => {
+        const { rows } = await pool.query<{
+          relrowsecurity: boolean;
+          relforcerowsecurity: boolean;
+        }>(
+          `SELECT c.relrowsecurity, c.relforcerowsecurity
+             FROM pg_class c
+             JOIN pg_namespace n ON n.oid = c.relnamespace
+            WHERE n.nspname = 'public' AND c.relname = $1`,
+          [tabla],
+        );
+
+        expect(rows, `la tabla ${tabla} no existe`).toHaveLength(1);
+        expect(rows[0]?.relrowsecurity).toBe(true);
+        expect(rows[0]?.relforcerowsecurity).toBe(true);
+      },
+    );
+
+    it.each(TABLAS_25)(
+      'la política de aislamiento de %s filtra por app.current_tenant (R4)',
+      async (tabla) => {
+        const { rows } = await pool.query<{ polname: string; qual: string | null }>(
+          `SELECT policyname AS polname, qual
+             FROM pg_policies WHERE schemaname = 'public' AND tablename = $1`,
+          [tabla],
+        );
+
+        expect(rows.map((r) => r.polname)).toContain(`${tabla}_tenant_isolation`);
+        const politica = rows.find((r) => r.polname === `${tabla}_tenant_isolation`);
+        expect(politica?.qual).toContain('app.current_tenant');
+      },
+    );
+
+    it('tarifa_retencion tiene UNIQUE (tenant_id, anio) y porcentaje numeric(5,2) (R1)', async () => {
+      // El UNIQUE se crea como índice único (patrón de `0005`), así que vive
+      // en pg_indexes y no en information_schema.table_constraints.
+      const { rows: unicos } = await pool.query<{ indexname: string }>(
+        `SELECT indexname FROM pg_indexes
+          WHERE schemaname = 'public' AND tablename = 'tarifa_retencion'`,
+      );
+      expect(unicos.map((r) => r.indexname)).toContain(
+        'tarifa_retencion_tenant_anio_key',
+      );
+
+      const { rows: columna } = await pool.query<{
+        data_type: string;
+        numeric_precision: string | number | null;
+        numeric_scale: string | number | null;
+      }>(
+        `SELECT data_type, numeric_precision, numeric_scale
+           FROM information_schema.columns
+          WHERE table_schema = 'public' AND table_name = 'tarifa_retencion'
+            AND column_name = 'porcentaje'`,
+      );
+      expect(columna[0]?.data_type).toBe('numeric');
+      expect(Number(columna[0]?.numeric_precision)).toBe(5);
+      expect(Number(columna[0]?.numeric_scale)).toBe(2);
+    });
+
+    it.each(['codeudor_inquilino', 'referencia_inquilino'] as const)(
+      'la FK de %s hacia perfil_inquilino existe (R2, R3)',
+      async (tabla) => {
+        const { rows } = await pool.query<{ constraint_name: string }>(
+          `SELECT tc.constraint_name
+             FROM information_schema.table_constraints tc
+             JOIN information_schema.key_column_usage kcu
+               ON kcu.constraint_name = tc.constraint_name
+              AND kcu.table_schema = tc.table_schema
+             JOIN information_schema.constraint_column_usage ccu
+               ON ccu.constraint_name = tc.constraint_name
+              AND ccu.table_schema = tc.table_schema
+            WHERE tc.table_schema = 'public'
+              AND tc.table_name = $1
+              AND tc.constraint_type = 'FOREIGN KEY'
+              AND ccu.table_name = 'perfil_inquilino'`,
+          [tabla],
+        );
+
+        expect(rows, `${tabla} debe declarar una FK hacia perfil_inquilino`).toHaveLength(1);
+      },
+    );
+
+    it('ninguna FK de codeudor_inquilino ni referencia_inquilino apunta a contrato, firma, inventario u OTP (R18)', async () => {
+      const { rows } = await pool.query<{ table_name: string; referenciada: string }>(
+        `SELECT tc.table_name, ccu.table_name AS referenciada
+           FROM information_schema.table_constraints tc
+           JOIN information_schema.key_column_usage kcu
+             ON kcu.constraint_name = tc.constraint_name
+            AND kcu.table_schema = tc.table_schema
+           JOIN information_schema.constraint_column_usage ccu
+             ON ccu.constraint_name = tc.constraint_name
+            AND ccu.table_schema = tc.table_schema
+          WHERE tc.table_schema = 'public'
+            AND tc.table_name IN ('codeudor_inquilino', 'referencia_inquilino')
+            AND tc.constraint_type = 'FOREIGN KEY'`,
+      );
+
+      const prohibidas = rows.filter((r) =>
+        /contrato|firma|inventario|otp/i.test(r.referenciada),
+      );
+      expect(prohibidas).toEqual([]);
+    });
+
+    it('perfil_propietario sigue SIN ninguna columna de tarifa o porcentaje (R5)', async () => {
+      // R5 / D-2: la tarifa vive únicamente en tarifa_retencion. El spec de la
+      // #5 ya lo exigía; esta feature lo vuelve a verificar en su propia
+      // migración, porque es el riesgo de regresión que la trae al mundo.
+      const { rows } = await pool.query<{ column_name: string }>(
+        `SELECT column_name FROM information_schema.columns
+          WHERE table_schema = 'public' AND table_name = 'perfil_propietario'`,
+      );
+      const columnas = rows.map((r) => r.column_name);
+      const tarifas = columnas.filter((c) =>
+        /porcentaje|tarifa|retencion_pct|pct_retencion/.test(c),
+      );
+      expect(tarifas).toEqual([]);
+    });
+  });
 });

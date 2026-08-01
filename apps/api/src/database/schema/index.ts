@@ -9,6 +9,8 @@
  * Las tablas `perfil_propietario`, `perfil_inquilino` y `cuenta_bancaria` se
  * crearon en la feature #5 `owner_tenant_profiles`, que además relajó
  * `user.email` y `user.password_hash` a NULL-able (D-5).
+ * Las tablas `tarifa_retencion`, `codeudor_inquilino` y `referencia_inquilino`
+ * se crearon en la feature #25 `retencion_codeudor_referencias`.
  */
 export { tenant } from './tenant';
 export { user } from './user';
@@ -17,3 +19,6 @@ export { auditLog } from './audit-log';
 export { perfilPropietario } from './perfil-propietario';
 export { perfilInquilino } from './perfil-inquilino';
 export { cuentaBancaria } from './cuenta-bancaria';
+export { tarifaRetencion } from './tarifa-retencion';
+export { codeudorInquilino } from './codeudor-inquilino';
+export { referenciaInquilino } from './referencia-inquilino';

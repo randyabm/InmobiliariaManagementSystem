@@ -71,6 +71,13 @@
       "when": 1754265600000,
       "tag": "0009_identidad_por_documento",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1754352000000,
+      "tag": "0010_retencion_codeudor_referencias",
+      "breakpoints": true
     }
   ]
 }
