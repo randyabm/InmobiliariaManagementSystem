@@ -4,12 +4,9 @@
 > `history.md`. Mientras trabajas, **mantenlo actualizado en tiempo real**,
 > no al final.
 
-- **Feature en curso:** resto de la fase 1 por orden del humano (sin pedir
-  review ni aprobación): **#16-#20** (contratos y póliza, 1c), **#21-#22**
-  (comparación y versionado de inventarios), **#23** (CI). #12-#15 `done`.
-- **Agente:** leader → spec_author → implementer → reviewer, todo
-  autónomo; el humano autorizó el cierre sin puertas.
-- **Estado:** meta de la sesión: **completar la fase 1** (1b + 1c + #23).
+- **Feature en curso:** ninguna — **FASE 1 COMPLETA** (27/27 done).
+- **Agente:** líder autónomo por delegación del humano.
+- **Estado:** meta de la sesión cumplida: 1a+1b+1c+CI cerrados.
 
 ## UI del proyecto
 
@@ -18,16 +15,17 @@ scaffold (#1); `apps/pwa` no existe; el tablero no tiene features de
 frontend. Las features de la fase 1 son backend (API). La PWA de campo
 (#15) será el primer cliente real de inventarios.
 
-## En cola (resto de la fase 1, autónomo)
+## Línea base final
 
-- **#16-#20** — contratos y póliza (1c): templates, generación+firma,
-  digitalización, renovaciones/alertas, póliza.
-- **#21-#22** — comparación y versionado de inventarios (1b pendiente).
-- **#23** — CI pipeline (Forgejo sin montar; documentar la decisión).
+`./init.sh` exit 0 (22 OK) · `test` **871** · `test:db` **143** · lint/
+typecheck/build verdes. Resumen en `progress/impl_fase1_cierre.md` y
+`progress/history.md`.
 
-## Cerradas (19)
+## Cerradas (27/27)
 
-#1–#5, #24, #25–#27, #6–#15.
+#1–#27: core, hojas de vida, dashboard, ingreso, workflows, notificaciones,
+inventarios (#6–#15), contratos y póliza (#16–#20), comparación y
+versionado (#21–#22), CI (#23).
 
 ## Pendientes de decisión del humano
 

@@ -897,3 +897,43 @@ en profundidad). El humano autorizó cerrarla y **delegó el resto de la fase
   OTP >10 min sin test; D-4 regeneración con fotos cambiantes.
 
 Línea base: `./init.sh` exit 0, `test` **821**, `test:db` **143**.
+
+### 2026-08-01 — FASE 1 COMPLETA: #16–#23 cerradas (delegación del humano)
+
+El humano autorizó cerrar #14 y **delegó el resto de la fase 1 sin pedir
+review ni aprobación**. El líder ejecutó spec → implementación → review
+(mutaciones) → done de forma autónoma.
+
+- **#16 contract_templates** — base del tenant + copia por propiedad;
+  merge fields validados (PA-16-2); validación solo admin (PA-16-3);
+  version++ tras validar. Migración 0019.
+- **#17 contract_generation_signature** — merge del template validado +
+  inquilino → PDF (GeneradorPdf de #14); firmas con evidencia y OTP FIRMA
+  (#13); RF-I12: el inventario CERRADO como ANEXO (PA-17-3,
+  `anexo_de_contrato_id`; el UNIQUE de clave_storage impide duplicar el
+  objeto). Migración 0020.
+- **#18 contract_digitization** — escaneo con metadatos (PA-18-1: crea el
+  contrato si no existe); `contract.inquilino_id` nullable; descarga con
+  hash verificado (test de objeto corrupto en MinIO → 404). Migración 0021.
+- **#19 contract_renewals_alerts** — Ley 820: config por tenant (umbrales/
+  destinatarios/IPC, PA-19-1), panel de vencimientos, alertas por outbox
+  con dedupe (PA-19-3), renovación asistida (incremento pactado > IPC,
+  PA-19-2: contrato nuevo + prórroga), no-renovar con transición a
+  en_desocupacion (#8) + inventario de salida. Migración 0022.
+- **#20 insurance_policy** — RF-PI7/PI8: en_estudio → aprobada/rechazada
+  con número/vigencia/valor + PDF en propiedad_documento (PA-20-1).
+  Migración 0023.
+- **#21 inventory_comparison** — RF-I10: entrada vs salida ítem por ítem
+  (PA-21-1/2), solo lectura, sin migraciones.
+- **#22 inventory_versioning** — RF-I6: versión por ronda de negociación
+  (snapshot_json, PA-22-1), EN_NEGOCIACION, confirmar-acuerdo ampliado.
+  Migración 0024.
+- **#23 ci_pipeline** — GitHub Actions con el semáforo de init.sh
+  (PA-23-1: portable a Forgejo cuando se monte).
+
+**Correcciones de frontera:** test de #9 actualizado (invariante: sin FK
+del ingreso hacia contract*).
+
+**Línea base final:** `./init.sh` exit 0 (22 OK), `test` **871**, `test:db`
+**143**, lint/typecheck/build verdes. **27/27 features done — Fase 1
+completa.**
