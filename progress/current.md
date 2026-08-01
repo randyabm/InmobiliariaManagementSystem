@@ -4,33 +4,26 @@
 > `history.md`. Mientras trabajas, **mantenlo actualizado en tiempo real**,
 > no al final.
 
-- **Feature en curso:** #6 `property_profile` — status **`spec_ready`**
-- **Agente:** leader → spec_author (3 archivos listos) → ⏸ **HUMANO**
-- **Estado:** ⏸ **esperando la aprobación del spec para pasar a
-  `in_progress`.** NO se toca código hasta entonces.
+- **Feature en curso:** #6 `property_profile` — status **`in_progress`**
+- **Agente:** leader → spec_author → implementer → **reviewer (APROBADO)**
+- **Estado:** ⏸ **esperando que el humano autorice marcarla `done`.**
 
-## Espec — `specs/property_profile/`
+## Estado de la verificación
 
-Hoja de vida del inmueble (RF-P1/P2/P3). 22 requirements (R1–R22), 28 tasks
-(12 de test). Cierra la dependencia explícita que #5 dejó escrita: la
-columna `propiedad.cuenta_bancaria_id` (override de giro) y su test de
-integración. `./init.sh` verde (524 + 88 tests) antes de redactar el spec.
+`./init.sh` exit 0 — `npm run test` **576** (56 archivos) y `npm run test:db`
+**100** (3 archivos). Lint, typecheck y build verdes.
 
-## Decisiones técnicas que el humano debe confirmar (design.md §13)
+28/28 tasks. Veredicto en `progress/review_property_profile.md`:
+**APROBADO, sin bloqueantes**. El reviewer reprodujo cuatro mutaciones del
+implementer (3/11, 3/17, 1/18, 1/18), añadió una propia de RLS (4/10) y un
+test que hace carga real la guarda del propietario principal (R10).
 
-1. **PA-6-1 — Almacenamiento real en MinIO dentro de #6.** Fotos y
-   repositorio documental suben a object storage (nuevo módulo
-   `core/almacenamiento/`, dependencias `minio` + `@testcontainers/minio`).
-   Cumple la aceptación "repositorio documental" y sirve a #12 y #18.
-   (Alternativa: solo metadatos y subida diferida — la aceptación quedaría
-   a medias.)
-2. **PA-6-2 — Propietario principal obligatorio + propietarios adicionales
-   por tabla puente.** El giro se resuelve contra el principal (integración
-   directa con `resolverCuentaDeGiro` de #5); la puente cubre el plural de
-   RF-P2 sin ambigüedad.
-3. **PA-6-3 — Estado del ciclo de vida (#8) y creación en línea (#9) fuera
-   de #6.** La ficha no inventa el motor de workflows ni los escenarios de
-   ingreso.
+## Espec
+
+`specs/property_profile/` — aprobado por el humano con las tres decisiones
+PA-6 (MinIO en #6; principal + puente; estado/#8 y creación en línea/#9
+fuera). Cierra la dependencia #5: `propiedad.cuenta_bancaria_id` con
+validación vía `resolverCuentaDeGiro`.
 
 ## Pendientes de decisión del humano (previos, no bloquean la puerta del spec)
 
