@@ -213,6 +213,19 @@ describe('Revisión del inquilino (#13)', () => {
         [idInventario],
       );
       expect(rows[0]?.revision_completada_en).not.toBeNull();
+
+      // R7: el empleado (creador del inventario) recibe la notificación.
+      const { rows: avisos } = await entorno.poolAdmin.query<{
+        destinatario: string;
+        canal: string;
+      }>(
+        `SELECT destinatario, canal FROM notificacion_pendiente
+          WHERE contenido::text LIKE $1 ORDER BY created_at DESC LIMIT 1`,
+        [`%${idInventario}%`],
+      );
+      expect(avisos).toHaveLength(1);
+      expect(avisos[0]?.destinatario).toBe('admin-a@example.com');
+      expect(avisos[0]?.canal).toBe('CORREO');
     });
   });
 

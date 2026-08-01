@@ -180,6 +180,51 @@ describe('Inventario — creación (#12)', () => {
       expect(detalle.status).toBe(200);
       expect(detalle.body.estado).toBe('BORRADOR');
     });
+
+    it('la copia TENANT de la plantilla tiene prioridad sobre la SISTEMA (PA-12-3, R4)', async () => {
+      // Clonar la APARTAMENTO del sistema crea la copia TENANT; la edición
+      // de su primera zona debe materializarse en los inventarios nuevos.
+      const lista = await comoAdminA('get', '/plantillas');
+      const sistema = lista.body.find(
+        (p: { tipo: string; origen: string }) =>
+          p.tipo === 'APARTAMENTO' && p.origen === 'SISTEMA',
+      );
+      const clon = await comoAdminA('post', `/plantillas/${sistema.id}/clonar`);
+      expect(clon.status).toBe(201);
+      const detalleCopia = await comoAdminA('get', `/plantillas/${clon.body.id}`);
+      const zonaTenant = detalleCopia.body.zonas[0];
+      const renombrada = await comoAdminA(
+        'patch',
+        `/plantillas/${clon.body.id}/zonas/${zonaTenant.id}`,
+      ).send({ nombre: 'Salón TENANT' });
+      expect(renombrada.status).toBe(200);
+
+      // Nueva propiedad e inventario: la materialización usa la TENANT.
+      const propietario2 = await comoAdminA('post', '/propietarios').send({
+        nombre: `P2 ${Date.now()}`,
+        tipo_documento: 'CC',
+        documento: `P2-${Date.now()}`,
+      });
+      const propiedad2 = await comoAdminA('post', '/propiedades').send({
+        direccion: `Calle Tenancy ${Date.now()}`,
+        tipo: 'APARTAMENTO',
+        area: '60.00',
+        canon: '1000000.00',
+        propietario_principal_id: propietario2.body.id,
+      });
+      const creado = await comoAdminA('post', '/inventarios').send({
+        propiedad_id: propiedad2.body.id,
+        tipo_evento: 'ENTREGA',
+      });
+      expect(creado.status).toBe(201);
+      const nombres = creado.body.zonas.map((z: { nombre: string }) => z.nombre);
+      expect(nombres).toContain('Salón TENANT');
+      expect(nombres).not.toContain('Sala');
+
+      // El borrador se limpia para no ensuciar las suites de T15.
+      const limpieza = await comoAdminA('delete', `/inventarios/${creado.body.id}`);
+      expect(limpieza.status).toBe(200);
+    });
   });
 
   // ─── T13 — edición del borrador (R6, R7, R8) ─────────────────────────────

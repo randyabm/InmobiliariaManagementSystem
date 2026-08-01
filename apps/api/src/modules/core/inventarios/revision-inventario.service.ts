@@ -4,6 +4,7 @@ import type { InventarioCompleto } from '@inmobiliaria/types';
 import type { ContextoPeticion } from '../../../common/database/cliente-tenant';
 import { ResourceNotFoundError } from '../../../common/errors';
 import { AlmacenamientoService } from '../almacenamiento/almacenamiento.service';
+import { NotificacionesOutboxService } from '../notificaciones/notificaciones-outbox.service';
 import { RevisionInventarioRepository } from './revision-inventario.repository';
 import { InventariosRepository } from './inventarios.repository';
 import { RevisionInvalidaError } from './errors/revision-invalida.error';
@@ -21,6 +22,7 @@ export class RevisionInventarioService {
     private readonly repositorio: RevisionInventarioRepository,
     private readonly inventarios: InventariosRepository,
     private readonly almacenamiento: AlmacenamientoService,
+    private readonly outbox: NotificacionesOutboxService,
   ) {}
 
   /** R9 — el inquilino lee SOLO su inventario. */
@@ -113,13 +115,34 @@ export class RevisionInventarioService {
       }
     }
 
-    // R7: cuando todos los ítems activos tienen revisión → completada.
+    // R7: cuando todos los ítems activos tienen revisión → completada, y el
+    // empleado (quien creó el inventario) recibe la notificación por el
+    // motor de #10 (canal CORREO del creador, diseño §4).
     const [total, revisadas] = await Promise.all([
       this.repositorio.conteoItemsActivos(ctx, inventario.id),
       this.repositorio.conteoRevisiones(ctx, inventario.id, perfil),
     ]);
     if (revisadas >= total && total > 0) {
       await this.repositorio.marcarCompletada(ctx, inventario.id);
+      const { rows: creador } = await ctx.cliente.query<{ email: string | null }>(
+        `SELECT email FROM "user" WHERE id = $1 AND tenant_id = $2`,
+        [inventario.creado_por, ctx.tenantId],
+      );
+      const emailCreador = creador[0]?.email;
+      if (emailCreador) {
+        await this.outbox.crear(
+          {
+            destinatario: emailCreador,
+            canal: 'CORREO',
+            contenido: {
+              asunto: `El inquilino completó la revisión del inventario ${inventario.id}`,
+              inventario_id: inventario.id,
+              revision_completada: true,
+            },
+          },
+          ctx,
+        );
+      }
     }
 
     return { id: revisionId!, respuesta: datos.respuesta };
