@@ -255,25 +255,27 @@ describe('Inquilinos — CRUD (#5)', () => {
   });
 
   /**
-   * §7.4 tras **D-9**: el modelo sigue admitiendo que una identidad tenga los
-   * dos roles en la misma inmobiliaria (RF-C2), pero el **flujo de alta ya no
-   * la deduplica**, y no por descuido.
+   * §7.4, **reescrito por la feature #26** (R1, R2, R3, R4).
    *
-   * Antes, la deduplicación dentro del tenant se hacía por `user.email`. D-9
-   * (**R71**) manda que `user.email` quede **NULL** en un cliente registrado
-   * por la inmobiliaria —es credencial de acceso, no contacto—, así que no
-   * queda ninguna clave por la que reconocer a la misma persona en el momento
-   * del alta. `design.md` §7.3 ya lo anticipaba: *"la deduplicación de
-   * identidad solo es posible cuando hay email"*.
+   * ## Qué decía este test antes y por qué ha cambiado
    *
-   * Consecuencia: la misma persona registrada como propietaria **y** como
-   * inquilina de la misma inmobiliaria tiene hoy **dos filas de `user`** y un
-   * perfil colgando de cada una. Queda anotado como decisión abierta en
-   * `progress/impl_owner_tenant_profiles_cierre.md`: unificarlas exigiría una
-   * deduplicación por `documento` dentro del tenant, que **ningún requirement
-   * pide** y que no se ha inventado aquí.
+   * Afirmaba lo contrario: que la misma persona registrada como propietaria
+   * **y** como inquilina de la misma inmobiliaria acababa con **dos filas de
+   * `user`**. No era un descuido, era el estado real tras D-9: la deduplicación
+   * se hacía por `user.email`, y D-9 (**R71**) lo dejó NULL para todo cliente
+   * registrado por la inmobiliaria, así que no quedaba clave por la que
+   * reconocer a nadie. Se anotó como deuda **D5** del review #2.
+   *
+   * La feature **#26** cierra esa deuda: la clave es ahora el **documento
+   * dentro de la inmobiliaria**, y el alta deduplica. Este test pasa a afirmar
+   * el comportamiento correcto en lugar del defecto documentado.
+   *
+   * La versión completa del escenario —con las dos credenciales, los dos
+   * perfiles y sus contactos independientes— está en
+   * `identidad-multirol.api.test.ts` (T13, T14). Aquí se conserva porque este
+   * archivo es el que fijaba la afirmación vieja.
    */
-  it('el modelo admite los dos roles en una identidad, aunque el alta ya no deduplique (§7.4, D-9)', async () => {
+  it('la misma persona con los dos roles es UNA identidad con dos roles (#26 R1, R2, R3)', async () => {
     const propietario = await request(entorno.app.getHttpServer())
       .post('/propietarios')
       .set('Authorization', `Bearer ${entorno.adminA.token}`)
@@ -294,31 +296,31 @@ describe('Inquilinos — CRUD (#5)', () => {
     });
     expect(inquilino.status).toBe(201);
 
-    // Hoy: dos identidades, ambas del tenant A, ambas con `email` NULL (R71).
-    expect(inquilino.body.user_id).not.toBe(propietario.body.user_id);
+    // R1/R2: una sola identidad. Es la afirmación que este archivo negaba.
+    expect(inquilino.body.user_id).toBe(propietario.body.user_id);
+
     const { rows: identidades } = await entorno.poolAdmin.query<{
       email: string | null;
       tenant_id: string;
-    }>(`SELECT email, tenant_id::text FROM "user" WHERE id = ANY($1::uuid[])`, [
-      [propietario.body.user_id, inquilino.body.user_id],
+    }>(
+      `SELECT email, tenant_id::text FROM "user"
+        WHERE tenant_id = $1 AND tipo_documento = 'CC' AND documento = 'D-1'`,
+      [TENANT_A],
+    );
+    expect(identidades).toHaveLength(1);
+    // R71 sigue vigente: la identidad de un cliente no tiene correo credencial.
+    expect(identidades[0]?.email).toBeNull();
+
+    // R3: los dos roles, ambos activos, sobre esa única identidad.
+    const { rows: roles } = await entorno.poolAdmin.query<{
+      rol: string;
+      activo: boolean;
+    }>(`SELECT rol, activo FROM user_role WHERE user_id = $1 ORDER BY rol`, [
+      propietario.body.user_id,
     ]);
-    expect(identidades).toHaveLength(2);
-    expect(identidades.every((i) => i.email === null)).toBe(true);
-    expect(identidades.every((i) => i.tenant_id === TENANT_A)).toBe(true);
-
-    // Y el ESQUEMA sigue admitiendo los dos roles sobre una sola identidad,
-    // que es lo que §7.4 afirma: `user_role` tiene UNIQUE(user_id, tenant_id,
-    // rol), no UNIQUE(user_id, tenant_id).
-    const { rowCount } = await entorno.poolAdmin.query(
-      `INSERT INTO user_role (user_id, tenant_id, rol) VALUES ($1, $2, 'inquilino')`,
-      [propietario.body.user_id, TENANT_A],
-    );
-    expect(rowCount).toBe(1);
-
-    const { rows: roles } = await entorno.poolAdmin.query<{ rol: string }>(
-      `SELECT rol FROM user_role WHERE user_id = $1 ORDER BY rol`,
-      [propietario.body.user_id],
-    );
-    expect(roles.map((r) => r.rol)).toEqual(['inquilino', 'propietario']);
+    expect(roles).toEqual([
+      { rol: 'inquilino', activo: true },
+      { rol: 'propietario', activo: true },
+    ]);
   });
 });

@@ -393,6 +393,76 @@ describe('Propietarios — CRUD y creación en línea (#5)', () => {
       );
       expect(rows).toHaveLength(0);
     });
+
+    /**
+     * **T16 — R12 (#26): atomicidad de la REUTILIZACIÓN de identidad.**
+     *
+     * El caso de arriba cubre el alta de una identidad nueva: si falla el
+     * perfil, no queda ni `user` ni `user_role`. La feature #26 abre un camino
+     * distinto y peor: cuando la identidad **ya existe**, lo que se añade es un
+     * `user_role`, y un rollback incompleto dejaría a esa persona con un rol
+     * que nadie le dio y sin el perfil que lo justificaría. Es decir, acceso
+     * concedido sin registro de por qué.
+     *
+     * Se ejercita con el MISMO mecanismo de inyección de fallos ya declarado en
+     * `EXCEPCIONES_JUSTIFICADAS` de `tests/ddl-en-tests.test.ts`, y por eso vive
+     * en este archivo: no se añade ninguna excepción nueva al guard.
+     */
+    it('si falla el perfil tras reutilizar la identidad, el user_role se deshace (#26 R12)', async () => {
+      // La persona ya existe en esta inmobiliaria como inquilina.
+      const inquilino = await comoAdminA('post', '/inquilinos').send({
+        nombre: 'Rosa Atomica',
+        tipo_documento: 'CC',
+        documento: '5100',
+        email: 'rosa.atomica@example.com',
+        celular: '3009990000',
+        medio_preferido_contacto: 'CORREO',
+      });
+      expect(inquilino.status).toBe(201);
+      const userId = inquilino.body.user_id;
+
+      const rolesDe = async () => {
+        const { rows } = await entorno.poolAdmin.query<{ rol: string }>(
+          'SELECT rol FROM user_role WHERE user_id = $1 ORDER BY rol',
+          [userId],
+        );
+        return rows.map((r) => r.rol);
+      };
+      expect(await rolesDe()).toEqual(['inquilino']);
+
+      await entorno.poolAdmin.query(`
+        CREATE OR REPLACE FUNCTION fallar_insert_perfil() RETURNS TRIGGER AS $fn$
+        BEGIN
+          RAISE EXCEPTION 'fallo forzado en el INSERT del perfil';
+        END;
+        $fn$ LANGUAGE plpgsql`);
+      await entorno.poolAdmin.query(`
+        CREATE TRIGGER trg_fallar_insert_perfil
+          BEFORE INSERT ON perfil_propietario
+          FOR EACH ROW EXECUTE FUNCTION fallar_insert_perfil()`);
+
+      try {
+        const respuesta = await comoAdminA('post', '/propietarios').send({
+          nombre: 'Rosa Atomica',
+          tipo_documento: 'CC',
+          documento: '5100',
+        });
+        expect(respuesta.status).toBe(500);
+      } finally {
+        await entorno.poolAdmin.query(
+          'DROP TRIGGER IF EXISTS trg_fallar_insert_perfil ON perfil_propietario',
+        );
+      }
+
+      // R12: exactamente los roles que tenía antes de la petición.
+      expect(await rolesDe()).toEqual(['inquilino']);
+      // Y la identidad sigue siendo una sola, sin perfil de propietario.
+      const { rows } = await entorno.poolAdmin.query<{ total: string }>(
+        'SELECT count(*)::text AS total FROM perfil_propietario WHERE user_id = $1',
+        [userId],
+      );
+      expect(Number(rows[0]?.total)).toBe(0);
+    });
   });
 
   // ─── T21 — identidad entre tenants (R26/R62) ────────────────────────────

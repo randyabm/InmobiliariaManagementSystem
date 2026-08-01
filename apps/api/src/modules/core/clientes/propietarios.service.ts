@@ -7,6 +7,8 @@ import type {
 
 import type { ContextoPeticion } from '../../../common/database/cliente-tenant';
 import { ResourceNotFoundError } from '../../../common/errors';
+import { AuditService } from '../audit/audit.service';
+import { auditarRolAnadido } from './auditoria-identidad';
 import { CuentasBancariasRepository } from './cuentas-bancarias.repository';
 import type {
   ActualizarPropietarioDto,
@@ -34,6 +36,7 @@ export class PropietariosService {
     private readonly repositorio: PropietariosRepository,
     private readonly cuentas: CuentasBancariasRepository,
     private readonly identidad: IdentidadService,
+    private readonly audit: AuditService,
   ) {}
 
   /**
@@ -54,15 +57,25 @@ export class PropietariosService {
     // D-9 (R71): la identidad se crea SIN correo. `user.email` es credencial de
     // acceso y este cliente todavía no tiene portal; su correo de contacto va
     // al perfil, unas líneas más abajo.
-    const { userId } = await this.identidad.crearIdentidad(
+    //
+    // #26 (R1, R5): la identidad se resuelve por **documento** dentro de esta
+    // inmobiliaria. Si esa persona ya existe aquí —porque ya es inquilina— se
+    // reutiliza su identidad y solo se le añade el rol: una sola credencial
+    // (R4). Si el nombre declarado no coincide con el registrado, esto lanza
+    // 409 **antes** de escribir nada (R9).
+    const { userId, reutilizada } = await this.identidad.resolverIdentidad(
       ctx.cliente,
-      { nombre: dto.nombre },
+      {
+        nombre: dto.nombre,
+        tipoDocumento: dto.tipo_documento,
+        documento: dto.documento,
+      },
       ctx.tenantId,
       'propietario',
     );
 
     try {
-      return await this.repositorio.insertar(ctx, {
+      const perfil = await this.repositorio.insertar(ctx, {
         userId,
         tipoDocumento: dto.tipo_documento,
         documento: dto.documento,
@@ -72,6 +85,14 @@ export class PropietariosService {
         ciudad: dto.ciudad ?? null,
         sujetoRetencion: dto.sujeto_retencion ?? false,
       });
+
+      // R13: la reutilización de identidad se audita, y solo ella. Es el
+      // momento en que una credencial existente gana acceso a los datos de un
+      // rol nuevo, que es acción crítica (§C7). Se registra **después** del
+      // INSERT del perfil para no auditar un alta que acabe deshecha (R12).
+      await auditarRolAnadido(this.audit, ctx, userId, 'propietario', reutilizada);
+
+      return perfil;
     } catch (error) {
       // Carrera entre la comprobación previa y el INSERT: la restricción
       // UNIQUE del tenant es la que manda, y el cliente ve el mismo 409.

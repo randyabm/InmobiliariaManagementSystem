@@ -47,43 +47,43 @@
       cubre las columnas nuevas: con el rol de aplicación, una identidad de otra
       inmobiliaria no es visible ni siquiera filtrando por su `documento`.
       **Cubre: R14, R22, R24.**
-- [ ] **T8** — `identidad.service.ts`: `crearIdentidad` → `resolverIdentidad`
+- [x] **T8** — `identidad.service.ts`: `crearIdentidad` → `resolverIdentidad`
       con la firma de `design.md` §5. Elimina `buscarEnEsteTenant` por email y
       añade `buscarPorDocumentoEnEsteTenant` con predicado explícito de
       `tenant_id`. El `INSERT` persiste documento. **Cubre: R1, R2, R5, R10, R11.**
-- [ ] **T9** — `resolverIdentidad`: reutilizar identidad no toca `email`,
+- [x] **T9** — `resolverIdentidad`: reutilizar identidad no toca `email`,
       `password_hash` ni `nombre`; devuelve `reutilizada: true` y llama a
       `asegurarRol`. **Cubre: R3, R4.**
-- [ ] **T29** — Función pura exportada `nombresCoinciden(a, b)` con el criterio
+- [x] **T29** — Función pura exportada `nombresCoinciden(a, b)` con el criterio
       de **R27** (podar, colapsar espacios internos, minúsculas; **sin** plegar
       diacríticos ni reordenar apellidos) y
       `NombreNoCoincideConIdentidadError` (409) con el cuerpo accionable de
       `design.md` §7. `resolverIdentidad` rechaza **antes** de insertar el
       `user_role`, así que no hay nada que deshacer.
       **Cubre: R9, R27, R28.**
-- [ ] **T30** — Test unitario de `nombresCoinciden`, tabla de casos:
+- [x] **T30** — Test unitario de `nombresCoinciden`, tabla de casos:
       `"  maría   PÉREZ "` ≡ `"María Pérez"` → coincide; `"Maria Perez"` vs
       `"María Pérez"` → **no** coincide; `"Pérez María"` vs `"María Pérez"` →
       **no** coincide. Los dos últimos fijan por escrito lo que R27
       deliberadamente **no** resuelve (PA-5 de `design.md` §10.2): son
       documentación ejecutable de la frontera, no un descuido.
       **Cubre: R27.**
-- [ ] **T10** — Adaptar `propietarios.service.ts` e `inquilinos.service.ts` a la
+- [x] **T10** — Adaptar `propietarios.service.ts` e `inquilinos.service.ts` a la
       firma nueva (pasan `tipo_documento`/`documento`), conservando intacta la
       comprobación previa que produce el 409. **Cubre: R1, R2, R7.**
-- [ ] **T11** — Auditoría `identidad.rol_anadido` en ambos servicios cuando
+- [x] **T11** — Auditoría `identidad.rol_anadido` en ambos servicios cuando
       `reutilizada === true`, sin registrar el documento. **Cubre: R13.**
-- [ ] **T12** — Test unitario de `IdentidadService` con un `PoolClient` doble que
+- [x] **T12** — Test unitario de `IdentidadService` con un `PoolClient` doble que
       registra las consultas: afirma que **ninguna** consulta filtra `user` por
       `email` y que todas las de búsqueda llevan `tenant_id`. **Cubre: R10, R11.**
-- [ ] **T13** — Test API (rol de aplicación real): se crea propietario con
+- [x] **T13** — Test API (rol de aplicación real): se crea propietario con
       documento X y después inquilino con el mismo documento en la **misma**
       inmobiliaria → un solo `user`, dos `user_role` activos, dos perfiles, un
       solo `password_hash`. **Cubre: R1, R2, R3, R4.**
-- [ ] **T14** — Test API: los dos perfiles conservan sus datos de contacto
+- [x] **T14** — Test API: los dos perfiles conservan sus datos de contacto
       distintos (correo y teléfono propios de cada rol) y el `nombre` de la
       identidad no se sobrescribe. **Cubre: R8.**
-- [ ] **T31** — Test API determinista del 409 de nombre discrepante y de su
+- [x] **T31** — Test API determinista del 409 de nombre discrepante y de su
       camino feliz, en un solo escenario: (a) alta de inquilino con el documento
       de un propietario existente y nombre distinto → **409**
       `NOMBRE_NO_COINCIDE_CON_IDENTIDAD`, cuerpo con `user_id`,
@@ -91,18 +91,18 @@
       `user`, `user_role` ni perfil (verificado con `SELECT`, no con el cuerpo);
       (b) se corrige la ficha existente con el `PATCH` de la #5 y se reintenta el
       alta → **201** y la deduplicación ocurre. **Cubre: R9, R28.**
-- [ ] **T15** — Test API: crear dos veces el **mismo rol** con el mismo documento
+- [x] **T15** — Test API: crear dos veces el **mismo rol** con el mismo documento
       → 409 `PERFIL_YA_EXISTE` y ninguna fila nueva (verificado con `SELECT`, no
       con el cuerpo de la respuesta). **Cubre: R7.**
-- [ ] **T16** — Test de atomicidad: fallo al insertar el perfil tras haber
+- [x] **T16** — Test de atomicidad: fallo al insertar el perfil tras haber
       añadido el `user_role` → la identidad queda con exactamente los roles
       previos. Reutiliza el mecanismo de inyección de fallos ya exento en
       `ddl-en-tests` (no se añade ninguna excepción nueva). **Cubre: R12.**
-- [ ] **T17** — Test de la frontera D-8: la misma persona (mismo documento) dada
+- [x] **T17** — Test de la frontera D-8: la misma persona (mismo documento) dada
       de alta en la inmobiliaria A y en la B produce **dos** identidades
       distintas, con `tenant_id` distinto, y la respuesta de B no contiene ningún
       dato de A. **Cubre: R14, R22.**
-- [ ] **T18** — Test de auditoría de R13 contra la tabla real: la entrada existe,
+- [x] **T18** — Test de auditoría de R13 contra la tabla real: la entrada existe,
       es del tenant correcto y su `metadata` **no** contiene el documento.
       **Cubre: R13.**
 

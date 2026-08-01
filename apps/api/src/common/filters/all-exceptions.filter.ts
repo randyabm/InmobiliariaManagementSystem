@@ -69,6 +69,11 @@ export class AllExceptionsFilter implements ExceptionFilter {
       message: this.resolverMensaje(exception, status),
       timestamp: new Date().toISOString(),
       path: request.url,
+      // Datos accionables de los errores de dominio que los declaran (**R28**
+      // de la #26). No es vía libre para adjuntar cualquier cosa: solo los
+      // errores < 500 que definen `detalles` a propósito, y cada uno justifica
+      // en su propia clase por qué esos campos no revelan nada ajeno.
+      ...this.resolverDetalles(exception, status),
     };
 
     // El detalle técnico se registra, no se devuelve. Sin datos personales
@@ -101,5 +106,28 @@ export class AllExceptionsFilter implements ExceptionFilter {
       MENSAJES_POR_ESTADO[ESTADO_POR_DEFECTO] ??
       'Ocurrió un error inesperado.'
     );
+  }
+
+  /**
+   * Campos extra que un error de dominio decide exponer (**R28**).
+   *
+   * Solo para errores propios con estado < 500, por el mismo motivo que
+   * `resolverMensaje`: son los únicos escritos y revisados aquí. Un 5xx nunca
+   * adjunta datos, porque su causa es un defecto y su contenido, impredecible.
+   *
+   * Los detalles NO se registran en el log: el log lleva método, ruta y código
+   * y nada más (Ley 1581 de 2012). Que un dato sea legítimo en la respuesta a
+   * quien acaba de teclearlo no lo hace legítimo en un archivo persistente.
+   */
+  private resolverDetalles(
+    exception: unknown,
+    status: number,
+  ): Record<string, unknown> {
+    if (!(exception instanceof AppError) || status >= 500) return {};
+
+    const detalles = (exception as { detalles?: unknown }).detalles;
+    if (typeof detalles !== 'object' || detalles === null) return {};
+
+    return { ...(detalles as Record<string, unknown>) };
   }
 }

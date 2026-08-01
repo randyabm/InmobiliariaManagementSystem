@@ -3,6 +3,8 @@ import type { PerfilInquilino, TipoDocumento } from '@inmobiliaria/types';
 
 import type { ContextoPeticion } from '../../../common/database/cliente-tenant';
 import { ResourceNotFoundError } from '../../../common/errors';
+import { AuditService } from '../audit/audit.service';
+import { auditarRolAnadido } from './auditoria-identidad';
 import type {
   ActualizarInquilinoDto,
   CrearInquilinoDto,
@@ -31,6 +33,7 @@ export class InquilinosService {
   constructor(
     private readonly repositorio: InquilinosRepository,
     private readonly identidad: IdentidadService,
+    private readonly audit: AuditService,
   ) {}
 
   /** **R18**, R22, R24, R25. */
@@ -41,15 +44,25 @@ export class InquilinosService {
     await this.rechazarSiDocumentoRepetido(ctx, dto.tipo_documento, dto.documento);
 
     // D-9 (R71): la identidad se crea SIN correo; el de contacto va al perfil.
-    const { userId } = await this.identidad.crearIdentidad(
+    //
+    // #26 (R2, R5): la identidad se resuelve por **documento** dentro de esta
+    // inmobiliaria. Si esa persona ya existe aquí —porque ya es propietaria— se
+    // reutiliza su identidad y solo se le añade el rol: una sola credencial
+    // (R4). Si el nombre declarado no coincide con el registrado, esto lanza
+    // 409 **antes** de escribir nada (R9).
+    const { userId, reutilizada } = await this.identidad.resolverIdentidad(
       ctx.cliente,
-      { nombre: dto.nombre },
+      {
+        nombre: dto.nombre,
+        tipoDocumento: dto.tipo_documento,
+        documento: dto.documento,
+      },
       ctx.tenantId,
       'inquilino',
     );
 
     try {
-      return await this.repositorio.insertar(ctx, {
+      const perfil = await this.repositorio.insertar(ctx, {
         userId,
         tipoDocumento: dto.tipo_documento,
         documento: dto.documento,
@@ -57,6 +70,14 @@ export class InquilinosService {
         celular: dto.celular,
         medioPreferidoContacto: dto.medio_preferido_contacto,
       });
+
+      // R13: se audita la reutilización de identidad, y solo ella. Ver
+      // `auditoria-identidad.ts`: es el momento en que una credencial existente
+      // gana acceso a los datos de un rol nuevo. Después del INSERT del perfil,
+      // para no auditar un alta que acabe deshecha (R12).
+      await auditarRolAnadido(this.audit, ctx, userId, 'inquilino', reutilizada);
+
+      return perfil;
     } catch (error) {
       if (esViolacionDeUnicidad(error)) {
         throw new PerfilYaExisteError();
