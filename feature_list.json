@@ -57,7 +57,7 @@
       "name": "multitenancy_rls",
       "phase": "1a",
       "sdd": true,
-      "status": "blocked",
+      "status": "done",
       "note": "Reabierta el 2026-07-27 y marcada blocked (no se trabaja por si sola: se cierra dentro de la feature #5): el RLS esta declarado y FORCE-ado, pero la aplicacion se conecta a PostgreSQL como superusuario, que se salta el RLS por completo (FORCE alcanza al dueno de la tabla, no al superusuario). En ejecucion real el aislamiento lo sostienen los WHERE tenant_id del codigo, no el motor. Se cierra dentro de la feature #5. Ver progress/review_owner_tenant_profiles.md (B3).",
       "title": "Multi-tenancy con Row-Level Security",
       "prd_refs": ["RF-A1", "D2", "11.3"],
@@ -74,7 +74,7 @@
       "name": "auth_rbac",
       "phase": "1a",
       "sdd": true,
-      "status": "blocked",
+      "status": "done",
       "note": "Reabierta el 2026-07-27 y marcada blocked (no se trabaja por si sola: se cierra dentro de la feature #5): la politica user_tenant_isolation (0003_auth_rbac.sql:48-54) es FOR ALL sin WITH CHECK, asi que su USING se aplica tambien al INSERT. En cuanto el rol deje de ser superusuario, crear una identidad es un bloqueo circular y auth.service.ts:44 consulta \"user\" sin contexto de tenant, con lo que el login devolveria 401 a todos. Se cierra dentro de la feature #5. Ver progress/review_owner_tenant_profiles.md (B4).",
       "title": "Autenticación, identidad multi-rol y RBAC",
       "prd_refs": ["RF-AU1", "RF-C2", "RF-C3", "RF-AU6"],
@@ -91,7 +91,7 @@
       "name": "auditoria",
       "phase": "1a",
       "sdd": true,
-      "status": "blocked",
+      "status": "done",
       "note": "Reabierta el 2026-07-27 y marcada blocked (no se trabaja por si sola: se cierra dentro de la feature #5): NINGUNA migracion crea el trigger append-only de audit_log; 0004_auditoria.sql solo lo declara en un comentario. El trigger lo crea el propio test (audit-log.test.ts:32-52) antes de probarlo, asi que la inmutabilidad era verde por construccion y en produccion no existe. Se cierra dentro de la feature #5. Ver progress/review_owner_tenant_profiles.md (B2).",
       "title": "Auditoría inmutable de acciones críticas",
       "prd_refs": ["RF-W4", "11.3", "7"],
@@ -107,7 +107,7 @@
       "name": "owner_tenant_profiles",
       "phase": "1a",
       "sdd": true,
-      "status": "in_progress",
+      "status": "done",
       "title": "Hoja de vida de propietario e inquilino (núcleo)",
       "prd_refs": ["RF-C1", "RF-C4", "RF-C5", "RF-C6"],
       "note": "Partida en dos el 2026-07-26 por decisión del humano: 55 tasks en una corrida daban un diff inrevisable. La tarifa de retención, los codeudores/coarrendatarios y las referencias del inquilino se movieron a la feature #25 retencion_codeudor_referencias. La columna sujeto_retencion del perfil se queda aquí; solo la tarifa se fue.",
@@ -156,6 +156,24 @@
         "La reutilizacion de identidad sigue prohibida entre inmobiliarias distintas (D-8): esta feature no la reintroduce.",
         "init.sh falla, no advierte, si DATABASE_URL y DATABASE_MIGRATION_URL son iguales (deuda D4).",
         "El titular de R62 y el enunciado de T58 del spec de #5 se corrigen para que no contradigan su propio cuerpo (deuda D6)."
+      ]
+    },
+    {
+      "id": 27,
+      "name": "sesion_y_revocacion",
+      "phase": "1a",
+      "sdd": true,
+      "status": "pending",
+      "title": "Sesiones, refresh tokens y revocacion inmediata",
+      "prd_refs": ["RF-AU1", "RF-C3", "RF-AU6"],
+      "note": "Creada el 2026-08-01 por decision del humano, a partir de PA-3 del spec de la feature #26. Hoy el rol se valida contra la base solo en la emision del token: si a alguien se le revoca un rol, su token ya emitido sigue siendo valido hasta que expire. El proyecto no tiene refresh tokens ni revocacion. El humano prefirio resolverlo de verdad en vez de aceptar la ventana con expiracion corta.",
+      "acceptance": [
+        "Existen refresh tokens y una nocion explicita de sesion, distinta del token de acceso.",
+        "Revocar un rol o una sesion invalida el acceso de forma inmediata, sin esperar a que el token expire.",
+        "Cerrar sesion invalida la sesion en el servidor, no solo en el cliente.",
+        "Existe un test determinista que revoca un rol y demuestra que la siguiente peticion con el token ya emitido es rechazada.",
+        "La revocacion queda auditada con actor, motivo y timestamp.",
+        "Un token o sesion de una inmobiliaria nunca da acceso a otra."
       ]
     },
     {
