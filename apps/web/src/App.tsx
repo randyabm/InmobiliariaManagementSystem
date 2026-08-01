@@ -1,35 +1,54 @@
+import { useState } from 'react';
 import type { JSX } from 'react';
 
-import { useHealth } from './hooks/use-health';
+import { ClienteWeb } from './api/cliente-web';
+import { Login } from './vistas/Login';
+import { Layout, type Vista } from './vistas/Layout';
+import { Dashboard } from './vistas/Dashboard';
+import { Inventarios } from './vistas/Inventarios';
+import { Contratos } from './vistas/Contratos';
+import { Clientes } from './vistas/Clientes';
+import { Plantillas } from './vistas/Plantillas';
 
 /**
- * Shell mínimo de la aplicación web.
- *
- * Los tres estados (cargando / error / listo) son explícitos y visibles: es
- * requisito de docs/conventions.md para cualquier vista que consulte la API.
+ * Panel web de administración (feature #28, PA-28-1): navegación por
+ * estado, sin router. Login → Layout con las vistas.
  */
-export function App(): JSX.Element {
-  const salud = useHealth();
+export function App(props: { cliente?: ClienteWeb } = {}): JSX.Element {
+  const [api] = useState(
+    () =>
+      props.cliente ??
+      new ClienteWeb({
+        baseUrl: import.meta.env.VITE_API_URL ?? 'http://localhost:3000',
+        tenantId: import.meta.env.VITE_TENANT_ID ?? '',
+      }),
+  );
+  const [usuario, setUsuario] = useState<{ nombre: string } | null>(null);
+  const [vista, setVista] = useState<Vista>('dashboard');
+
+  if (!usuario) {
+    return <Login api={api} onLogin={(u) => setUsuario({ nombre: u.nombre })} />;
+  }
+
+  const contenido: Record<Vista, JSX.Element> = {
+    dashboard: <Dashboard api={api} />,
+    inventarios: <Inventarios api={api} />,
+    contratos: <Contratos api={api} />,
+    clientes: <Clientes api={api} />,
+    plantillas: <Plantillas api={api} />,
+  };
 
   return (
-    <main>
-      <h1>Gestión Inmobiliaria</h1>
-
-      {salud.estado === 'cargando' && (
-        <p role="status">Consultando el estado del servicio…</p>
-      )}
-
-      {salud.estado === 'error' && (
-        <p role="alert">
-          No fue posible consultar el estado del servicio. {salud.mensaje}
-        </p>
-      )}
-
-      {salud.estado === 'listo' && (
-        <p role="status">
-          Servicio disponible (versión {salud.datos.version}).
-        </p>
-      )}
-    </main>
+    <Layout
+      vista={vista}
+      onNavegar={setVista}
+      usuario={usuario}
+      onCerrarSesion={() => {
+        void api.cerrarSesion();
+        setUsuario(null);
+      }}
+    >
+      {contenido[vista]}
+    </Layout>
   );
 }

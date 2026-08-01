@@ -560,6 +560,29 @@
         "El empleado ve todas las objeciones en un solo panel.",
         "El admin ve inventarios estancados en negociación."
       ]
+    },
+    {
+      "id": 28,
+      "name": "web_admin_panels",
+      "phase": "1d",
+      "sdd": true,
+      "status": "done",
+      "title": "Paneles web de administración (RF-P5 dashboard, RF-I13 panel de inventarios, RF-AU4 portales)",
+      "prd_refs": [
+        "RF-P5",
+        "RF-I13",
+        "RF-AU4",
+        "RF-C3"
+      ],
+      "note": "Añadida por el humano: quiere la UI. Primera feature de FRONTEND de paneles internos; apps/web deja de ser solo el shell de healthcheck.",
+      "acceptance": [
+        "Login con el flujo #27 (codigo+email+password).",
+        "Dashboard de propiedades con los estados del ciclo de vida (RF-P5).",
+        "Panel de inventarios con lista, filtros y ficha (RF-I13).",
+        "Contratos: lista y vencimientos con acciones de renovar/no-renovar.",
+        "Clientes: propietarios e inquilinos. Plantillas: listar y clonar.",
+        "Tokens en IndexedDB, nunca localStorage (patrón #15)."
+      ]
     }
   ]
 }

@@ -5,3 +5,4 @@ import { afterEach } from 'vitest';
 afterEach(() => {
   cleanup();
 });
+import 'fake-indexeddb/auto';
