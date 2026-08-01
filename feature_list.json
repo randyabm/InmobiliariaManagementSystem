@@ -144,7 +144,7 @@
       "name": "identidad_multirol_cliente",
       "phase": "1a",
       "sdd": true,
-      "status": "pending",
+      "status": "spec_ready",
       "title": "Identidad unica por inmobiliaria y vista como propietario o inquilino",
       "prd_refs": ["RF-C2", "RF-C6", "RF-AU1", "RF-AU6"],
       "note": "Creada el 2026-08-01 por decision del humano, a partir de la deuda D5 del segundo review de la feature #5. Al mudar el contacto al perfil (D-9), user.email quedo vacio para los clientes y desaparecio la clave por la que reconocer a la misma persona dentro de una inmobiliaria: quien sea propietario e inquilino de la misma agencia son hoy dos filas de user. Se hace como feature propia y no reabriendo la #5, que ya llevaba dos revisiones y cerraba cuatro features a la vez. Incluye tambien la deuda D4 y D6 del mismo review.",
