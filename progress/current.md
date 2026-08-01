@@ -6,8 +6,10 @@
 
 - **Feature en curso:** #25 `retencion_codeudor_referencias` — status
   **`in_progress`**
-- **Agente:** leader → spec_author → **implementer** → reviewer
-- **Estado:** implementando el spec aprobado (27 tasks, T1–T27).
+- **Agente:** leader → spec_author → implementer (T1–T27, **completas**) →
+  ⏸ **reviewer**
+- **Estado:** esperando el review. Informe en
+  `progress/impl_retencion_codeudor_referencias.md`.
 
 ## Espec
 
