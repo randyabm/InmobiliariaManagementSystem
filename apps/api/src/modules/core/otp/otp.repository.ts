@@ -53,6 +53,23 @@ export class OtpRepository {
     );
     return rowCount ?? 0;
   }
+
+  /** R8 (#14) — el OTP de FIRMA verificado en los últimos 10 minutos. */
+  async otpFirmaReciente(
+    ctx: ContextoPeticion,
+    userId: string,
+  ): Promise<Date | null> {
+    const { rows } = await ctx.cliente.query<{ verificado_en: Date }>(
+      `SELECT verificado_en FROM codigo_otp
+        WHERE tenant_id = $1 AND user_id = $2 AND proposito = 'FIRMA'
+          AND verificado_en IS NOT NULL
+          AND verificado_en > now() - interval '10 minutes'
+        ORDER BY verificado_en DESC
+        LIMIT 1`,
+      [ctx.tenantId, userId],
+    );
+    return rows[0]?.verificado_en ?? null;
+  }
 }
 
 interface FilaCodigo {

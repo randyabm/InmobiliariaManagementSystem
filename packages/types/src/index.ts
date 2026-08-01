@@ -35,6 +35,10 @@ export type {
   WorkflowTransicionLog,
 } from './workflows';
 
+// Feature #14 inventory_signature_pdf.
+export { FIRMANTES } from './inventario-firma';
+export type { FirmaInventario, FirmanteTipo } from './inventario-firma';
+
 // Feature #13 inventory_tenant_review.
 export { PROPOSITOS_OTP, RESPUESTAS_REVISION } from './inventario-revision';
 export type {

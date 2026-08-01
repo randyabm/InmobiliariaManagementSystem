@@ -41,6 +41,9 @@ export const propiedadDocumento = pgTable(
     hashSha256: text('hash_sha256').notNull(),
     mime: text('mime'),
     tamanoBytes: bigint('tamano_bytes', { mode: 'number' }),
+    /** Vínculo genérico de entidad (PA-14-2): el PDF firmado apunta a su inventario. */
+    entidadTipo: text('entidad_tipo'),
+    entidadId: uuid('entidad_id'),
     subidoPor: uuid('subido_por').references(() => user.id),
     activo: boolean('activo').notNull().default(true),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

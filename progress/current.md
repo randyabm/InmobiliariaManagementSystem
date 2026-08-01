@@ -4,10 +4,9 @@
 > `history.md`. Mientras trabajas, **mantenlo actualizado en tiempo real**,
 > no al final.
 
-- **Feature en curso:** **#14 `inventory_signature_pdf`** (spec_ready →
-  en implementación; depende de #13, que ya entregó el OTP FIRMA). #12,
-  #13 y #15 `done`.
-- **Agente:** implementer sobre #14 → reviewer (mutaciones) → humano
+- **Feature en curso:** **#14 `inventory_signature_pdf`** (implementada,
+  22/22 tasks, esperando **review**). #12, #13 y #15 `done`.
+- **Agente:** implementer terminó #14 → reviewer (mutaciones) → humano
   autoriza `done`.
 - **Estado:** meta de la sesión: **completar la fase 1** (1b + 1c + #23).
 
@@ -24,7 +23,13 @@ frontend. Las features de la fase 1 son backend (API). La PWA de campo
 
 ## En review
 
-- **#14 `inventory_signature_pdf`** — en implementación.
+- **#14 `inventory_signature_pdf`** — implementación completa:
+  - Suite: `npm run test` **821** + `npm run test:db` **143**.
+  - Lint, typecheck y build verdes; `./init.sh` exit 0 (22 OK).
+  - Trazabilidad R1–R12 → test en `progress/impl_inventory_signature_pdf.md`.
+  - PA-14-1..4 ejecutadas; PDF pdf-lib con hash estable, evidencia
+    append-only, OTP FIRMA de #13 consumido; vínculo al contrato anotado
+    para #17.
 
 ## Pendientes de decisión del humano
 

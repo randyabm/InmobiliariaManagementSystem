@@ -3,7 +3,11 @@ import { Module } from '@nestjs/common';
 import { AuditModule } from '../audit/audit.module';
 import { AlmacenamientoModule } from '../almacenamiento/almacenamiento.module';
 import { NotificacionesModule } from '../notificaciones/notificaciones.module';
+import { OtpModule } from '../otp/otp.module';
 import { PlantillasModule } from '../plantillas/plantillas.module';
+import { FirmaPdfController } from './firma/firma-pdf.controller';
+import { FirmaPdfRepository } from './firma/firma-pdf.repository';
+import { FirmaPdfService } from './firma/firma-pdf.service';
 import { InventariosController } from './inventarios.controller';
 import { InventariosRepository } from './inventarios.repository';
 import { InventariosService } from './inventarios.service';
@@ -19,13 +23,21 @@ import { RevisionInventarioService } from './revision-inventario.service';
  * revisión completa notifica al empleado por el motor de #10 (R7).
  */
 @Module({
-  imports: [AuditModule, PlantillasModule, AlmacenamientoModule, NotificacionesModule],
-  controllers: [InventariosController, RevisionInventarioController],
+  imports: [
+    AuditModule,
+    PlantillasModule,
+    AlmacenamientoModule,
+    NotificacionesModule,
+    OtpModule,
+  ],
+  controllers: [InventariosController, RevisionInventarioController, FirmaPdfController],
   providers: [
     InventariosRepository,
     InventariosService,
     RevisionInventarioRepository,
     RevisionInventarioService,
+    FirmaPdfRepository,
+    FirmaPdfService,
   ],
   exports: [InventariosService],
 })

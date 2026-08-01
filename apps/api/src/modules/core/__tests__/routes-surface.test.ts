@@ -119,6 +119,15 @@ const RUTAS_PERMITIDAS = [
   'POST /inquilino/inventarios/:id/items/:idItem/revision',
   'POST /auth/otp/solicitar',
   'POST /auth/otp/verificar',
+  // ─── Feature #14 inventory_signature_pdf: 5 rutas (R12, design.md §6) ──
+  // `confirmar-acuerdo`, `pdf` (POST y GET) y la firma del empleado son
+  // admin/empleado; la firma del inquilino es `@Roles('inquilino')` con
+  // scoping por perfil (#13, R9) + OTP de FIRMA reciente (R4).
+  'POST /inventarios/:id/confirmar-acuerdo',
+  'POST /inventarios/:id/pdf',
+  'POST /inventarios/:id/firmas/empleado',
+  'POST /inventarios/:id/firmas/inquilino',
+  'GET /inventarios/:id/pdf',
   // ─── Feature #7 workflow_engine: 9 rutas (R17, design.md §8) ───────────
   // Gestión de definiciones: solo `admin` (RF-W2). Instancias y ejecución:
   // `@Roles('admin','empleado')`.

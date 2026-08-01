@@ -104,6 +104,13 @@ export class OtpService {
 
     return { id: pendiente.id, verificado_en: new Date().toISOString() };
   }
+  /** R8 (#14) — ¿hay un OTP de FIRMA verificado en la ventana reciente? */
+  async firmaVerificadaRecientemente(
+    ctx: ContextoPeticion,
+    userId: string,
+  ): Promise<Date | null> {
+    return this.repositorio.otpFirmaReciente(ctx, userId);
+  }
 }
 
 /** SHA-256 del código: la base nunca ve el valor en claro (R12). */

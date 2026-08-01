@@ -1435,4 +1435,108 @@ describe('Aplicación real de las migraciones (R10)', () => {
       expect(rows).toHaveLength(1);
     });
   });
+
+  // ─── Feature #14 inventory_signature_pdf (T4: R3, R12) ─────────────────
+
+  describe('esquema de #14 (R3, R12)', () => {
+    it('inventario_firma existe con RLS habilitado Y FORZADO (R3)', async () => {
+      const { rows } = await pool.query<{
+        relrowsecurity: boolean;
+        relforcerowsecurity: boolean;
+      }>(
+        `SELECT c.relrowsecurity, c.relforcerowsecurity
+           FROM pg_class c
+           JOIN pg_namespace n ON n.oid = c.relnamespace
+          WHERE n.nspname = 'public' AND c.relname = 'inventario_firma'`,
+      );
+      expect(rows).toHaveLength(1);
+      expect(rows[0]?.relrowsecurity).toBe(true);
+      expect(rows[0]?.relforcerowsecurity).toBe(true);
+
+      const { rows: politicas } = await pool.query<{ polname: string }>(
+        `SELECT policyname AS polname FROM pg_policies
+          WHERE schemaname = 'public' AND tablename = 'inventario_firma'`,
+      );
+      expect(politicas.map((p) => p.polname)).toContain(
+        'inventario_firma_tenant_isolation',
+      );
+    });
+
+    it('inventario_firma es append-only incluso para el dueño (R3)', async () => {
+      // Cadena mínima real: tenant → usuario → propietario → propiedad →
+      // inventario → firma.
+      const { rows: tenant } = await pool.query<{ id: string }>(
+        `INSERT INTO tenant (nombre, nit, codigo)
+         VALUES ('Firma Test', $1, 'firma-test') RETURNING id`,
+        [`nit-firma-${Date.now()}`],
+      );
+      const tenantId = tenant[0]?.id;
+      const { rows: usuario } = await pool.query<{ id: string }>(
+        `INSERT INTO "user" (tenant_id, email, nombre)
+         VALUES ($1, $2, 'Firma Test') RETURNING id`,
+        [tenantId, `firma-${Date.now()}@example.com`],
+      );
+      const { rows: prop } = await pool.query<{ id: string }>(
+        `INSERT INTO perfil_propietario (tenant_id, user_id, tipo_documento, documento)
+         VALUES ($1, $2, 'CC', $3) RETURNING id`,
+        [tenantId, usuario[0]?.id, `PF-${Date.now()}`],
+      );
+      const { rows: propiedad } = await pool.query<{ id: string }>(
+        `INSERT INTO propiedad (tenant_id, direccion, tipo, area, canon, propietario_principal_id)
+         VALUES ($1, 'Calle Firma', 'APARTAMENTO', '60.00', '1000000.00', $2) RETURNING id`,
+        [tenantId, prop[0]?.id],
+      );
+      const { rows: inventario } = await pool.query<{ id: string }>(
+        `INSERT INTO inventario (tenant_id, propiedad_id, tipo_evento)
+         VALUES ($1, $2, 'ENTREGA') RETURNING id`,
+        [tenantId, propiedad[0]?.id],
+      );
+      const { rows: firma } = await pool.query<{ id: string }>(
+        `INSERT INTO inventario_firma
+           (tenant_id, inventario_id, firmante_tipo, firmante_user_id,
+            hash_documento, ip)
+         VALUES ($1, $2, 'EMPLEADO', $3, $4, '127.0.0.1')
+         RETURNING id`,
+        [tenantId, inventario[0]?.id, usuario[0]?.id, 'a'.repeat(64)],
+      );
+      expect(firma).toHaveLength(1);
+
+      await expect(
+        pool.query(`UPDATE inventario_firma SET ip = '10.0.0.1' WHERE id = $1`, [
+          firma[0]?.id,
+        ]),
+      ).rejects.toThrow(/append-only/i);
+
+      await expect(
+        pool.query(`DELETE FROM inventario_firma WHERE id = $1`, [firma[0]?.id]),
+      ).rejects.toThrow(/append-only/i);
+    });
+
+    it('UNIQUE por (inventario_id, firmante_tipo): una firma por parte (R5)', async () => {
+      const { rows: firma } = await pool.query<{ id: string }>(
+        `SELECT id FROM inventario_firma LIMIT 1`,
+      );
+      const { rows: detalle } = await pool.query<{
+        inventario_id: string;
+        firmante_tipo: string;
+        firmante_user_id: string;
+      }>(`SELECT inventario_id, firmante_tipo, firmante_user_id FROM inventario_firma WHERE id = $1`, [
+        firma[0]?.id,
+      ]);
+      const duplicada = await pool.query(
+        `INSERT INTO inventario_firma
+           (tenant_id, inventario_id, firmante_tipo, firmante_user_id,
+            hash_documento, ip)
+         VALUES ($1, $2, $3, $4, $5, '127.0.0.1')`,
+        [
+          '00000000-0000-0000-0000-000000000000',
+          detalle[0]?.inventario_id,
+          detalle[0]?.firmante_tipo,
+          detalle[0]?.firmante_user_id,
+          'b'.repeat(64),
+        ],
+      ).catch((error: { code?: string }) => error);
+      expect((duplicada as { code?: string }).code).toBe('23505');
+    });
+  });
 });
