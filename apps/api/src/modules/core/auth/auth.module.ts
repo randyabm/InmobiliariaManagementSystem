@@ -6,6 +6,8 @@ import { AuditModule } from '../audit/audit.module';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { JwtStrategy } from './jwt.strategy';
+import { SesionesRepository } from './sesiones.repository';
+import { SesionesService } from './sesiones.service';
 
 /**
  * El secreto se lee **cuando se construye el módulo**, no cuando se importa el
@@ -47,7 +49,7 @@ import { JwtStrategy } from './jwt.strategy';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy],
+  providers: [AuthService, JwtStrategy, SesionesRepository, SesionesService],
   exports: [AuthService, JwtModule],
 })
 export class AuthModule {}

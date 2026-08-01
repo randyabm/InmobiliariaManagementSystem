@@ -19,6 +19,12 @@ const RUTAS_PERMITIDAS = [
   'GET /auth/me',
   'GET /health',
   'POST /auth/login',
+  // ─── Feature #27 sesion_y_revocacion: 2 rutas (R20, design.md §7) ───────
+  // `POST /auth/refresh` es pública: es el camino de recuperación cuando el
+  // access expira o se revoca; el credencial presentado es el refresh mismo.
+  // `POST /auth/logout` lleva JwtAuthGuard y revoca la sesión del jti.
+  'POST /auth/refresh',
+  'POST /auth/logout',
   // ─── Feature #26 identidad_multirol_cliente: 1 ruta (R16, design.md §5) ──
   // Elegir con qué rol se actúa. Solo `JwtAuthGuard`: cualquier identidad
   // autenticada elige entre SUS roles, y el 403 de R17 lo decide el servicio

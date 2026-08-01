@@ -11,6 +11,8 @@ import {
 import { AuditService } from '../audit/audit.service';
 import { CodigoDeInmobiliariaInvalidoError } from './errors/codigo-de-inmobiliaria-invalido.error';
 import { RolNoDisponibleError } from './errors/rol-no-disponible.error';
+import { SesionInvalidaError } from './errors/sesion-invalida.error';
+import { hashToken, SesionesService } from './sesiones.service';
 
 interface LoginDto {
   /** Código de la inmobiliaria en la que se entra (**R63**, D-12). */
@@ -33,6 +35,13 @@ interface JwtTokenPayload {
    * Cuando está presente, **restringe**; nunca amplía (`roles.guard.ts`).
    */
   rol_activo?: string;
+  /**
+   * Id de la sesión (**R3**, #27). Obligatorio desde esta feature (R5): la
+   * validación por petición lo usa para comprobar que la sesión sigue viva.
+   */
+  jti: string;
+  /** `user.token_version` al emitir (**R3**, #27). Invalidado al revocar un rol (R12). */
+  ver: number;
 }
 
 /**
@@ -91,10 +100,13 @@ export class AuthService {
   constructor(
     private readonly jwtService: JwtService,
     private readonly audit: AuditService,
+    private readonly sesiones: SesionesService,
   ) {}
 
   async login(dto: LoginDto): Promise<{
     access_token: string;
+    refresh_token: string;
+    expires_in: number;
     user: { id: string; email: string | null; nombre: string };
   }> {
     // R63: el código es obligatorio y su forma se valida ANTES de tocar la
@@ -200,6 +212,7 @@ export class AuthService {
     tenantId: string,
     rol: string,
     email: string | null = null,
+    jti: string | undefined,
   ): Promise<{ access_token: string; rol_activo: string }> {
     const cliente = await getDatabasePool(process.env.DATABASE_URL!).connect();
     try {
@@ -207,6 +220,12 @@ export class AuthService {
       await this.fijarTenant(cliente, tenantId);
 
       const roles = await this.rolesActivos(cliente, userId);
+      // #27 (R3): la versión actual de la identidad viaja en el token nuevo.
+      const { rows: versiones } = await cliente.query<{ token_version: number }>(
+        'SELECT token_version FROM "user" WHERE id = $1',
+        [userId],
+      );
+      const ver = versiones[0]?.token_version ?? 0;
       await cliente.query('COMMIT');
 
       // R17: el rol tiene que estar entre los ACTIVOS de ESTA inmobiliaria.
@@ -221,12 +240,22 @@ export class AuthService {
         throw new RolNoDisponibleError();
       }
 
+      // R5: sin sesión declarada no se puede elegir rol (la validación de
+      // sesión ya lo habría rechazado, pero el contrato lo exige explícito).
+      if (typeof jti !== 'string' || jti === '') {
+        throw new SesionInvalidaError();
+      }
+
       const payload: JwtTokenPayload = {
         sub: userId,
         email,
         tenant_id: tenantId,
         roles,
         rol_activo: rol,
+        // #27 (R3): MISMA sesión, versión actual. Elegir rol no abre una
+        // sesión nueva: la revocación sigue alcanzando al jti original.
+        jti,
+        ver,
       };
 
       // R21: acción crítica, se audita. El `metadata` lleva el rol elegido, que
@@ -247,6 +276,145 @@ export class AuthService {
     } finally {
       cliente.release();
     }
+  }
+
+  /**
+   * `POST /auth/refresh` — rotar el refresh y emitir un access nuevo (**R7**,
+   * R8, R9, R18, R19).
+   *
+   * ## Por qué esta ruta es la excepción al contexto de tenant
+   *
+   * No lleva access token y no puede saber su tenant hasta que encuentra la
+   * sesión: el hash se resuelve por `sesion_por_refresh_token` (R18), la
+   * única vía previa al contexto junto a `tenant_por_codigo` (R52). Una vez
+   * resuelto, TODO se revalida dentro de una transacción con `SET LOCAL` del
+   * tenant devuelto (R19): la función solo arranca el contexto, no es la
+   * barrera.
+   */
+  async refrescar(
+    refreshToken: string,
+  ): Promise<{ access_token: string; refresh_token: string }> {
+    if (typeof refreshToken !== 'string' || refreshToken === '') {
+      throw new SesionInvalidaError();
+    }
+    const hash = hashToken(refreshToken);
+
+    const cliente = await getDatabasePool(process.env.DATABASE_URL!).connect();
+    try {
+      // R18: bootstrap por coincidencia exacta de hash, sin contexto.
+      const { rows: bootstrap } = await cliente.query<{
+        id: string;
+        user_id: string;
+        tenant_id: string;
+        expira_en: Date;
+        revocada_at: Date | null;
+      }>('SELECT * FROM sesion_por_refresh_token($1)', [hash]);
+      const sesion = bootstrap[0];
+
+      // R9: inexistente, expirada o revocada → el mismo 401.
+      if (!sesion) throw new SesionInvalidaError();
+      if (sesion.revocada_at !== null) throw new SesionInvalidaError();
+      if (sesion.expira_en.getTime() <= Date.now()) throw new SesionInvalidaError();
+
+      // R19: relectura completa DENTRO del RLS del tenant resuelto.
+      await cliente.query('BEGIN');
+      await this.fijarTenant(cliente, sesion.tenant_id);
+      const fila = await this.sesiones.buscarPorId(cliente, sesion.id);
+
+      if (!fila) throw new SesionInvalidaError();
+      if (fila.revocada_at !== null) throw new SesionInvalidaError();
+      if (fila.expira_en.getTime() <= Date.now()) throw new SesionInvalidaError();
+      if (fila.user_id !== sesion.user_id || fila.tenant_id !== sesion.tenant_id) {
+        // La función y la relectura no coinciden: algo cambió entre medias.
+        throw new SesionInvalidaError();
+      }
+
+      // R8: reuso de un refresh ya rotado → la sesión completa muere, auditada.
+      if (fila.refresh_token_hash_anterior !== null && fila.refresh_token_hash_anterior === hash) {
+        await this.sesiones.revocar(cliente, sesion.id, 'refresh_token_reutilizado');
+        await cliente.query('COMMIT');
+        await this.audit.log({
+          tenantId: sesion.tenant_id,
+          actorId: sesion.user_id,
+          accion: 'auth.sesion_revocada_por_reuso',
+          entityType: 'sesion',
+          entityId: sesion.id,
+          metadata: { motivo: 'refresh_token_reutilizado' },
+        });
+        throw new SesionInvalidaError();
+      }
+      if (fila.refresh_token_hash !== hash) {
+        // Ni vigente ni huella anterior: no es el token de esta sesión.
+        throw new SesionInvalidaError();
+      }
+
+      // R7: rotación — el vigente pasa a huella, el nuevo manda.
+      const { refreshToken: nuevoRefresh } = await this.sesiones.rotar(cliente, sesion.id);
+
+      const roles = await this.rolesActivos(cliente, sesion.user_id);
+      const { rows: versiones } = await cliente.query<{ token_version: number }>(
+        'SELECT token_version FROM "user" WHERE id = $1',
+        [sesion.user_id],
+      );
+      const ver = versiones[0]?.token_version ?? 0;
+
+      // R12: tras revocar un rol, el access nuevo sale con el `ver` nuevo y
+      // sin el rol revocado; las rutas de ese rol vuelven a exigir 403.
+      const payload: JwtTokenPayload = {
+        sub: sesion.user_id,
+        email: null,
+        tenant_id: sesion.tenant_id,
+        roles,
+        jti: sesion.id,
+        ver,
+      };
+      const accessToken = this.jwtService.sign(payload);
+      await cliente.query('COMMIT');
+
+      await this.audit.log({
+        tenantId: sesion.tenant_id,
+        actorId: sesion.user_id,
+        accion: 'auth.refresh_emitido',
+        entityType: 'sesion',
+        entityId: sesion.id,
+      });
+
+      return { access_token: accessToken, refresh_token: nuevoRefresh };
+    } catch (error) {
+      await cliente.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      cliente.release();
+    }
+  }
+
+  /**
+   * `POST /auth/logout` — revocación de la sesión en el servidor (**R11**,
+   * R13). A partir de este momento el access token es 401 (R4): el cliente
+   * puede olvidarlo, pero el servidor no depende de que lo haga.
+   */
+  async cerrarSesion(jti: string, tenantId: string, userId: string): Promise<void> {
+    const cliente = await getDatabasePool(process.env.DATABASE_URL!).connect();
+    try {
+      await cliente.query('BEGIN');
+      await this.fijarTenant(cliente, tenantId);
+      await this.sesiones.revocar(cliente, jti, 'cierre_de_sesion');
+      await cliente.query('COMMIT');
+    } catch (error) {
+      await cliente.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      cliente.release();
+    }
+
+    await this.audit.log({
+      tenantId,
+      actorId: userId,
+      accion: 'auth.sesion_cerrada',
+      entityType: 'sesion',
+      entityId: jti,
+      metadata: { motivo: 'cierre_de_sesion' },
+    });
   }
 
   /**
@@ -274,6 +442,8 @@ export class AuthService {
     password: unknown,
   ): Promise<{
     access_token: string;
+    refresh_token: string;
+    expires_in: number;
     user: { id: string; email: string | null; nombre: string };
   }> {
     try {
@@ -295,8 +465,9 @@ export class AuthService {
         email: string;
         nombre: string;
         password_hash: string | null;
+        token_version: number;
       }>(
-        `SELECT id, email, nombre, password_hash FROM "user"
+        `SELECT id, email, nombre, password_hash, token_version FROM "user"
           WHERE email = $1 AND email IS NOT NULL AND tenant_id = $2`,
         [email, tenantId],
       );
@@ -320,6 +491,14 @@ export class AuthService {
       }
 
       const roles = await this.rolesActivos(cliente, encontrado.id);
+
+      // #27 (R6): el login abre una sesión. El refresh token en claro solo
+      // existe en la respuesta; en la base, solo su hash (R10).
+      const sesion = await this.sesiones.abrirSesion(cliente, {
+        userId: encontrado.id,
+        tenantId,
+      });
+
       await cliente.query('COMMIT');
 
       // R67: el token lleva los roles del ÚNICO tenant del usuario. `RolesGuard`
@@ -329,10 +508,24 @@ export class AuthService {
         email: encontrado.email,
         tenant_id: tenantId,
         roles,
+        // #27 (R3): la sesión y la versión viajan en el token.
+        jti: sesion.id,
+        ver: encontrado.token_version,
       };
+
+      // R13: apertura de sesión auditada, sin tokens ni PII en metadata.
+      await this.audit.log({
+        tenantId,
+        actorId: encontrado.id,
+        accion: 'auth.sesion_abierta',
+        entityType: 'sesion',
+        entityId: sesion.id,
+      });
 
       return {
         access_token: this.jwtService.sign(payload),
+        refresh_token: sesion.refreshToken,
+        expires_in: Number(process.env.JWT_EXPIRATION) || 3600,
         user: {
           id: encontrado.id,
           email: encontrado.email,

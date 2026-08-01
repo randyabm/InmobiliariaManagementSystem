@@ -42,6 +42,8 @@ interface IdentidadDelToken {
   email?: string | null;
   tenant_id?: string;
   roles?: Array<{ tenant_id: string; rol: string }>;
+  /** Id de la sesión (**R3**, #27). */
+  jti?: string;
 }
 
 @Controller('auth')
@@ -100,6 +102,46 @@ export class AuthController {
       tenantId,
       typeof dto?.rol === 'string' ? dto.rol : '',
       req.user.email ?? null,
+      req.user.jti,
     );
+  }
+
+  /**
+   * `POST /auth/refresh` — rotar el refresh token y emitir un access nuevo
+   * (**R7**, R8, R9, R18, R19).
+   *
+   * Es **público** a propósito: es el camino de recuperación cuando el access
+   * ya expiró o fue revocado; el credencial que se presenta es el propio
+   * refresh token. Resuelve su tenant por `sesion_por_refresh_token` (R18) y
+   * revalida todo dentro del RLS (R19). Un refresh inexistente, expirado,
+   * revocado o reutilizado responde el mismo 401 (`SESION_INVALIDA`).
+   */
+  @HttpCode(200)
+  @Post('refresh')
+  async refrescar(@Body() dto: { refresh_token?: unknown }) {
+    return this.authService.refrescar(
+      typeof dto?.refresh_token === 'string' ? dto.refresh_token : '',
+    );
+  }
+
+  /**
+   * `POST /auth/logout` — revocar la sesión en el servidor (**R11**, R13).
+   *
+   * Lleva `JwtAuthGuard`: revoca la sesión declarada en el `jti` del propio
+   * token, y la revocación queda auditada con actor, motivo y timestamp.
+   * Después del logout, el access token ya emitido responde 401.
+   */
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(200)
+  @Post('logout')
+  async cerrarSesion(@Request() req: { user: IdentidadDelToken }) {
+    const tenantId = req.user.tenant_id ?? req.user.roles?.[0]?.tenant_id;
+    if (tenantId === undefined) {
+      throw new UnauthorizedException('Token sin inmobiliaria');
+    }
+    if (typeof req.user.jti !== 'string' || req.user.jti === '') {
+      throw new UnauthorizedException('Token sin sesión');
+    }
+    await this.authService.cerrarSesion(req.user.jti, tenantId, req.user.sub);
   }
 }
