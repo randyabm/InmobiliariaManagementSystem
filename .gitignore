@@ -12,7 +12,6 @@ build/
 .env
 .env.*
 !.env.example
-ci/forgejo/.env
 *.pem
 *.key
 

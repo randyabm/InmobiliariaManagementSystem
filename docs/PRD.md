@@ -643,7 +643,7 @@ Esta sección fija las decisiones técnicas transversales tomadas para el MVP. E
 | **Orquestación** | **Docker Compose** en ZimaOS | Todo self-hostable, sin costos cloud recurrentes. |
 | **Pruebas** | **Vitest, Supertest, Testcontainers, Playwright** | Testcontainers es obligatorio para probar RLS contra un Postgres real; Playwright valida el flujo offline de la PWA. Ver sección 16. |
 | **Evals de IA** | **Promptfoo** (+ **Langfuse**) | Self-hosted y agnósticos de proveedor; incluyen red-teaming de *prompt injection* (RF-CB11). |
-| **CI** | **Gitea Actions / Forgejo** (self-hosted) | Coherente con la infraestructura propia; sin dependencias externas. |
+| **CI** | **GitHub Actions** | El pipeline reproduce el semáforo de `init.sh` (lint, typecheck, tests deterministas, tests de base de datos real con Testcontainers y build) en cada push/PR (feature #23). |
 
 ### 11.3 Invariantes de seguridad (no negociables, validados en cada entrega)
 
@@ -982,7 +982,7 @@ Todas las herramientas son **open source y self-hosted**, coherentes con la deci
 | **Frontend (componentes)** | **Vitest** + **Testing Library** | Coherente con React/TS |
 | **Carga y volumen** | **k6** (opcional) | Volumen de fotos y documentos (NFR escalabilidad) |
 
-- **RF-QA1**: Debe existir una suite de pruebas automatizadas que se ejecute en **CI self-hosted (Gitea Actions / Forgejo)** en cada cambio, y que bloquee la integración si falla.
+- **RF-QA1**: Debe existir una suite de pruebas automatizadas que se ejecute en **CI (GitHub Actions)** en cada cambio, y que bloquee la integración si falla.
 - **RF-QA2** (aislamiento): Deben existir pruebas específicas que verifiquen, contra una base de datos real, que **ningún endpoint devuelve datos de otro tenant** y que el RLS está activo (RF-A1, RF-C3).
 - **RF-QA3** (RBAC): Deben existir pruebas que verifiquen los límites de cada rol — que un inquilino no accede a datos de propietario, que un propietario solo ve sus inmuebles, etc.
 - **RF-QA4** (offline): Deben existir pruebas E2E que ejerciten el flujo de campo sin conexión: crear inventario offline, verificar el indicador de pendientes, restaurar conexión y validar la sincronización (automática y manual).
@@ -1014,7 +1014,7 @@ Herramientas **self-hosted y agnósticas de proveedor** — se configura el endp
 | Carga (opcional) | k6 | ✅ |
 | Evals de IA + red-teaming | **Promptfoo** | ✅ (agnóstico de proveedor) |
 | Observabilidad y datasets de IA | **Langfuse** | ✅ (Docker) |
-| CI | **Gitea Actions / Forgejo** | ✅ |
+| CI | **GitHub Actions** (`.github/workflows/ci.yml`) | ✅ |
 
 ---
 

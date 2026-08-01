@@ -937,3 +937,25 @@ del ingreso hacia contract*).
 **Línea base final:** `./init.sh` exit 0 (22 OK), `test` **871**, `test:db`
 **143**, lint/typecheck/build verdes. **27/27 features done — Fase 1
 completa.**
+
+### 2026-08-01 — Forgejo ELIMINADO por decisión del humano
+
+Se quitó Forgejo por completo del repositorio:
+
+- **Remote** `forgejo` eliminado (`git remote remove forgejo`) — incluía
+  credenciales en la URL (token); el remoto único es `origin` → GitHub.
+- **`.forgejo/`** (workflows) y **`ci/forgejo/`** (docker-compose,
+  config-runner, scripts, README) borrados.
+- **Tests** `ci-infraestructura.test.ts` (27) y `ci-flujo-trabajo.test.ts`
+  (15) eliminados y reemplazados por `tests/ci-github.test.ts` (7): valida
+  el workflow de GitHub Actions (el semáforo de init.sh en orden, sin
+  secretos) y sostiene la AUSENCIA de Forgejo (rutas, remote, PRD,
+  .gitignore) para que no vuelva.
+- **docs/PRD.md**: las tres decisiones de CI (tabla §11, RF-QA1, tabla
+  final) pasan de «Gitea Actions / Forgejo» a «GitHub Actions».
+- **feature_list.json #23**, `progress/current.md`,
+  `progress/impl_fase1_cierre.md` y `specs/ci_pipeline/` actualizados.
+
+Línea base tras la eliminación: `./init.sh` exit 0 (22 OK), `test` **838**
+(los 42 tests de Forgejo → 7 de GitHub), `test:db` **143**. El push
+pendiente solo depende de autorizar `origin` → GitHub.

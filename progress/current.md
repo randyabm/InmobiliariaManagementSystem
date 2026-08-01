@@ -29,8 +29,7 @@ versionado (#21–#22), CI (#23).
 
 ## Pendientes de decisión del humano
 
-1. **El push sigue sin hacerse.** Forgejo no responde en `127.0.0.1:3000`
-   (feature #23, aún sin montar). El remoto `origin` → GitHub no está
+1. **El push sigue sin hacerse.** El remoto `origin` → GitHub no está
    autorizado como destino.
 2. **PA-14** sigue abierta: quién da de alta una inmobiliaria y asigna su
    `codigo` (no hay RF-* de onboarding).
@@ -39,4 +38,5 @@ versionado (#21–#22), CI (#23).
 ## Cola
 
 - **#16–#20** — contratos y póliza (1c).
-- **#23** `ci_pipeline` — `pending` (Forgejo sin montar; bloquea el push).
+- **#23** `ci_pipeline` — `done` (GitHub Actions; Forgejo eliminado por
+   decisión del humano).

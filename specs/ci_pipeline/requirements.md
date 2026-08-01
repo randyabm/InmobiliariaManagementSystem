@@ -21,5 +21,5 @@ tests; las credenciales de base de datos son las de prueba (inertes).
 ## DECISIONES de la puerta
 | Id | Decisión |
 |---|---|
-| PA-23-1 | GitHub Actions (`.github/workflows/ci.yml`): Forgejo no está montado en el entorno y el remoto apunta a GitHub; el workflow es portable a Forgejo (misma sintaxis) cuando #23 original se monte |
+| PA-23-1 | GitHub Actions (`.github/workflows/ci.yml`) como único pipeline; Forgejo se eliminó por decisión del humano |
 | PA-23-2 | `test:db` corre con el servicio `postgres:16-alpine` del runner (Testcontainers ya lo usa) |

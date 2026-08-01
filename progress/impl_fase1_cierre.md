@@ -14,7 +14,7 @@ Línea base final: `./init.sh` exit 0 (22 OK), `npm run test` **871**,
 | #20 insurance_policy | RF-PI7/PI8: en_estudio → aprobada/rechazada con PDF en el repositorio documental |
 | #21 inventory_comparison | RF-I10: entrada vs salida ítem por ítem, solo lectura |
 | #22 inventory_versioning | RF-I6: versiones por ronda de negociación (snapshot_json) + EN_NEGOCIACION |
-| #23 ci_pipeline | GitHub Actions que reproduce el semáforo de init.sh (PA-23-1: portable a Forgejo) |
+| #23 ci_pipeline | GitHub Actions que reproduce el semáforo de init.sh |
 
 ## Correcciones de frontera en features previas
 - #9 (ingreso): test de frontera actualizado — el invariante es «sin FK del
@@ -29,10 +29,9 @@ PA-22-1/2, PA-23-1/2 — todas anotadas en sus specs.
 ## Deudas anotadas
 - #19-D: el IPC se carga manualmente (PA-19-1); un job programado puede
   disparar las alertas sin tocar el motor (PA-19-3).
-- #23-D: Forgejo no está montado en el entorno; el workflow es GitHub
-  Actions y portable a Forgejo cuando se monte.
-- Push pendiente (deuda global): Forgejo 127.0.0.1:3000 no responde;
-  origin → GitHub no autorizado.
+- Forgejo ELIMINADO por decisión del humano (remote, `.forgejo/`,
+  `ci/forgejo/`, tests e infraestructura): el CI es GitHub Actions.
+- Push pendiente (deuda global): origin → GitHub no autorizado.
 - Reviews formales (actas por feature) quedaron como resúmenes en
   history.md; las mutaciones se ejecutaron por feature (todas rojas en los
   puntos de riesgo).

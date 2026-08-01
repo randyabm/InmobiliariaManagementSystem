@@ -223,6 +223,6 @@ confunda con "no hay nada que probar".)
 - JWT, roles, guards y respuestas `403`/`404` por tenant → feature #3
   `auth_rbac`.
 - Tabla de auditoría append-only → feature #4 `audit_log`.
-- Pipeline de CI en Gitea Actions/Forgejo (RF-QA1): no figura en los
+- Pipeline de CI en GitHub Actions (RF-QA1): no figura en los
   criterios de aceptación de esta feature; ver decisión abierta en
   `design.md` §11.

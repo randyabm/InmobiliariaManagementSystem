@@ -304,7 +304,7 @@ El reviewer debe tratarlo como conocido, no como omisión.
    `pnpm >= 9` (no instalable hoy sin red/corepack en esta máquina).
 3. **Build tool del frontend.** El PRD dice "React + TypeScript" sin fijar
    bundler. Se propone Vite por coherencia con la PWA offline (D5).
-4. **CI (RF-QA1, Gitea Actions/Forgejo).** No está en los criterios de
+4. **CI (RF-QA1, GitHub Actions).** No está en los criterios de
    aceptación de esta feature; se deja **fuera de alcance**. Si el humano lo
    quiere aquí, se añade como feature o como tasks extra.
 5. **Node 26 en la máquina de desarrollo.** Muy por delante de la LTS
