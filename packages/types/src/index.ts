@@ -35,6 +35,19 @@ export type {
   WorkflowTransicionLog,
 } from './workflows';
 
+// Feature #10 notifications.
+export { CANALES_NOTIFICACION, ESTADOS_PENDIENTE, ESTADOS_PROGRAMADA } from './notificaciones';
+export type {
+  CanalNotificacion,
+  DestinatarioHook,
+  EstadoPendiente,
+  EstadoProgramada,
+  HookNotificacion,
+  NotificacionEnviada,
+  NotificacionPendiente,
+  NotificacionProgramada,
+} from './notificaciones';
+
 // Feature #8 property_lifecycle.
 export type {
   CicloVidaDePropiedad,

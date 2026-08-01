@@ -1037,4 +1037,102 @@ describe('Aplicación real de las migraciones (R10)', () => {
       expect(sigue[0]?.automatica).toBe(false);
     });
   });
+
+  // ─── Feature #10 notifications (T4: R1, R6, R10, R17) ───────────────────
+
+  describe('esquema de #10 (R1, R6, R10, R17)', () => {
+    const TABLAS_10 = [
+      'notificacion_pendiente',
+      'notificacion_enviada',
+      'notificacion_programada',
+    ] as const;
+
+    it.each(TABLAS_10)(
+      'la tabla %s existe con RLS habilitado Y FORZADO (R1/R6/R10)',
+      async (tabla) => {
+        const { rows } = await pool.query<{
+          relrowsecurity: boolean;
+          relforcerowsecurity: boolean;
+        }>(
+          `SELECT c.relrowsecurity, c.relforcerowsecurity
+             FROM pg_class c
+             JOIN pg_namespace n ON n.oid = c.relnamespace
+            WHERE n.nspname = 'public' AND c.relname = $1`,
+          [tabla],
+        );
+
+        expect(rows, `la tabla ${tabla} no existe`).toHaveLength(1);
+        expect(rows[0]?.relrowsecurity).toBe(true);
+        expect(rows[0]?.relforcerowsecurity).toBe(true);
+      },
+    );
+
+    it.each(TABLAS_10)(
+      'la política de aislamiento de %s filtra por app.current_tenant (R1/R6/R10)',
+      async (tabla) => {
+        const { rows } = await pool.query<{ polname: string; qual: string | null }>(
+          `SELECT policyname AS polname, qual
+             FROM pg_policies WHERE schemaname = 'public' AND tablename = $1`,
+          [tabla],
+        );
+
+        expect(rows.map((r) => r.polname)).toContain(`${tabla}_tenant_isolation`);
+        const politica = rows.find((r) => r.polname === `${tabla}_tenant_isolation`);
+        expect(politica?.qual).toContain('app.current_tenant');
+      },
+    );
+
+    it('notificacion_enviada es append-only incluso para el dueño (R6)', async () => {
+      const { rows: tenant } = await pool.query<{ id: string }>(
+        `INSERT INTO tenant (nombre, nit, codigo)
+         VALUES ('Notif', '900-010', 'notif')
+         ON CONFLICT (nit) DO UPDATE SET nombre = EXCLUDED.nombre
+         RETURNING id`,
+      );
+      const tenantId = tenant[0]?.id;
+      expect(tenantId).toBeDefined();
+
+      const { rows: enviada } = await pool.query<{ id: string }>(
+        `INSERT INTO notificacion_enviada (tenant_id, canal, destinatario, estado)
+         VALUES ($1, 'CORREO', 'x@example.com', 'PROCESADA') RETURNING id`,
+        [tenantId],
+      );
+      const enviadaId = enviada[0]?.id;
+
+      await expect(
+        pool.query(
+          `UPDATE notificacion_enviada SET destinatario = 'otro@example.com' WHERE id = $1`,
+          [enviadaId],
+        ),
+      ).rejects.toThrow(/append-only/i);
+
+      await expect(
+        pool.query('DELETE FROM notificacion_enviada WHERE id = $1', [enviadaId]),
+      ).rejects.toThrow(/append-only/i);
+
+      const { rows: sigue } = await pool.query<{ destinatario: string }>(
+        'SELECT destinatario FROM notificacion_enviada WHERE id = $1',
+        [enviadaId],
+      );
+      expect(sigue[0]?.destinatario).toBe('x@example.com');
+    });
+
+    it('los CHECK de estado de las tres tablas existen (R1/R6/R10)', async () => {
+      const { rows } = await pool.query<{ conname: string }>(
+        `SELECT conname FROM pg_constraint
+          WHERE conrelid IN ('notificacion_pendiente'::regclass,
+                             'notificacion_enviada'::regclass,
+                             'notificacion_programada'::regclass)
+            AND contype = 'c'`,
+      );
+      const nombres = rows.map((r) => r.conname);
+      expect(nombres).toEqual(
+        expect.arrayContaining([
+          'notificacion_pendiente_estado_check',
+          'notificacion_enviada_estado_check',
+          'notificacion_programada_estado_check',
+        ]),
+      );
+    });
+  });
 });

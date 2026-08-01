@@ -39,3 +39,6 @@ export { workflowEstado } from './workflow-estado';
 export { workflowTransicion } from './workflow-transicion';
 export { workflowInstancia } from './workflow-instancia';
 export { workflowTransicionLog } from './workflow-transicion-log';
+export { notificacionPendiente } from './notificacion-pendiente';
+export { notificacionEnviada } from './notificacion-enviada';
+export { notificacionProgramada } from './notificacion-programada';

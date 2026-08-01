@@ -47,6 +47,9 @@ const archivosSql = readdirSync(rutaRepo(CARPETA))
  * Las cinco tablas `workflow_*` se crearon en la feature #7
  * `workflow_engine` (R1, R2, R6, R12), con RLS habilitado y forzado en la
  * misma migración.
+ * Las tres tablas `notificacion_*` se crearon en la feature #10
+ * `notifications` (R1, R6, R10), con RLS habilitado y forzado en la misma
+ * migración.
  */
 const TABLAS_PERMITIDAS: readonly string[] = [
   'tenant',
@@ -69,6 +72,9 @@ const TABLAS_PERMITIDAS: readonly string[] = [
   'workflow_transicion',
   'workflow_instancia',
   'workflow_transicion_log',
+  'notificacion_pendiente',
+  'notificacion_enviada',
+  'notificacion_programada',
 ];
 
 describe('Migración inicial (R10)', () => {
