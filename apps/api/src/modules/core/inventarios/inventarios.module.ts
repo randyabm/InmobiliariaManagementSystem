@@ -8,6 +8,8 @@ import { PlantillasModule } from '../plantillas/plantillas.module';
 import { FirmaPdfController } from './firma/firma-pdf.controller';
 import { FirmaPdfRepository } from './firma/firma-pdf.repository';
 import { FirmaPdfService } from './firma/firma-pdf.service';
+import { ComparacionInventariosController } from './comparacion-inventarios.controller';
+import { ComparacionInventariosService } from './comparacion-inventarios.service';
 import { InventariosController } from './inventarios.controller';
 import { InventariosRepository } from './inventarios.repository';
 import { InventariosService } from './inventarios.service';
@@ -30,7 +32,7 @@ import { RevisionInventarioService } from './revision-inventario.service';
     NotificacionesModule,
     OtpModule,
   ],
-  controllers: [InventariosController, RevisionInventarioController, FirmaPdfController],
+  controllers: [InventariosController, RevisionInventarioController, FirmaPdfController, ComparacionInventariosController],
   providers: [
     InventariosRepository,
     InventariosService,
@@ -38,6 +40,7 @@ import { RevisionInventarioService } from './revision-inventario.service';
     RevisionInventarioService,
     FirmaPdfRepository,
     FirmaPdfService,
+    ComparacionInventariosService,
   ],
   exports: [InventariosService],
 })
