@@ -154,3 +154,34 @@ Las **23 tasks pendientes** quedan hechas. Informe completo:
 **Estado:** #5 sigue en `in_progress`, a la espera del reviewer. Quedan cuatro
 decisiones abiertas para el humano, listadas al final del informe (la más
 relevante: D-9 deja el alta sin deduplicar identidad dentro del tenant).
+
+---
+
+## Sesión — implementación de #26 `identidad_multirol_cliente` (T1–T31)
+
+Las **31 tasks** quedan hechas. Informe completo:
+`progress/impl_identidad_multirol_cliente.md`.
+
+- La identidad de un cliente se deduplica por **documento dentro de la
+  inmobiliaria** (migración `0009`, índice único parcial). Quien es propietario
+  **e** inquilino de la misma agencia es ahora **una** persona con **una**
+  credencial y dos roles. Cierra la deuda **D5**.
+- Nombre divergente al deduplicar → **409** `NOMBRE_NO_COINCIDE_CON_IDENTIDAD`
+  con cuerpo accionable y **sin escribir nada** (verificado con `SELECT`).
+- El token puede declarar `rol_activo` (`POST /auth/rol-activo`), que
+  **restringe y nunca amplía**. **No** se implementa revocación: es la #27.
+- **D-8 intacta**: la reutilización entre inmobiliarias sigue prohibida, con
+  test dedicado y mutación que lo demuestra.
+- Deudas **D4** (`init.sh` falla si las dos URLs coinciden) y **D6** (el spec de
+  la #5 ya no dice "identidad siempre nueva") saldadas.
+- Seis mutaciones verificadas, todas en rojo (tabla con números reales en el
+  informe). La lista blanca del guard anti-DDL **no se amplió**.
+- Defecto latente corregido de paso: `AuthModule` congelaba `JWT_SECRET` al
+  importar el archivo y la API rechazaba sus propios tokens.
+- `./init.sh` en verde: **452** tests + **71** de `test:db`.
+
+**Estado:** #26 sigue en `in_progress`, a la espera del reviewer. Cuatro
+decisiones abiertas al final del informe; la más relevante para el humano:
+**PA-5** (¿se pliegan las tildes al comparar nombres?) y que el **portal del
+cliente (RF-AU2/AU4) no existe como feature**, así que R18 no se puede demostrar
+sobre rutas de cliente todavía.
