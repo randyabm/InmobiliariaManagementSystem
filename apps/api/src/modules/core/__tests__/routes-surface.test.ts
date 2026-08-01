@@ -171,6 +171,10 @@ const RUTAS_PERMITIDAS = [
   // ─── Feature #22 inventory_versioning: 2 rutas (R5, design.md §2) ──────
   'POST /inventarios/:id/negociar',
   'GET /inventarios/:id/versiones',
+  // ─── Feature #29 inventory_paper_format: 3 rutas (R4, design.md §1) ────
+  'POST /inventarios/:id/formato-papel',
+  'POST /inventarios/:id/reconstruir',
+  'POST /inventarios/:id/confirmar-papel',
   // ─── Feature #7 workflow_engine: 9 rutas (R17, design.md §8) ───────────
   // Gestión de definiciones: solo `admin` (RF-W2). Instancias y ejecución:
   // `@Roles('admin','empleado')`.

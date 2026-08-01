@@ -589,7 +589,7 @@
       "name": "inventory_paper_format",
       "phase": "2",
       "sdd": true,
-      "status": "spec_ready",
+      "status": "done",
       "title": "Formato de inventario en papel y reconstrucción digital (RF-I19–I21, §10.5)",
       "prd_refs": [
         "RF-I19",
@@ -605,7 +605,7 @@
       "name": "payment_reconciliation",
       "phase": "3",
       "sdd": true,
-      "status": "spec_ready",
+      "status": "in_progress",
       "title": "Conciliación de pagos (RF-PA1–PA15, §15, D9) — el sistema no procesa pagos",
       "prd_refs": [
         "RF-PA1",
