@@ -386,7 +386,7 @@
       "name": "inventory_signature_pdf",
       "phase": "1b",
       "sdd": true,
-      "status": "spec_ready",
+      "status": "in_progress",
       "title": "Firma electrónica y PDF del inventario",
       "prd_refs": [
         "RF-I8",
@@ -409,7 +409,7 @@
       "name": "pwa_offline",
       "phase": "1b",
       "sdd": true,
-      "status": "in_progress",
+      "status": "done",
       "title": "PWA de campo con soporte offline",
       "prd_refs": [
         "RF-I14",

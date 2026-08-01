@@ -4,11 +4,11 @@
 > `history.md`. Mientras trabajas, **mantenlo actualizado en tiempo real**,
 > no al final.
 
-- **Feature en curso:** batch: **#12 y #13 `done`** (review APPROVED),
-  **#15 `pwa_offline`** (implementada, 17/17 tasks, esperando **review**),
-  **#14 `inventory_signature_pdf`** (spec_ready — después de #15).
-- **Agente:** implementer terminó #15 → reviewer (mutaciones) → humano
-  autoriza `done` → luego #14.
+- **Feature en curso:** **#14 `inventory_signature_pdf`** (spec_ready →
+  en implementación; depende de #13, que ya entregó el OTP FIRMA). #12,
+  #13 y #15 `done`.
+- **Agente:** implementer sobre #14 → reviewer (mutaciones) → humano
+  autoriza `done`.
 - **Estado:** meta de la sesión: **completar la fase 1** (1b + 1c + #23).
 
 ## UI del proyecto
@@ -18,21 +18,13 @@ scaffold (#1); `apps/pwa` no existe; el tablero no tiene features de
 frontend. Las features de la fase 1 son backend (API). La PWA de campo
 (#15) será el primer cliente real de inventarios.
 
-## Cerradas (17)
+## Cerradas (18)
 
-#1–#5, #24, #25–#27, #6–#13.
+#1–#5, #24, #25–#27, #6–#13, #15.
 
 ## En review
 
-- **#15 `pwa_offline`** — implementación completa:
-  - Suite: `npm run test` **799** (incluye 11 de la PWA) + `npm run test:db` **140**.
-  - Lint, typecheck y build (monorepo + PWA) verdes; `./init.sh` exit 0 (22 OK).
-  - Trazabilidad R1–R12 → test en `progress/impl_pwa_offline.md`.
-  - PA-15-1..4 ejecutadas; E2E de pérdida de conexión, conflicto y sesión.
-  - **Errata de #12 corregida:** R6 (RF-I24) estaba incompleto — faltaban
-    las 4 rutas de crear/borrar zonas e ítems; añadidas con tests (15
-    rutas de inventarios).
-- **#14 `inventory_signature_pdf`** — spec_ready (después de #15).
+- **#14 `inventory_signature_pdf`** — en implementación.
 
 ## Pendientes de decisión del humano
 

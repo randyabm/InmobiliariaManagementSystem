@@ -849,3 +849,29 @@ El humano autorizó cerrar #12 y #13 tras el review con mutaciones
 
 Línea base al cierre: `./init.sh` exit 0 (22 OK), `test` **786**,
 `test:db` **140**, lint/typecheck/build verdes.
+
+### 2026-08-01 — #15 `pwa_offline` cerrada (`done`)
+
+Review APPROVED (`f4d8efb`) con 3 mutaciones rojas y 1 fix del reviewer.
+
+- **La primera app de FRONTEND real del repositorio:** workspace
+  `apps/pwa` (React+Vite, instalable, SW cache-first del shell).
+- IndexedDB (`idb`) con tres stores: inventarios, cola por operación con
+  versión base (PA-15-2), caché (propiedades, plantillas, refresh token —
+  nunca `localStorage`, R10).
+- Motor de sync: pasadas ITERATIVAS (fix del reviewer: el de una pasada
+  dejaba hijos sin enviar), padres antes que hijos (R8), confirmación solo
+  con 2xx, conflicto por `updated_at` divergente con decisión manual
+  local/remoto (R6, PA-15-3), retry sin perder la cola, sin superposición.
+- Compresión canvas → WebP/JPEG ≤1280 px 0.7 con EXIF (R9, PA-15-4); el
+  binario viaja como ArrayBuffer (los Blobs no sobreviven el clonado de
+  IndexedDB).
+- Cliente API con transporte inyectable (E2E R11): 401 → refresh rotado en
+  IndexedDB → reintento → logout.
+- **Errata de #12 corregida:** R6 (RF-I24) incompleto — faltaban
+  `POST/DELETE` de zonas e ítems; 4 rutas añadidas con tests (15 rutas de
+  inventarios; el editor offline las usa).
+- Deuda: D-1 `refrescarCache` sin zonas (ficha por GET al abrir); D-2 UI
+  mínima (el motor es el entregable); D-3 tope defensivo de pasadas.
+
+Línea base: `./init.sh` exit 0, `test` **800**, `test:db` **140**.
