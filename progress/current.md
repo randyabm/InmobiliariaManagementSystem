@@ -4,9 +4,30 @@
 > `history.md`. Mientras trabajas, **mantenlo actualizado en tiempo real**,
 > no al final.
 
-- **Feature en curso:** _ninguna_ — la #10 `notifications` quedó `done` el
-  2026-08-01. **14 features cerradas** (fase 1a completa + #10).
-- **Agente:** — (sesión cerrada)
+- **Feature en curso:** #11 `inventory_templates` — status **`spec_ready`**
+- **Agente:** leader → spec_author (3 archivos listos) → ⏸ **HUMANO**
+- **Estado:** ⏸ **esperando la aprobación del spec.** Meta de la sesión:
+  **completar la fase 1** (1b + 1c + #23).
+
+## Espec — `specs/inventory_templates/`
+
+Plantillas de inmuebles (§8.8, RF-I2/I22/I23). 15 requirements (R1–R15),
+22 tasks (11 de test). Reutiliza el patrón de plantillas del sistema de #7
+(tenant reservado + RLS OR/WITH CHECK). `./init.sh` verde (706 + 116 tests)
+antes de redactar el spec.
+
+## Decisiones técnicas que el humano debe confirmar (design.md §10)
+
+1. **PA-11-1 — Plantillas del sistema con `tenant_id` reservado** (mismo
+   patrón que #7): una sola tabla, la escritura de filas del sistema
+   bloqueada por el motor.
+2. **PA-11-2 — Seed:** APARTAMENTO con el ejemplo completo del PRD §8.8.5;
+   las otras cinco (CASA/LOCAL/OFICINA/BODEGA/PARQUEADERO) como plantillas
+   **sin zonas** — el PRD no las enumera y no se inventa producto.
+3. **PA-11-3 — La materialización (snapshot + libertad ad-hoc) es #12**
+   (RF-I24): #11 entrega el molde y su gestión.
+4. **PA-11-4 — Gestión solo `admin`** (clonar/zonas/ítems); lectura
+   admin/empleado. `opciones_json` solo con `field_type = 'seleccion'`.
 
 ## Pendientes de decisión del humano
 
