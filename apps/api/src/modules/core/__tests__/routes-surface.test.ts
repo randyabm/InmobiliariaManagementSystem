@@ -64,6 +64,18 @@ const RUTAS_PERMITIDAS = [
   'DELETE /propiedades/:idPropiedad/documentos/:idDocumento',
   'POST /propiedades/:id/fotos',
   'DELETE /propiedades/:id/fotos',
+  // ─── Feature #7 workflow_engine: 9 rutas (R17, design.md §8) ───────────
+  // Gestión de definiciones: solo `admin` (RF-W2). Instancias y ejecución:
+  // `@Roles('admin','empleado')`.
+  'GET /workflows',
+  'GET /workflows/:id',
+  'POST /workflows/:id/clonar',
+  'POST /workflows/:id/transiciones',
+  'DELETE /workflows/:idDefinicion/transiciones/:idTransicion',
+  'POST /workflows/:id/instancias',
+  'GET /workflows/instancias/:idInstancia',
+  'POST /workflows/instancias/:idInstancia/transiciones/:idTransicion',
+  'GET /workflows/instancias/:idInstancia/historial',
   // ─── Feature #25 retencion_codeudor_referencias: 10 rutas (R25, design §5) ─
   // `@Roles('admin','empleado')` (R20). Todas con @UseGuards(JwtAuthGuard,
   // RolesGuard). Sus tres tests obligatorios están en `retencion.test.ts`,

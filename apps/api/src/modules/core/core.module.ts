@@ -7,6 +7,7 @@ import { AuditModule } from './audit/audit.module';
 import { AlmacenamientoModule } from './almacenamiento/almacenamiento.module';
 import { ClientesModule } from './clientes/clientes.module';
 import { PropiedadesModule } from './propiedades/propiedades.module';
+import { WorkflowsModule } from './workflows/workflows.module';
 
 /**
  * Módulo transversal: tenant, auth, usuarios, roles y auditoría viven aquí
@@ -16,7 +17,8 @@ import { PropiedadesModule } from './propiedades/propiedades.module';
  * Contiene healthcheck (#1), auth (#3), auditoría (#4), la hoja de vida de
  * propietario e inquilino (#5, `ClientesModule`), el almacenamiento
  * compartido (#6, `AlmacenamientoModule`) y la hoja de vida del inmueble
- * (#6, `PropiedadesModule`).
+ * (#6, `PropiedadesModule`) y el motor de workflows
+ * (#7, `WorkflowsModule`).
  */
 @Module({
   imports: [
@@ -25,9 +27,17 @@ import { PropiedadesModule } from './propiedades/propiedades.module';
     AlmacenamientoModule,
     ClientesModule,
     PropiedadesModule,
+    WorkflowsModule,
   ],
   controllers: [HealthController],
   providers: [HealthService],
-  exports: [HealthService, AuthModule, AuditModule, ClientesModule, PropiedadesModule],
+  exports: [
+    HealthService,
+    AuthModule,
+    AuditModule,
+    ClientesModule,
+    PropiedadesModule,
+    WorkflowsModule,
+  ],
 })
 export class CoreModule {}
