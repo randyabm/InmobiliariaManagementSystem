@@ -8,7 +8,9 @@ import {
   esCodigoDeInmobiliariaValido,
   normalizarCodigoDeInmobiliaria,
 } from './codigo-inmobiliaria';
+import { AuditService } from '../audit/audit.service';
 import { CodigoDeInmobiliariaInvalidoError } from './errors/codigo-de-inmobiliaria-invalido.error';
+import { RolNoDisponibleError } from './errors/rol-no-disponible.error';
 
 interface LoginDto {
   /** Código de la inmobiliaria en la que se entra (**R63**, D-12). */
@@ -22,6 +24,15 @@ interface JwtTokenPayload {
   email: string | null;
   tenant_id: string;
   roles: Array<{ tenant_id: string; rol: string }>;
+  /**
+   * Rol con el que la persona ha elegido actuar (**R16**, #26).
+   *
+   * **Opcional a propósito**: su ausencia es exactamente el comportamiento
+   * anterior a esta feature (**R20**), así que ningún token ya emitido queda
+   * invalidado y quien no elige rol —empleados, administradores— no nota nada.
+   * Cuando está presente, **restringe**; nunca amplía (`roles.guard.ts`).
+   */
+  rol_activo?: string;
 }
 
 /**
@@ -77,7 +88,10 @@ export function normalizarEmailDeLogin(email: unknown): string | null {
  */
 @Injectable()
 export class AuthService {
-  constructor(private readonly jwtService: JwtService) {}
+  constructor(
+    private readonly jwtService: JwtService,
+    private readonly audit: AuditService,
+  ) {}
 
   async login(dto: LoginDto): Promise<{
     access_token: string;
@@ -148,6 +162,85 @@ export class AuthService {
       const roles = await this.rolesActivos(cliente, userId);
       await cliente.query('COMMIT');
       return { ...encontrado, roles };
+    } catch (error) {
+      await cliente.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      cliente.release();
+    }
+  }
+
+  /**
+   * `POST /auth/rol-activo` — elegir con qué rol se actúa (**R16**, **R17**,
+   * **R19**, **R21**).
+   *
+   * Emite un `access_token` **nuevo** que declara `rol_activo`. El anterior
+   * sigue siendo válido hasta que expire; esta feature no revoca nada.
+   *
+   * ## El rol se comprueba contra la BASE DE DATOS, no contra el token
+   *
+   * **R19.** Un token es un dato firmado pero **viejo**: si el rol se revocó
+   * después de emitirlo, seguiría listándolo. Aceptar el rol "porque el token
+   * lo dice" convertiría cada emisión en una prórroga automática de un permiso
+   * que quizá ya no existe. Aquí se consulta `user_role` con `activo = true`
+   * dentro del contexto de la inmobiliaria del token.
+   *
+   * ## Lo que esta feature NO cierra (PA-3, decisión del humano)
+   *
+   * Si el rol se revoca **después** de emitir este token, el token lo sigue
+   * concediendo hasta que expire. Esa ventana **no se acepta**, y **no se
+   * cierra aquí**: la cierra la feature **#27 `sesion_y_revocacion`** (refresh
+   * tokens, revocación inmediata, cierre de sesión en servidor y auditoría de
+   * la revocación), que ya está encolada. **#26 no implementa revocación**: se
+   * limita a no empeorar el problema y a dejarle a #27 el claim sobre el que
+   * construir.
+   */
+  async elegirRolActivo(
+    userId: string,
+    tenantId: string,
+    rol: string,
+    email: string | null = null,
+  ): Promise<{ access_token: string; rol_activo: string }> {
+    const cliente = await getDatabasePool(process.env.DATABASE_URL!).connect();
+    try {
+      await cliente.query('BEGIN');
+      await this.fijarTenant(cliente, tenantId);
+
+      const roles = await this.rolesActivos(cliente, userId);
+      await cliente.query('COMMIT');
+
+      // R17: el rol tiene que estar entre los ACTIVOS de ESTA inmobiliaria.
+      // `rolesActivos` corre bajo el contexto de tenant, así que el RLS ya ha
+      // descartado los de cualquier otra; el `filter` es la doble barrera de
+      // siempre.
+      const disponible = roles.some(
+        (r) => r.tenant_id === tenantId && r.rol === rol,
+      );
+      if (!disponible) {
+        // Ningún token se emite. El mensaje no dice qué roles sí tiene.
+        throw new RolNoDisponibleError();
+      }
+
+      const payload: JwtTokenPayload = {
+        sub: userId,
+        email,
+        tenant_id: tenantId,
+        roles,
+        rol_activo: rol,
+      };
+
+      // R21: acción crítica, se audita. El `metadata` lleva el rol elegido, que
+      // no es dato personal.
+      await this.audit.log({
+        tenantId,
+        actorId: userId,
+        accion: 'auth.rol_activo_elegido',
+        entityType: 'user',
+        entityId: userId,
+        metadata: { rol },
+      });
+
+      return { access_token: this.jwtService.sign(payload), rol_activo: rol };
     } catch (error) {
       await cliente.query('ROLLBACK').catch(() => undefined);
       throw error;

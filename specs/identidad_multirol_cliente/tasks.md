@@ -108,30 +108,30 @@
 
 ## Bloque B — Vista como propietario o como inquilino
 
-- [ ] **T19** — `POST /auth/rol-activo`: `AuthService.elegirRolActivo` valida el
+- [x] **T19** — `POST /auth/rol-activo`: `AuthService.elegirRolActivo` valida el
       rol contra `user_role` activo **en base de datos** dentro del contexto de
       tenant, y emite el token con el claim `rol_activo`. **Cubre: R16, R17, R19.**
       *No implementa revocación: eso es la feature #27 (ver R19).*
-- [ ] **T20** — `RolNoDisponibleError` (403) con mensaje genérico + registro en
+- [x] **T20** — `RolNoDisponibleError` (403) con mensaje genérico + registro en
       el controlador y en el mapa de errores del borde HTTP. **Cubre: R17, R29.**
-- [ ] **T21** — `jwt.strategy.ts` propaga `rol_activo`; `roles.guard.ts` aplica
+- [x] **T21** — `jwt.strategy.ts` propaga `rol_activo`; `roles.guard.ts` aplica
       el algoritmo de `design.md` §6 (`rolesEfectivos ⊆ rolesDelTenant`), con la
       comprobación de coherencia interna del token.
       **Cubre: R18, R20, R29.**
-- [ ] **T22** — Auditoría `auth.rol_activo_elegido` en la emisión. **Cubre: R21.**
-- [ ] **T23** — Tests funcionales de `GET /auth/me` (hoy sin ninguno — deuda D3):
+- [x] **T22** — Auditoría `auth.rol_activo_elegido` en la emisión. **Cubre: R21.**
+- [x] **T23** — Tests funcionales de `GET /auth/me` (hoy sin ninguno — deuda D3):
       200 con perfil y roles del tenant del token; no incluye roles de otra
       inmobiliaria; 401 sin token. **Cubre: R15, R22.**
-- [ ] **T24** — Test API del selector: identidad propietario+inquilino elige
+- [x] **T24** — Test API del selector: identidad propietario+inquilino elige
       `propietario` → los endpoints de propietario responden 200 y los que exigen
       rol `inquilino` responden **403** con el mismo token; y a la inversa.
       **Cubre: R18, R23.**
-- [ ] **T25** — Test API: elegir un rol no poseído → 403 y **ningún** token
+- [x] **T25** — Test API: elegir un rol no poseído → 403 y **ningún** token
       emitido, con la comprobación hecha contra `user_role` en base de datos
       (se revoca el rol en la base y la emisión pasa a fallar, aunque el token
       del solicitante siga listándolo); token cuyo `rol_activo` no figura entre
       los roles del propio token → 403. **Cubre: R17, R19, R23, R29.**
-- [ ] **T26** — Test de regresión de compatibilidad: token **sin** `rol_activo`
+- [x] **T26** — Test de regresión de compatibilidad: token **sin** `rol_activo`
       autoriza exactamente igual que antes de esta feature (empleado y admin
       sobre las rutas existentes). **Cubre: R20.**
 

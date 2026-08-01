@@ -59,12 +59,62 @@ export class RolesGuard implements CanActivate {
     request.tenantResuelto = tenantId;
 
     const rolesDelTenant = user.roles.filter((r) => r.tenant_id === tenantId);
-    const tieneRol = rolesDelTenant.some((r) => requiredRoles.includes(r.rol));
+    const rolesEfectivos = this.rolesEfectivos(
+      rolesDelTenant,
+      (user as { rol_activo?: unknown }).rol_activo,
+    );
+    const tieneRol = rolesEfectivos.some((rol) => requiredRoles.includes(rol));
 
     if (!tieneRol) {
       throw new ForbiddenException('Rol insuficiente');
     }
 
     return true;
+  }
+
+  /**
+   * Conjunto de roles con los que la petición queda autorizada (**R18**,
+   * **R20**, **R29**, #26).
+   *
+   * ```
+   * si el token trae rol_activo:
+   *     si rol_activo ∉ rolesDelTenant   → 403           (coherencia, R29)
+   *     rolesEfectivos = { rol_activo }                  (R18)
+   * si no:
+   *     rolesEfectivos = rolesDelTenant                  (R20)
+   * ```
+   *
+   * **La propiedad que importa** es que `rolesEfectivos` es siempre un
+   * **subconjunto** de `rolesDelTenant`: por construcción, elegir un rol no
+   * puede autorizar nada que el conjunto completo no autorizara ya. Elegir
+   * "propietario" **quita** el acceso a lo de inquilino; no se limita a
+   * ocultarlo en el frontend.
+   *
+   * **Qué se comprueba aquí y qué no.** Solo la **coherencia interna del
+   * token** (R29): es barato, no consulta la base y basta para que un
+   * `rol_activo` manipulado no amplíe el conjunto autorizado. La comprobación
+   * **contra la base de datos** ocurre una sola vez, en la emisión
+   * (`POST /auth/rol-activo`, R19). La ventana entre revocar un rol y que el
+   * token expire la cierra la feature **#27**, no esta.
+   */
+  private rolesEfectivos(
+    rolesDelTenant: Array<{ rol: string }>,
+    rolActivo: unknown,
+  ): string[] {
+    const roles = rolesDelTenant.map((r) => r.rol);
+
+    // R20: sin `rol_activo` se autoriza exactamente como antes de la #26.
+    // Ningún token ya emitido cambia de comportamiento.
+    if (typeof rolActivo !== 'string' || rolActivo === '') {
+      return roles;
+    }
+
+    // R29: un `rol_activo` que el propio token no respalda es incoherente, y un
+    // token incoherente no autoriza nada.
+    if (!roles.includes(rolActivo)) {
+      throw new ForbiddenException('Rol activo no disponible');
+    }
+
+    return [rolActivo];
   }
 }

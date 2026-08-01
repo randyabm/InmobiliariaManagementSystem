@@ -19,6 +19,11 @@ const RUTAS_PERMITIDAS = [
   'GET /auth/me',
   'GET /health',
   'POST /auth/login',
+  // ─── Feature #26 identidad_multirol_cliente: 1 ruta (R16, design.md §5) ──
+  // Elegir con qué rol se actúa. Solo `JwtAuthGuard`: cualquier identidad
+  // autenticada elige entre SUS roles, y el 403 de R17 lo decide el servicio
+  // contra `user_role` en base de datos, no un `@Roles(...)` en el borde.
+  'POST /auth/rol-activo',
   // ─── Feature #5 owner_tenant_profiles: 13 rutas (R37, design.md §5) ─────
   // Todas con @UseGuards(JwtAuthGuard, RolesGuard) y @Roles('admin','empleado').
   // Sus tres tests obligatorios (camino feliz autorizado, rechazo por rol y
