@@ -494,9 +494,9 @@ describe('Aplicación real de las migraciones (R10)', () => {
 
     it('no hay ninguna OTRA función SECURITY DEFINER sobre `user` (R52, R18, R3, R53)', async () => {
       // R52 decía "única ruta", R18 (feature #27) añadió la del refresh, R3
-      // (feature #10) la del procesador de notificaciones y R53 (feature #13)
-      // la de la invitación. Si mañana alguien abre una quinta puerta que
-      // evite el RLS, este test la ve.
+      // (feature #10) la del procesador de notificaciones, R53 (feature #13)
+      // la de la invitación y R54 (feature #32) la del CORS por tenant. Si
+      // mañana alguien abre una sexta puerta que evite el RLS, este test la ve.
       const { rows } = await pool.query<{ proname: string }>(
         `SELECT p.proname
            FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
@@ -508,6 +508,7 @@ describe('Aplicación real de las migraciones (R10)', () => {
         'invitacion_por_token',
         'notificaciones_tenants_a_procesar',
         'sesion_por_refresh_token',
+        'tenant_dominio_por_origen',
         'tenant_por_codigo',
       ]);
     });

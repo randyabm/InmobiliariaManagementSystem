@@ -9,6 +9,7 @@ import { Inventarios } from './vistas/Inventarios';
 import { Contratos } from './vistas/Contratos';
 import { Clientes } from './vistas/Clientes';
 import { Plantillas } from './vistas/Plantillas';
+import { Pagos, Tickets } from './vistas/Operaciones';
 
 /**
  * Panel web de administración (feature #28, PA-28-1): navegación por
@@ -34,6 +35,8 @@ export function App(props: { cliente?: ClienteWeb } = {}): JSX.Element {
     dashboard: <Dashboard api={api} />,
     inventarios: <Inventarios api={api} />,
     contratos: <Contratos api={api} />,
+    tickets: <Tickets api={api} />,
+    pagos: <Pagos api={api} />,
     clientes: <Clientes api={api} />,
     plantillas: <Plantillas api={api} />,
   };

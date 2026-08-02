@@ -12,14 +12,13 @@ import { loadAppConfig } from '../../../config';
 import { buildCorsOptions } from '../cors-options';
 
 describe('Configuración de CORS (R18)', () => {
-  it('produce una lista explícita de orígenes, nunca un comodín', () => {
+  it('produce una función de resolución (lista explícita + CORS por tenant)', () => {
     const opciones = buildCorsOptions(loadAppConfig({ ...ENTORNO_DE_PRUEBA }));
 
-    expect(Array.isArray(opciones.origin)).toBe(true);
-    expect(opciones.origin).toEqual([
-      'http://localhost:5173',
-      'https://panel.example.com',
-    ]);
+    // Desde #32 (RF-INT4) el origin es un callback: lista configurada
+    // (camino rápido) + `tenant_dominio_por_origen` para dominios del
+    // tenant. El comodín y `true` siguen prohibidos por construcción.
+    expect(typeof opciones.origin).toBe('function');
     expect(opciones.origin).not.toBe(true);
     expect(opciones.origin).not.toBe('*');
   });

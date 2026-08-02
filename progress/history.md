@@ -1022,3 +1022,16 @@ implementación autónoma.
   probada DETERMINISTA (§16.1).
 
 Línea base: `./init.sh` exit 0, `test` **884**, `test:db` **143**.
+
+### 2026-08-01 — CORS por tenant (RF-INT4) y vistas de Tickets/Pagos en el panel
+
+- **CORS por tenant**: migración 0028 con la 5ª vía SECURITY DEFINER
+  `tenant_dominio_por_origen` (R54); `buildCorsOptions` pasó de lista
+  estática a callback: camino rápido con `CORS_ORIGINS` + resolución por
+  `tenant_dominio` (dominios del tenant permitidos, los demás sin cabeceras
+  CORS). Inventario de funciones SECURITY DEFINER: 5 entradas.
+- **UI**: secciones `Tickets` (listado con estado) y `Pagos`
+  (importaciones con sus tres grupos) en el panel web; mock ampliado y 2
+  tests nuevos.
+
+Línea base: `./init.sh` exit 0 (25 OK), `test` **889**, `test:db` **143**.

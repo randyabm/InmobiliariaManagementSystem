@@ -67,6 +67,29 @@ class TransportePaneles implements Transporte {
       this.renovado = true;
       return { status: 201, cuerpo: { id: 'c2' } };
     }
+    if (peticion.ruta === '/tickets') {
+      return {
+        status: 200,
+        cuerpo: [{ id: 't1', propiedad_id: 'p1', categoria: 'PLOMERIA', descripcion: 'Fuga', estado: 'recibida', created_at: '2026-08-01' }],
+      };
+    }
+    if (peticion.ruta === '/pagos/importaciones') {
+      return {
+        status: 200,
+        cuerpo: [{ id: 'imp-1', nombre_archivo: 'pagos.csv', estado: 'procesada', total_registros: 2 }],
+      };
+    }
+    if (peticion.ruta.startsWith('/pagos/importaciones/imp-1')) {
+      return {
+        status: 200,
+        cuerpo: {
+          sugeridos: [{ id: 'r1', valor: '1500000', referencia_texto: 'ARR-1', confianza: 0.95 }],
+          sin_identificar: [],
+          pendientes: [],
+          duplicados: [],
+        },
+      };
+    }
     if (peticion.ruta === '/plantillas') {
       return {
         status: 200,
@@ -140,6 +163,26 @@ describe('Paneles web (T4–T7: R2–R5)', () => {
     await waitFor(() => {
       expect(transporte.llamadas).toContain('POST /plantillas/pl-1/clonar');
     });
+  });
+
+  it('Tickets: navega al panel y muestra los tickets (R5)', async () => {
+    const transporte = new TransportePaneles();
+    await entrar(transporte);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Tickets' }));
+    expect(await screen.findByText('PLOMERIA')).toBeInTheDocument();
+    expect(screen.getByText('recibida')).toBeInTheDocument();
+    expect(transporte.llamadas).toContain('GET /tickets');
+  });
+
+  it('Pagos: navega y muestra las importaciones con su detalle (R6)', async () => {
+    const transporte = new TransportePaneles();
+    await entrar(transporte);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Pagos' }));
+    expect(await screen.findByText('pagos.csv')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Ver' }));
+    expect(await screen.findByText(/Sugeridos: 1/)).toBeInTheDocument();
   });
 
   it('Cerrar sesión limpia el refresh (R6)', async () => {

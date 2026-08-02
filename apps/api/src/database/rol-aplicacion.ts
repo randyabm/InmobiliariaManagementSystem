@@ -35,8 +35,9 @@ import { Pool } from 'pg';
  *   previa al tenant (R18, feature #27), en `notificaciones_pendientes`,
  *   la única ruta del procesador de notificaciones (R3, feature #10), y en
  *   `invitacion_por_token`, la única ruta de la invitación previa al tenant
- *   (R53, feature #13). Todas se revocan de PUBLIC en su migración y se
- *   conceden aquí, explícitamente.
+ *   (R53, feature #13), y `tenant_dominio_por_origen`, la única ruta del
+ *   CORS por tenant previa al contexto (R54, feature #32). Todas se
+ *   revocan de PUBLIC en su migración y se conceden aquí, explícitamente.
  * - **`DELETE` en ninguna tabla.** No hace falta: todas las bajas son lógicas
  *   (R14, R21) y las entidades con valor legal son inmutables. Negarlo en el
  *   motor convierte esa convención en una barrera real.
@@ -123,6 +124,7 @@ export async function asegurarRolDeAplicacion(
       `GRANT EXECUTE ON FUNCTION notificaciones_tenants_a_procesar() TO ${rol}`,
     );
     await pool.query(`GRANT EXECUTE ON FUNCTION invitacion_por_token(text) TO ${rol}`);
+    await pool.query(`GRANT EXECUTE ON FUNCTION tenant_dominio_por_origen(text) TO ${rol}`);
   } finally {
     await pool.end();
   }

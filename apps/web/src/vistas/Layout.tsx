@@ -4,6 +4,8 @@ export type Vista =
   | 'dashboard'
   | 'inventarios'
   | 'contratos'
+  | 'tickets'
+  | 'pagos'
   | 'clientes'
   | 'plantillas';
 
@@ -22,6 +24,8 @@ export function Layout(props: {
     { clave: 'dashboard', etiqueta: 'Dashboard' },
     { clave: 'inventarios', etiqueta: 'Inventarios' },
     { clave: 'contratos', etiqueta: 'Contratos' },
+    { clave: 'tickets', etiqueta: 'Tickets' },
+    { clave: 'pagos', etiqueta: 'Pagos' },
     { clave: 'clientes', etiqueta: 'Clientes' },
     { clave: 'plantillas', etiqueta: 'Plantillas' },
   ];
