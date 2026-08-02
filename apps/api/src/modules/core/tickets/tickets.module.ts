@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 
 import { AuditModule } from '../audit/audit.module';
+import { NotificacionesModule } from '../notificaciones/notificaciones.module';
 import { WorkflowsModule } from '../workflows/workflows.module';
 import { TicketsController } from './tickets.controller';
 import { TicketsService } from './tickets.service';
@@ -10,7 +11,7 @@ import { TicketsService } from './tickets.service';
  * #7 (PA-31-1); scoping por rol en el servicio (RF-M7).
  */
 @Module({
-  imports: [AuditModule, WorkflowsModule],
+  imports: [AuditModule, WorkflowsModule, NotificacionesModule],
   controllers: [TicketsController],
   providers: [TicketsService],
   exports: [TicketsService],

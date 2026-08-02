@@ -30,19 +30,21 @@ export class RenovacionesService {
     umbrales_dias: number[];
     avisar_a: string[];
     ipc_anual: number;
+    dias_gracia: number;
   }> {
     const { rows } = await ctx.cliente.query<{
       umbrales_dias: unknown;
       avisar_a: unknown;
       ipc_anual: string;
+      dias_gracia: number;
     }>(
-      `SELECT umbrales_dias, avisar_a, ipc_anual::text AS ipc_anual
+      `SELECT umbrales_dias, avisar_a, ipc_anual::text AS ipc_anual, dias_gracia
          FROM config_renovacion WHERE tenant_id = $1`,
       [ctx.tenantId],
     );
     const fila = rows[0];
     if (!fila) {
-      return { umbrales_dias: [90, 60, 30], avisar_a: ['admin', 'asesor'], ipc_anual: 0 };
+      return { umbrales_dias: [90, 60, 30], avisar_a: ['admin', 'asesor'], ipc_anual: 0, dias_gracia: 5 };
     }
     return {
       umbrales_dias: Array.isArray(fila.umbrales_dias)
@@ -50,27 +52,30 @@ export class RenovacionesService {
         : [90, 60, 30],
       avisar_a: Array.isArray(fila.avisar_a) ? (fila.avisar_a as string[]) : ['admin', 'asesor'],
       ipc_anual: Number(fila.ipc_anual),
+      dias_gracia: fila.dias_gracia ?? 5,
     };
   }
 
   /** R1 — guardar la configuración. */
   async guardarConfiguracion(
     ctx: ContextoPeticion,
-    datos: { umbrales_dias?: number[]; avisar_a?: string[]; ipc_anual?: number },
+    datos: { umbrales_dias?: number[]; avisar_a?: string[]; ipc_anual?: number; dias_gracia?: number },
   ): Promise<void> {
     const actual = await this.obtenerConfiguracion(ctx);
     const umbrales = datos.umbrales_dias ?? actual.umbrales_dias;
     const avisarA = datos.avisar_a ?? actual.avisar_a;
     const ipc = datos.ipc_anual ?? actual.ipc_anual;
+    const diasGracia = datos.dias_gracia ?? actual.dias_gracia;
     await ctx.cliente.query(
-      `INSERT INTO config_renovacion (tenant_id, umbrales_dias, avisar_a, ipc_anual, updated_at)
-       VALUES ($1, $2, $3, $4, now())
+      `INSERT INTO config_renovacion (tenant_id, umbrales_dias, avisar_a, ipc_anual, dias_gracia, updated_at)
+       VALUES ($1, $2, $3, $4, $5, now())
        ON CONFLICT (tenant_id) DO UPDATE
          SET umbrales_dias = EXCLUDED.umbrales_dias,
              avisar_a = EXCLUDED.avisar_a,
              ipc_anual = EXCLUDED.ipc_anual,
+             dias_gracia = EXCLUDED.dias_gracia,
              updated_at = now()`,
-      [ctx.tenantId, JSON.stringify(umbrales), JSON.stringify(avisarA), ipc],
+      [ctx.tenantId, JSON.stringify(umbrales), JSON.stringify(avisarA), ipc, diasGracia],
     );
   }
 

@@ -334,16 +334,24 @@ export class ImportacionesService {
         ORDER BY fecha_movimiento`,
       [ctx.tenantId, contractId],
     );
-    // Morosidad simple (PA-30-3): canon esperado sin pago conciliado en el
-    // mes corriente.
+    // Morosidad con días de gracia configurables (PA-30-3, RF-PA13): el
+    // canon esperado vence cada 30 días desde la fecha de inicio; si el
+    // último pago conciliado es anterior a (ventana + gracia), es moroso.
     const { rows: canon } = await ctx.cliente.query<{ canon: string }>(
       `SELECT canon::text AS canon FROM propiedad p JOIN contract c ON c.property_id = p.id
         WHERE c.id = $1 AND p.tenant_id = $2`,
       [contractId, ctx.tenantId],
     );
+    const { rows: config } = await ctx.cliente.query<{ dias_gracia: number }>(
+      `SELECT dias_gracia FROM config_renovacion WHERE tenant_id = $1`,
+      [ctx.tenantId],
+    );
+    const diasGracia = config[0]?.dias_gracia ?? 5;
+    const ultimoPago = rows.length > 0 ? new Date(rows[rows.length - 1]!.fecha_movimiento) : null;
     const moroso =
-      (rows.length === 0 || new Date(rows[rows.length - 1]!.fecha_movimiento).getMonth() !== new Date().getMonth()) &&
-      canon[0] !== undefined;
+      canon[0] !== undefined &&
+      (ultimoPago === null ||
+        Date.now() - ultimoPago.getTime() > (30 + diasGracia) * 86_400_000);
     return { contract_id: contractId, pagos: rows.map(aRegistro), moroso };
   }
 

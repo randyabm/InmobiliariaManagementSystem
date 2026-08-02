@@ -4,6 +4,7 @@ import type { TicketResumen } from '@inmobiliaria/types';
 import type { ContextoPeticion } from '../../../common/database/cliente-tenant';
 import { rolEfectivo } from '../../../common/database/cliente-tenant';
 import { ResourceNotFoundError } from '../../../common/errors';
+import { NotificacionesOutboxService } from '../notificaciones/notificaciones-outbox.service';
 import { WorkflowService } from '../workflows/workflow.service';
 
 /**
@@ -15,7 +16,10 @@ import { WorkflowService } from '../workflows/workflow.service';
  */
 @Injectable()
 export class TicketsService {
-  constructor(private readonly workflow: WorkflowService) {}
+  constructor(
+    private readonly workflow: WorkflowService,
+    private readonly outbox: NotificacionesOutboxService,
+  ) {}
 
   /** R1 — crear una solicitud (scoping del inquilino por contrato vigente). */
   async crear(
@@ -220,6 +224,7 @@ export class TicketsService {
     );
     const transicion = transiciones.find((t) => t.clave === clave);
     if (!transicion) throw new ResourceNotFoundError();
+    const antes = instancia.estado_actual_id;
     try {
       await this.workflow.ejecutarTransicion(
         instancia.id,
@@ -232,6 +237,50 @@ export class TicketsService {
       if (error instanceof BadRequestException) throw error;
       throw new ResourceNotFoundError();
     }
+    // RF-M3: cada cambio de estado notifica al solicitante por el motor de
+    // #10 (canal CORREO con el email del solicitante; RF-C4 en su
+    // variante mínima).
+    await this.notificarCambio(ctx, instanciaId, antes, clave);
+  }
+
+  /** RF-M3 — notificar al solicitante el cambio de estado del ticket. */
+  private async notificarCambio(
+    ctx: ContextoPeticion,
+    instanciaId: string,
+    estadoAnteriorId: string,
+    clave: string,
+  ): Promise<void> {
+    const { rows } = await ctx.cliente.query<{
+      solicitante_user_id: string;
+      email: string | null;
+      estado: string;
+      descripcion: string;
+    }>(
+      `SELECT i.contexto->>'solicitante_user_id' AS solicitante_user_id,
+              u.email,
+              e.clave AS estado,
+              i.contexto->>'descripcion' AS descripcion
+         FROM workflow_instancia i
+         JOIN "user" u ON u.id = (i.contexto->>'solicitante_user_id')::uuid
+         JOIN workflow_estado e ON e.id = i.estado_actual_id
+        WHERE i.id = $1 AND i.tenant_id = $2`,
+      [instanciaId, ctx.tenantId],
+    );
+    const fila = rows[0];
+    if (!fila?.email) return;
+    void estadoAnteriorId;
+    await this.outbox.crear(
+      {
+        destinatario: fila.email,
+        canal: 'CORREO',
+        contenido: {
+          asunto: `Tu ticket cambió a ${fila.estado} (${clave})`,
+          ticket_descripcion: fila.descripcion ?? '',
+          transicion: clave,
+        },
+      },
+      ctx,
+    );
   }
 
   private async visiblePara(

@@ -1035,3 +1035,18 @@ Línea base: `./init.sh` exit 0, `test` **884**, `test:db` **143**.
   tests nuevos.
 
 Línea base: `./init.sh` exit 0 (25 OK), `test` **889**, `test:db` **143**.
+
+### 2026-08-01 — Deudas cerradas: RF-M3, QR del papel, días de gracia y seed demo
+
+- **RF-M3 (notificación de tickets)**: cada cambio de estado encola la
+  notificación al solicitante por el motor de #10 (test + mutación roja).
+- **PA-29-1 (QR)**: el formato en papel incrusta un QR PNG con el ID de
+  vínculo (qrcode + pdf-lib); test del /Subtype /Image.
+- **PA-30-3 (días de gracia)**: `config_renovacion.dias_gracia` (migración
+  0029) configurable por PUT; la morosidad usa 30 días + gracia.
+- **Seed demo** (`npm run db:seed`): tenant, admin, 3 propiedades con
+  ciclo de vida, contrato, inventarios, póliza, pago conciliado y ticket —
+  el panel web se ve con contenido (verificado por curl: dashboard con
+  conteos, tickets, pagos, contratos).
+
+Línea base: `./init.sh` exit 0 (25 OK), `test` **891**, `test:db` **143**.

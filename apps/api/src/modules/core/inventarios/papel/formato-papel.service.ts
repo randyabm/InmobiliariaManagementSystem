@@ -4,9 +4,9 @@ import type { InventarioCompleto } from '@inmobiliaria/types';
 import type { ContextoPeticion } from '../../../../common/database/cliente-tenant';
 import { ResourceNotFoundError } from '../../../../common/errors';
 import { AlmacenamientoService } from '../../almacenamiento/almacenamiento.service';
+import { GeneradorPdfPdfLib, type GeneradorPdf, type PdfGenerado } from '../firma/generador-pdf';
 import { InventariosRepository } from '../inventarios.repository';
 import { AcuerdoIncompletoError } from '../errors/acuerdo-incompleto.error';
-import { GeneradorPdfPdfLib, type GeneradorPdf, type PdfGenerado } from '../firma/generador-pdf';
 
 /**
  * Formato en papel y reconstrucción digital (feature #29, R1–R3, §10.5).
@@ -46,21 +46,38 @@ export class FormatoPapelService {
     const fila = propiedad[0];
     if (!fila) throw new ResourceNotFoundError();
 
+    // PA-29-1: un código QR con el ID de vínculo (para retomar el borrador
+    // en la reconstrucción, RF-I20). El QR se incrusta como imagen PNG.
+    const qr = await generarQr(inventarioId);
+
     const generado = await this.generador.generar({
       propiedad_direccion: fila.direccion,
       propiedad_tipo: fila.tipo,
       tipo_evento: completo.tipo_evento,
       estado: completo.estado,
-      zonas: completo.zonas.map((z) => ({
-        nombre: z.nombre,
-        items: z.items.map((i) => ({
-          nombre: i.nombre,
-          // En papel las respuestas van vacías: las llenan a mano (R1).
-          respuesta: '________',
-          comentario: null,
-          fotos: [],
+      zonas: [
+        {
+          nombre: 'VÍNCULO DEL FORMATO',
+          items: [
+            {
+              nombre: `ID: ${inventarioId}`,
+              respuesta: 'Escaneá el QR o buscá este ID para retomar el borrador.',
+              comentario: null,
+              fotos: [{ binario: qr, mime: 'image/png' }],
+            },
+          ],
+        },
+        ...completo.zonas.map((z) => ({
+          nombre: z.nombre,
+          items: z.items.map((i) => ({
+            nombre: i.nombre,
+            // En papel las respuestas van vacías: las llenan a mano (R1).
+            respuesta: '________',
+            comentario: null,
+            fotos: [],
+          })),
         })),
-      })),
+      ],
     });
 
     return {
@@ -200,4 +217,13 @@ export class FormatoPapelService {
   ): Promise<{ clave: string; hash_sha256: string; tamano_bytes: number }> {
     return this.almacenamiento.subir(binario, mime);
   }
+}
+
+/**
+ * Genera un PNG con el código QR del vínculo (PA-29-1). El binario es
+ * puro: sin dependencias de navegador.
+ */
+async function generarQr(contenido: string): Promise<Buffer> {
+  const qrcode = (await import('qrcode')) as typeof import('qrcode');
+  return qrcode.toBuffer(contenido, { type: 'png', width: 220, margin: 1 });
 }

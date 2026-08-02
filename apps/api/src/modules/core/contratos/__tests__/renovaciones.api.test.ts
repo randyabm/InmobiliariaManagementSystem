@@ -90,10 +90,12 @@ describe('Renovaciones y alertas (#19)', () => {
         umbrales_dias: [120, 90],
         avisar_a: ['admin', 'asesor', 'propietario'],
         ipc_anual: 7.5,
+        dias_gracia: 10,
       });
       expect(guardada.status).toBe(200);
       expect(guardada.body.umbrales_dias).toEqual([120, 90]);
       expect(guardada.body.ipc_anual).toBe(7.5);
+      expect(guardada.body.dias_gracia).toBe(10);
 
       const { rows } = await entorno.poolAdmin.query<{ ipc_anual: string }>(
         `SELECT ipc_anual::text AS ipc_anual FROM config_renovacion WHERE tenant_id = $1`,

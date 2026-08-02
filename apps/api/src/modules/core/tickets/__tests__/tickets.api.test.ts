@@ -234,6 +234,27 @@ describe('Tickets de mantenimiento (#31)', () => {
     });
   });
 
+  // ─── R3 — notificación (RF-M3) ──────────────────────────────────────────
+
+  describe('R3 — notificación (RF-M3)', () => {
+    it('cada cambio de estado encola la notificación al solicitante', async () => {
+      const suf = Date.now().toString().slice(-6);
+      const nuevo = await comoInquilino('post', `/propiedades/${idPropiedad}/tickets`).send({
+        categoria: 'HIDRAULICA',
+        descripcion: `Notificar esto ${suf}`,
+      });
+      await comoAdminA('post', `/tickets/${nuevo.body.id}/transiciones/asignar`);
+
+      const { rows } = await entorno.poolAdmin.query<{ destinatario: string; contenido: unknown }>(
+        `SELECT destinatario, contenido FROM notificacion_pendiente
+          WHERE contenido::text LIKE $1 ORDER BY created_at DESC LIMIT 1`,
+        [`%${suf}%`],
+      );
+      expect(rows[0]?.destinatario).toMatch(/@example.com$/);
+      expect(JSON.stringify(rows[0]?.contenido)).toContain('asignada');
+    });
+  });
+
   // ─── R6 — aislamiento ───────────────────────────────────────────────────
 
   describe('R6 — aislamiento', () => {

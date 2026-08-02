@@ -24,6 +24,7 @@ interface CuerpoConfig {
   umbrales_dias?: unknown;
   avisar_a?: unknown;
   ipc_anual?: unknown;
+  dias_gracia?: unknown;
 }
 
 interface CuerpoRenovar {
@@ -55,7 +56,7 @@ export class RenovacionesController {
   @Roles('admin')
   @Audit('actualizar', 'config_renovacion')
   async guardarConfiguracion(@Body() cuerpo: CuerpoConfig, @Req() request: unknown) {
-    const datos: { umbrales_dias?: number[]; avisar_a?: string[]; ipc_anual?: number } = {};
+    const datos: { umbrales_dias?: number[]; avisar_a?: string[]; ipc_anual?: number; dias_gracia?: number } = {};
     if (Array.isArray(cuerpo.umbrales_dias)) {
       datos.umbrales_dias = cuerpo.umbrales_dias
         .filter((u): u is number => typeof u === 'number' && u > 0)
@@ -68,6 +69,9 @@ export class RenovacionesController {
     }
     if (typeof cuerpo.ipc_anual === 'number' && cuerpo.ipc_anual >= 0) {
       datos.ipc_anual = cuerpo.ipc_anual;
+    }
+    if (typeof cuerpo.dias_gracia === 'number' && cuerpo.dias_gracia >= 0) {
+      datos.dias_gracia = cuerpo.dias_gracia;
     }
     await this.renovaciones.guardarConfiguracion(construirContextoPeticion(request), datos);
     return this.renovaciones.obtenerConfiguracion(construirContextoPeticion(request));

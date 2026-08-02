@@ -89,6 +89,15 @@ describe('Formato en papel (#29)', () => {
       expect(respuesta.headers['x-vinculo-inventario']).toBe(idInventario);
     });
 
+    it('el PDF incluye la imagen del QR incrustada (PA-29-1)', async () => {
+      const respuesta = await comoAdminA('post', `/inventarios/${idInventario}/formato-papel`);
+      expect(respuesta.status).toBe(201);
+      const binario = Buffer.from(respuesta.body);
+      // El QR es una imagen PNG incrustada: los diccionarios de objetos no
+      // van comprimidos, así que /Subtype /Image es visible en crudo.
+      expect(binario.toString('latin1')).toContain('/Subtype /Image');
+    });
+
     it('fuera de BORRADOR → 409', async () => {
       await entorno.poolAdmin.query(
         `UPDATE inventario SET estado = 'ENVIADO' WHERE id = $1`,
